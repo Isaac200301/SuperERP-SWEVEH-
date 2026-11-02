@@ -1282,6 +1282,10 @@ components:
             id: { type: string, format: uuid }
             nombre: { type: string }
         roles: { type: array, items: { type: string, enum: [dueno, recepcion, mecanico] } }
+        permisos:
+          type: array
+          items: { type: string }
+          description: 'Permisos recurso:acción del rol; la UI los usa solo para ocultar, el servidor siempre verifica (R-05)'
         cuentaNueva: { type: boolean }
 
     Cliente:

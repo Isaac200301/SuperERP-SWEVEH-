@@ -954,6 +954,8 @@ export interface components {
                 nombre: string;
             };
             roles: ("dueno" | "recepcion" | "mecanico")[];
+            /** @description Permisos recurso:acción del rol; la UI los usa solo para ocultar, el servidor siempre verifica (R-05) */
+            permisos?: string[];
             cuentaNueva: boolean;
         };
         Cliente: {

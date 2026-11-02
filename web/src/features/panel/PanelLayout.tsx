@@ -3,15 +3,19 @@ import { NavLink, Outlet, useNavigate } from 'react-router';
 import type { Sesion } from '../../shared/api/client';
 import { roles } from '../../shared/i18n/es-CO';
 import { Brand } from '../../shared/ui/Logo';
-import { IconCar, IconLogout, IconOrders, IconTeam, IconTool } from '../../shared/ui/icons';
-import { useLogout } from '../auth/api';
+import { IconCar, IconClock, IconLogout, IconOrders, IconTeam, IconTool } from '../../shared/ui/icons';
+import { can, useLogout } from '../auth/api';
 
-/** Navegación del panel. Solo aparecen las secciones que ya existen (el resto llega con sus HU). */
+/**
+ * Navegación del panel. Solo aparecen las secciones que ya existen y que el rol puede usar
+ * (HU-81: el mecánico no ve configuración). Ocultar no protege: el servidor responde 403 igual.
+ */
 const nav = [
-  { to: '/panel/ordenes', label: 'Órdenes', icon: IconOrders },
-  { to: '/panel/catalogo', label: 'Servicios y repuestos', icon: IconTool },
-  { to: '/panel/equipo', label: 'Equipo', icon: IconTeam },
-  { to: '/panel/taller', label: 'Mi taller', icon: IconCar },
+  { to: '/panel/piso', label: 'Piso', icon: IconClock, perm: 'order:read' },
+  { to: '/panel/ordenes', label: 'Órdenes', icon: IconOrders, perm: 'order:read' },
+  { to: '/panel/catalogo', label: 'Servicios y repuestos', icon: IconTool, perm: 'service:manage' },
+  { to: '/panel/equipo', label: 'Equipo', icon: IconTeam, perm: 'user:manage' },
+  { to: '/panel/taller', label: 'Mi taller', icon: IconCar, perm: 'workshop:manage' },
 ];
 
 export function PanelLayout({ session }: { session: Sesion }) {
@@ -24,7 +28,7 @@ export function PanelLayout({ session }: { session: Sesion }) {
           <Brand subtitle={session.taller.nombre} />
         </div>
         <nav aria-label="Secciones del panel" className="flex flex-row gap-2 md:flex-col">
-          {nav.map((n) => (
+          {nav.filter((n) => can(session, n.perm)).map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
