@@ -123,21 +123,6 @@ type OrderView struct {
 }
 
 // Recent lista las órdenes más recientes (panel, HU-23 más adelante).
-func (s *Service) Recent(ctx context.Context, tallerID shared.ID, limit int, cursor *ports.Cursor) ([]OrderView, error) {
-	if limit <= 0 || limit > 100 {
-		limit = 25
-	}
-	var out []OrderView
-	err := s.uow.Do(ctx, func(ctx context.Context) error {
-		list, err := s.repo.Recent(ctx, tallerID, limit, cursor)
-		if err != nil {
-			return err
-		}
-		out, err = s.decorate(ctx, tallerID, list)
-		return err
-	})
-	return out, err
-}
 
 // decorate agrega cliente y vehículo pidiéndolos por lotes a sus fachadas (sin N+1).
 func (s *Service) decorate(ctx context.Context, tallerID shared.ID, list []domain.Order) ([]OrderView, error) {
