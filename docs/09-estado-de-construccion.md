@@ -50,7 +50,7 @@
 | HU-20 | Mover la orden por sus estados | T1 | sí | 🟦 En curso | | Código ya existe (dominio, caso de uso, HTTP). Criterios 1–4 con prueba: dominio (`orders/domain/flow_test.go`) y HTTP (`server/flow_test.go`: saltos, 409 por versión, falta de cotización, historial con usuario y hora). 2026-11-02: corregido que devolverse a Recibido pedía el checklist. Falta: prueba del permiso del mecánico (sin anulación del dueño) y pantalla del piso |
 | HU-21 | Agregar fotos y notas en cualquier momento | T1 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-22 | Asignar mecánico y fecha prometida | T6 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
-| HU-23 | Ver mis órdenes en el celular | T1 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
+| HU-23 | Ver mis órdenes en el celular | T1 | sí | 🟦 En curso | | Criterios 1 y 2 con prueba HTTP; vista "Piso" en el panel (2026-11-02). Falta PWA instalable |
 | HU-24 | Ver la conversación de WhatsApp dentro de la orden | T2 | sí | ⬜ Pendiente | | |
 | HU-25 | Entregar el vehículo | T1 | sí | ⬜ Pendiente | | |
 | HU-26 | Cancelar una orden que no siguió | T6 | no | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
@@ -108,7 +108,7 @@
 | HU-78 | Hacerle preguntas libres al asistente | T7 | no | ⬜ Pendiente | | |
 | HU-79 | Que mis datos no los vea otro taller | T0 | no | 🟦 En curso | | RLS forzado + `SET LOCAL` probado (incluida meta-prueba de todas las tablas) y 404 entre talleres por HTTP. Falta: "el intento queda registrado" (criterio 1) y repetir contra el pooler de Supabase |
 | HU-80 | Agregar a mi mecánico | T0 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
-| HU-81 | Ver solo lo que me toca como mecánico | T0 | sí | ⬜ Pendiente | | |
+| HU-81 | Ver solo lo que me toca como mecánico | T0 | sí | 🟦 En curso | | Criterios 1 y 2 con prueba HTTP (`mechanic_test.go`): sin costo ni permisos de dinero, 403 en configuración. Menú y botones según permisos |
 | HU-82 | Trabajar como recepción | T6 | no | ⬜ Pendiente | | |
 | HU-83 | Ocultar la gestión de usuarios si trabajo solo | T6 | no | ⬜ Pendiente | | |
 | HU-84 | Desactivar a un usuario que se va | T6 | no | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
