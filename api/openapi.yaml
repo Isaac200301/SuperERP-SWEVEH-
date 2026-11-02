@@ -500,10 +500,20 @@ paths:
   /orders/{id}/quote:
     get:
       operationId: getQuote
-      summary: Cotización de la orden (HU-27). Permiso quote:read
+      summary: Cotización vigente de la orden; si aún no hay, devuelve {"cotizacion":null} (HU-27). Permiso quote:read
       parameters: [{ $ref: '#/components/parameters/Id' }]
       responses:
-        '200': { $ref: '#/components/responses/Cotizacion' }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/Cotizacion' }
+                  - type: object
+                    required: [cotizacion]
+                    properties:
+                      cotizacion: { type: object, nullable: true }
         '404': { $ref: '#/components/responses/Problem' }
 
   /orders/{id}/quote/lines:
@@ -565,7 +575,7 @@ paths:
               type: object
               required: [decision, canal]
               properties:
-                decision: { type: string }
+                decision: { type: string, enum: [aprobar, rechazar, dudas] }
                 canal: { type: string, enum: [telefono, mostrador] }
                 itemsAprobados: { type: array, items: { type: string, format: uuid } }
       responses:
