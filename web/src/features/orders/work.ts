@@ -37,6 +37,15 @@ export function useTransition(id: string) {
   });
 }
 
+/** HU-23: primero las asignadas a mí por fecha prometida; si el taller no asigna, todas las abiertas (Q-14). */
+export function useMyOrders() {
+  return useQuery({
+    queryKey: [...ordersKey, 'mias'],
+    queryFn: async () => unwrap(await api.GET('/orders/mine')).ordenes,
+    refetchInterval: 30_000,
+  });
+}
+
 export function useChecklist(id: string) {
   return useQuery({
     queryKey: keys.checklist(id),
