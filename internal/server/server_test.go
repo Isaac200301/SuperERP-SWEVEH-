@@ -28,6 +28,7 @@ import (
 	"sweveh/internal/platform/authn"
 	"sweveh/internal/platform/clock"
 	"sweveh/internal/platform/db"
+	"sweveh/internal/platform/storage"
 	"sweveh/internal/platform/testdb"
 	"sweveh/internal/server"
 	"sweveh/internal/shared"
@@ -41,6 +42,7 @@ type env struct {
 	log *slog.Logger
 	clk *clock.Fake
 	mux *chi.Mux
+	st  storage.Store
 }
 
 func newEnv(t *testing.T) *env {
@@ -53,6 +55,10 @@ func newEnv(t *testing.T) *env {
 	clk := clock.NewFake(time.Now())
 	mem := otp.NewMemory()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	st, err := storage.NewLocal(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	// El origen permitido se conoce antes de arrancar: se arma el router y luego se inicia TLS.
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
@@ -61,12 +67,12 @@ func newEnv(t *testing.T) *env {
 		Signer:    authn.NewSigner(key, "test-1", clk),
 		Verifier:  authn.NewVerifier(map[string]*ecdsa.PublicKey{"test-1": &key.PublicKey}, clk),
 		OTPSender: mem, OTPPepper: []byte("pepper-de-pruebas-de-32-caracteres!!"),
-		AllowedOrigins: []string{origin}, LoginPerMinute: 100000,
+		AllowedOrigins: []string{origin}, LoginPerMinute: 100000, Storage: st,
 	})
 	srv.Config.Handler = mux
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
-	return &env{t: t, srv: srv, otp: mem, db: d, log: log, clk: clk, mux: mux}
+	return &env{t: t, srv: srv, otp: mem, db: d, log: log, clk: clk, mux: mux, st: st}
 }
 
 type client struct {
