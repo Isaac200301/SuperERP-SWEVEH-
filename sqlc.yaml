@@ -1,0 +1,87 @@
+# sqlc: SQL escrito a mano, código Go generado (ADR-08). Un paquete por módulo;
+# los structs generados no salen del adaptador (skill sweveh-db-migraciones-sqlc §3).
+version: "2"
+overrides:
+  go:
+    overrides:
+      - db_type: uuid
+        go_type: github.com/google/uuid.UUID
+      - db_type: uuid
+        nullable: true
+        go_type:
+          import: github.com/google/uuid
+          type: UUID
+          pointer: true
+      - db_type: timestamptz
+        go_type: time.Time
+      - db_type: timestamptz
+        nullable: true
+        go_type:
+          import: time
+          type: Time
+          pointer: true
+      - db_type: pg_catalog.timestamptz
+        go_type: time.Time
+      - db_type: pg_catalog.timestamptz
+        nullable: true
+        go_type:
+          import: time
+          type: Time
+          pointer: true
+      - db_type: jsonb
+        go_type: encoding/json.RawMessage
+      - db_type: jsonb
+        nullable: true
+        go_type: encoding/json.RawMessage
+sql:
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/tenancy.sql
+    gen:
+      go: &go
+        package: sqlcgen
+        out: internal/tenancy/adapters/out/postgres/sqlcgen
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/identity.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/identity/adapters/out/postgres/sqlcgen
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/customers.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/customers/adapters/out/postgres/sqlcgen
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/vehicles.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/vehicles/adapters/out/postgres/sqlcgen
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/orders.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/orders/adapters/out/postgres/sqlcgen
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/audit.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/audit/adapters/out/postgres/sqlcgen
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/outbox.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/outbox/adapters/out/postgres/sqlcgen

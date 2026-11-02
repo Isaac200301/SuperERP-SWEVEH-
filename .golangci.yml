@@ -1,0 +1,72 @@
+# golangci-lint v2. depguard hace cumplir lo mismo que internal/arch_test.go desde el linter
+# (docs/06 §4.1). Desactivar una regla para poner el pipeline en verde está prohibido (docs/02 §3.4).
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard
+  enable:
+    - depguard
+    - errorlint
+    - gosec
+    - bodyclose
+    - noctx
+    - unconvert
+    - revive
+  # misspell no se activa: revisa ortografía en inglés y los comentarios y mensajes del
+  # proyecto van en español de Colombia por convención (docs/08 §3). Revisado el 2026-11-01.
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+    gosec:
+      excludes:
+        # G115 (conversión de enteros) se revisa a mano: los int32 vienen de columnas con CHECK.
+        - G115
+    depguard:
+      rules:
+        domain:
+          list-mode: lax
+          files: ["**/internal/*/domain/**"]
+          deny:
+            - pkg: github.com/jackc/pgx
+              desc: "el dominio no conoce la base de datos"
+            - pkg: net/http
+              desc: "el dominio no conoce HTTP"
+            - pkg: log/slog
+              desc: "el dominio no registra logs"
+            - pkg: sweveh/internal/platform
+              desc: "el dominio no depende de la plataforma"
+        app:
+          list-mode: lax
+          files: ["**/internal/*/app/**", "**/internal/*/ports/**"]
+          deny:
+            - pkg: github.com/jackc/pgx
+              desc: "los casos de uso hablan con puertos, no con la base"
+            - pkg: net/http
+              desc: "los casos de uso no conocen HTTP"
+            - pkg: github.com/go-chi
+              desc: "los casos de uso no conocen el router"
+  exclusions:
+    generated: strict
+    paths:
+      - ".*/sqlcgen/.*"
+    rules:
+      # Las pruebas pueden usar contraseñas y URLs de desarrollo (Ficticio).
+      - path: _test\.go
+        linters: [gosec, noctx]
+      - path: internal/platform/testdb/
+        linters: [gosec]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes: [sweveh]

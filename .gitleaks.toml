@@ -1,0 +1,14 @@
+# gitleaks: reglas por defecto + exclusión de cachés locales que no son código del proyecto.
+# Justificación (docs/02 §7): .cache/ guarda la caché de módulos de Go (llaves de prueba de
+# librerías de terceros) y node_modules/ las dependencias de npm; ambas están en .gitignore y
+# nunca llegan al repositorio. Revisado el 2026-11-01; revisar si cambia la estructura.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Cachés locales y dependencias de terceros (no versionadas)"
+paths = [
+  '''(^|/)\.cache/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)web/dist/''',
+]
