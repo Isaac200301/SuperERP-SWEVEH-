@@ -13,6 +13,9 @@ const PolicyPage = page(() => import('../features/auth/PolicyPage'), 'PolicyPage
 const OrdersPage = page(() => import('../features/orders/OrdersPage'), 'OrdersPage');
 const NewOrderPage = page(() => import('../features/orders/NewOrderPage'), 'NewOrderPage');
 const OrderDetailPage = page(() => import('../features/orders/OrderDetailPage'), 'OrderDetailPage');
+const CatalogPage = page(() => import('../features/catalog/CatalogPage'), 'CatalogPage');
+const TeamPage = page(() => import('../features/team/TeamPage'), 'TeamPage');
+const WorkshopPage = page(() => import('../features/workshop/WorkshopPage'), 'WorkshopPage');
 
 function Lazy({ Page }: { Page: LazyExoticComponent<ComponentType> }) {
   return (
@@ -41,6 +44,9 @@ export const router = createBrowserRouter([
       { path: 'ordenes', element: <Lazy Page={OrdersPage} /> },
       { path: 'ordenes/nueva', element: <Lazy Page={NewOrderPage} /> },
       { path: 'ordenes/:id', element: <Lazy Page={OrderDetailPage} /> },
+      { path: 'catalogo', element: <Lazy Page={CatalogPage} /> },
+      { path: 'equipo', element: <Lazy Page={TeamPage} /> },
+      { path: 'taller', element: <Lazy Page={WorkshopPage} /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
