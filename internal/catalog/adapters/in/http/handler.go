@@ -76,12 +76,12 @@ func (h *Handler) create(r *http.Request, p reqctx.Principal) (int, any, error) 
 
 // patchReq usa punteros dobles para distinguir "no vino" de "vino en null" (quitar el precio).
 type patchReq struct {
-	Nombre      *string         `json:"nombre"`
-	Tipo        *string         `json:"tipoVehiculo"`
+	Nombre      *string               `json:"nombre"`
+	Tipo        *string               `json:"tipoVehiculo"`
 	Precio      httpx.Optional[int64] `json:"precio"`
 	DuracionMin httpx.Optional[int]   `json:"duracionMin"`
-	Activo      *bool           `json:"activo"`
-	Version     int             `json:"version"`
+	Activo      *bool                 `json:"activo"`
+	Version     int                   `json:"version"`
 }
 
 func (h *Handler) update(r *http.Request, p reqctx.Principal) (int, any, error) {

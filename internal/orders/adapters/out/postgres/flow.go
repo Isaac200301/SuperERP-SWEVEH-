@@ -15,24 +15,24 @@ import (
 type Flow struct{}
 
 type orderRow struct {
-	ID          shared.ID  `db:"id"`
-	TallerID    shared.ID  `db:"taller_id"`
-	Numero      int        `db:"numero"`
-	VehiculoID  shared.ID  `db:"vehiculo_id"`
-	ClienteID   shared.ID  `db:"cliente_id"`
-	Placa       string     `db:"placa"`
-	Tipo        string     `db:"tipo_vehiculo"`
-	Estado      string     `db:"estado"`
-	Sintoma     string     `db:"sintoma"`
-	Version     int        `db:"version"`
-	CreatedAt   time.Time  `db:"created_at"`
-	CreatedBy   *shared.ID `db:"created_by"`
-	MecanicoID  *shared.ID `db:"mecanico_id"`
-	Prometida   *time.Time `db:"fecha_prometida"`
-	Ejemplo     bool       `db:"ejemplo"`
-	EntregadoA  *string    `db:"entregado_a"`
-	MotivoCanc  *string    `db:"motivo_cancelacion"`
-	CerradaEn   *time.Time `db:"cerrada_en"`
+	ID         shared.ID  `db:"id"`
+	TallerID   shared.ID  `db:"taller_id"`
+	Numero     int        `db:"numero"`
+	VehiculoID shared.ID  `db:"vehiculo_id"`
+	ClienteID  shared.ID  `db:"cliente_id"`
+	Placa      string     `db:"placa"`
+	Tipo       string     `db:"tipo_vehiculo"`
+	Estado     string     `db:"estado"`
+	Sintoma    string     `db:"sintoma"`
+	Version    int        `db:"version"`
+	CreatedAt  time.Time  `db:"created_at"`
+	CreatedBy  *shared.ID `db:"created_by"`
+	MecanicoID *shared.ID `db:"mecanico_id"`
+	Prometida  *time.Time `db:"fecha_prometida"`
+	Ejemplo    bool       `db:"ejemplo"`
+	EntregadoA *string    `db:"entregado_a"`
+	MotivoCanc *string    `db:"motivo_cancelacion"`
+	CerradaEn  *time.Time `db:"cerrada_en"`
 }
 
 const orderCols = `id, taller_id, numero, vehiculo_id, cliente_id, placa, tipo_vehiculo, estado, sintoma, version, created_at,

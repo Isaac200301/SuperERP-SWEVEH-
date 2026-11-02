@@ -8,11 +8,11 @@ import (
 )
 
 var (
-	ErrNotFound     = shared.NotFound("servicio_no_encontrado", "No encontramos ese servicio en tu taller.")
-	ErrName         = shared.Validation("servicio_nombre", "El servicio necesita un nombre de hasta 120 letras.").WithField("nombre")
-	ErrKind         = shared.Validation("servicio_tipo", "Indica si el servicio es de carro, de moto o de ambos.").WithField("tipoVehiculo")
-	ErrPrice        = shared.Validation("servicio_precio", "El precio va en pesos, sin decimales y no negativo.").WithField("precio")
-	ErrDuration     = shared.Validation("servicio_duracion", "La duración va en minutos, mayor que cero.").WithField("duracionMin")
+	ErrNotFound = shared.NotFound("servicio_no_encontrado", "No encontramos ese servicio en tu taller.")
+	ErrName     = shared.Validation("servicio_nombre", "El servicio necesita un nombre de hasta 120 letras.").WithField("nombre")
+	ErrKind     = shared.Validation("servicio_tipo", "Indica si el servicio es de carro, de moto o de ambos.").WithField("tipoVehiculo")
+	ErrPrice    = shared.Validation("servicio_precio", "El precio va en pesos, sin decimales y no negativo.").WithField("precio")
+	ErrDuration = shared.Validation("servicio_duracion", "La duración va en minutos, mayor que cero.").WithField("duracionMin")
 )
 
 // Service es un servicio que el taller ofrece. Precio nil = "el taller te confirma el valor" (HU-07).

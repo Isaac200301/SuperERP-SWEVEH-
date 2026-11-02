@@ -96,8 +96,8 @@ type Action struct {
 // AICall es el registro de cada llamada al clasificador (HU-99).
 type AICall struct {
 	Provider, Model, Purpose, Result string
-	TokensIn, TokensOut, LatencyMs  int
-	CostMicroUSD                    int64
+	TokensIn, TokensOut, LatencyMs   int
+	CostMicroUSD                     int64
 }
 
 type Repository interface {
@@ -130,8 +130,6 @@ type Service struct {
 func NewService(u UnitOfWork, r Repository, t Taller, a AuditLog, c Clock, monthlyCapMicroUSD int64) *Service {
 	return &Service{uow: u, repo: r, taller: t, audit: a, clock: c, capUSD: monthlyCapMicroUSD}
 }
-
-var agentActor = shared.Actor{Type: shared.ActorAgent}
 
 // Textos de plantilla (llenos con datos; no son redacción de IA, por eso pueden salir solos, RF-18).
 const (
@@ -400,7 +398,9 @@ func (s *Service) classify(ctx context.Context, tallerID shared.ID, text string,
 	return intent, err
 }
 
-func monthStart(t time.Time) time.Time { return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC) }
+func monthStart(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
+}
 
 func (s *Service) saveDraft(ctx context.Context, tallerID shared.ID, in Inbound, intent, text string, src []domain.Source, a *Action, origin string) error {
 	if src == nil {

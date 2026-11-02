@@ -15,21 +15,21 @@ import (
 type Repository struct{}
 
 type row struct {
-	ID         shared.ID       `db:"id"`
-	TallerID   shared.ID       `db:"taller_id"`
-	ConvID     shared.ID       `db:"conversacion_id"`
-	InboundID  shared.ID       `db:"mensaje_entrante_id"`
-	Intencion  string          `db:"intencion"`
-	Propuesto  string          `db:"texto_propuesto"`
-	Final      *string         `db:"texto_final"`
-	Fuentes    json.RawMessage `db:"fuentes"`
-	Accion     json.RawMessage `db:"accion"`
-	Estado     string          `db:"estado"`
-	Origen     string          `db:"origen"`
-	CreatedAt  time.Time       `db:"created_at"`
-	Resuelto   *time.Time      `db:"resuelto_en"`
-	Entrante   *string         `db:"entrante"`
-	Celular    string          `db:"celular"`
+	ID        shared.ID       `db:"id"`
+	TallerID  shared.ID       `db:"taller_id"`
+	ConvID    shared.ID       `db:"conversacion_id"`
+	InboundID shared.ID       `db:"mensaje_entrante_id"`
+	Intencion string          `db:"intencion"`
+	Propuesto string          `db:"texto_propuesto"`
+	Final     *string         `db:"texto_final"`
+	Fuentes   json.RawMessage `db:"fuentes"`
+	Accion    json.RawMessage `db:"accion"`
+	Estado    string          `db:"estado"`
+	Origen    string          `db:"origen"`
+	CreatedAt time.Time       `db:"created_at"`
+	Resuelto  *time.Time      `db:"resuelto_en"`
+	Entrante  *string         `db:"entrante"`
+	Celular   string          `db:"celular"`
 }
 
 func (r row) record() app.DraftRecord {

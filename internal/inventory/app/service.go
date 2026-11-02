@@ -23,13 +23,13 @@ type Repository interface {
 
 // Movement es un movimiento del libro de inventario.
 type Movement struct {
-	TallerID  shared.ID
-	PartID    shared.ID
-	Qty       int // positivo entra, negativo sale
-	Reason    string
-	OrderID   *shared.ID
-	LineID    *shared.ID
-	UserID    *shared.ID
+	TallerID shared.ID
+	PartID   shared.ID
+	Qty      int // positivo entra, negativo sale
+	Reason   string
+	OrderID  *shared.ID
+	LineID   *shared.ID
+	UserID   *shared.ID
 }
 
 type UnitOfWork interface {

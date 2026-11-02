@@ -12,11 +12,11 @@ import (
 const ContractVersionDraft = "contrato-transmision-borrador-2026-11-01"
 
 var (
-	ErrAttends   = shared.Validation("atiende_requerido", "Elige qué vehículos atiendes: carros, motos o ambos.").WithField("atiende")
-	ErrSize      = shared.Validation("tamano_invalido", "Elige cuántos trabajan: solo yo, 2 a 5 o 6 o más.").WithField("tamano")
-	ErrCity      = shared.Validation("ciudad_invalida", "La ciudad puede tener hasta 80 letras.").WithField("ciudad")
-	ErrContract  = shared.Rule("contrato_requerido", "Para continuar acepta el contrato de transmisión de datos con SWEVEH.").WithField("contratoAceptado")
-	ErrSchedule  = shared.Validation("horario_invalido", "Usa horas como 08:00 y la hora de cierre después de la de apertura.").WithField("horario")
+	ErrAttends  = shared.Validation("atiende_requerido", "Elige qué vehículos atiendes: carros, motos o ambos.").WithField("atiende")
+	ErrSize     = shared.Validation("tamano_invalido", "Elige cuántos trabajan: solo yo, 2 a 5 o 6 o más.").WithField("tamano")
+	ErrCity     = shared.Validation("ciudad_invalida", "La ciudad puede tener hasta 80 letras.").WithField("ciudad")
+	ErrContract = shared.Rule("contrato_requerido", "Para continuar acepta el contrato de transmisión de datos con SWEVEH.").WithField("contratoAceptado")
+	ErrSchedule = shared.Validation("horario_invalido", "Usa horas como 08:00 y la hora de cierre después de la de apertura.").WithField("horario")
 )
 
 var Days = []string{"lun", "mar", "mie", "jue", "vie", "sab", "dom"}

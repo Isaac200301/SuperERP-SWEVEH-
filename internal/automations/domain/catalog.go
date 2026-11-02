@@ -10,15 +10,15 @@ import (
 
 // Definition es una tarjeta del catálogo (docs/03 §M5).
 type Definition struct {
-	Code          string
-	Name          string
-	Trigger       string
-	DefaultOn     bool
-	ComingSoon    bool
-	SendsMessage  bool   // AU-08 es interna: no cuesta mensajes
-	Editable      bool   // el dueño puede editar el texto (HU-42)
-	DefaultText   string
-	Placeholders  []string
+	Code         string
+	Name         string
+	Trigger      string
+	DefaultOn    bool
+	ComingSoon   bool
+	SendsMessage bool // AU-08 es interna: no cuesta mensajes
+	Editable     bool // el dueño puede editar el texto (HU-42)
+	DefaultText  string
+	Placeholders []string
 }
 
 // Catalog: 5 encendidas, 3 apagadas y AU-09 "próximamente" (escena 10; Q-25).

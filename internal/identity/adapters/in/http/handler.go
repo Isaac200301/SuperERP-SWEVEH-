@@ -165,9 +165,9 @@ func (h *Handler) writeSession(w http.ResponseWriter, s app.Session, status int)
 	authn.SetSessionCookies(w, authn.AccessToken{Value: s.AccessToken, ExpiresAt: s.AccessExpires}, s.RefreshToken, s.RefreshExpires)
 	w.Header().Set("Cache-Control", "no-store")
 	httpx.WriteJSON(w, status, sessionResp{
-		Usuario:     userDTO{ID: s.User.ID.String(), Nombre: s.User.Name, Celular: shared.NationalNumber(s.User.Phone)},
-		Taller:      workshopDTO{ID: s.Workshop.ID.String(), Nombre: s.Workshop.Name},
-		Roles:       s.Roles, Permisos: domain.Permissions(s.Roles),
+		Usuario: userDTO{ID: s.User.ID.String(), Nombre: s.User.Name, Celular: shared.NationalNumber(s.User.Phone)},
+		Taller:  workshopDTO{ID: s.Workshop.ID.String(), Nombre: s.Workshop.Name},
+		Roles:   s.Roles, Permisos: domain.Permissions(s.Roles),
 		CuentaNueva: s.NewAccount,
 	})
 }

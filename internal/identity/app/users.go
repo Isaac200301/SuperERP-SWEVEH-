@@ -31,10 +31,10 @@ type Members interface {
 }
 
 var (
-	ErrRole        = shared.Validation("rol_invalido", "El rol debe ser mecánico o recepción.").WithField("rol")
-	ErrMemberNF    = shared.NotFound("usuario_no_encontrado", "Ese usuario no está en tu taller.")
-	ErrSelf        = shared.Rule("no_a_ti_mismo", "No puedes desactivarte ni cambiar tu propio rol.")
-	ErrNotMember   = shared.Forbidden("sin_taller", "No perteneces a ese taller.")
+	ErrRole      = shared.Validation("rol_invalido", "El rol debe ser mecánico o recepción.").WithField("rol")
+	ErrMemberNF  = shared.NotFound("usuario_no_encontrado", "Ese usuario no está en tu taller.")
+	ErrSelf      = shared.Rule("no_a_ti_mismo", "No puedes desactivarte ni cambiar tu propio rol.")
+	ErrNotMember = shared.Forbidden("sin_taller", "No perteneces a ese taller.")
 )
 
 // SetMembers conecta el repositorio de miembros.

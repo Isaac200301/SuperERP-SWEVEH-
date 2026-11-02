@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -28,7 +29,9 @@ func (h *Handler) flowRoutes(r chi.Router) {
 	r.With(h.guard.Require("vehicle:read")).Get("/vehicles/{id}/history", httpx.JSON(h.log, h.history))
 }
 
-func orderID(r *http.Request) (shared.ID, error) { return httpx.PathID(r, "id", domain.ErrOrderNotFound) }
+func orderID(r *http.Request) (shared.ID, error) {
+	return httpx.PathID(r, "id", domain.ErrOrderNotFound)
+}
 
 type transitionReq struct {
 	Estado       string `json:"estado"`
@@ -226,7 +229,7 @@ func (h *Handler) addEvidence(r *http.Request, p reqctx.Principal) (int, any, er
 	done := false
 	for {
 		part, err := mr.NextPart()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -301,9 +304,9 @@ func (h *Handler) mine(r *http.Request, p reqctx.Principal) (int, any, error) {
 }
 
 type historyItemDTO struct {
-	Orden       orderDTO      `json:"orden"`
-	Evidencias  []evidenceDTO `json:"evidencias"`
-	Cotizacion  any           `json:"cotizacion"`
+	Orden      orderDTO      `json:"orden"`
+	Evidencias []evidenceDTO `json:"evidencias"`
+	Cotizacion any           `json:"cotizacion"`
 }
 
 // history es la ficha del vehículo (HU-13). El mecánico ve trabajos, fotos y repuestos, sin dinero.

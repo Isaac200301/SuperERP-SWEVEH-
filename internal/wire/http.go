@@ -59,17 +59,17 @@ func (h *handler) routes(r chi.Router) {
 }
 
 type msgDTO struct {
-	ID         string          `json:"id"`
-	Direccion  string          `json:"direccion"`
-	Tipo       string          `json:"tipo"`
-	Cuerpo     string          `json:"cuerpo"`
-	Payload    json.RawMessage `json:"payload"`
-	Estado     string          `json:"estado"`
-	Origen     string          `json:"origen"`
-	OrdenID    *string         `json:"ordenId"`
-	Automat    *string         `json:"automatizacion"`
-	Error      *string         `json:"error"`
-	CreadoEn   time.Time       `json:"creadoEn"`
+	ID        string          `json:"id"`
+	Direccion string          `json:"direccion"`
+	Tipo      string          `json:"tipo"`
+	Cuerpo    string          `json:"cuerpo"`
+	Payload   json.RawMessage `json:"payload"`
+	Estado    string          `json:"estado"`
+	Origen    string          `json:"origen"`
+	OrdenID   *string         `json:"ordenId"`
+	Automat   *string         `json:"automatizacion"`
+	Error     *string         `json:"error"`
+	CreadoEn  time.Time       `json:"creadoEn"`
 }
 
 func msgOut(m messagingapp.Message) msgDTO {
@@ -83,14 +83,14 @@ func msgOut(m messagingapp.Message) msgDTO {
 }
 
 type convDTO struct {
-	ID          string     `json:"id"`
-	Celular     string     `json:"celular"`
-	ClienteID   *string    `json:"clienteId"`
-	Modo        string     `json:"modo"`
-	PideHumano  bool       `json:"pideHumano"`
+	ID           string     `json:"id"`
+	Celular      string     `json:"celular"`
+	ClienteID    *string    `json:"clienteId"`
+	Modo         string     `json:"modo"`
+	PideHumano   bool       `json:"pideHumano"`
 	VentanaHasta *time.Time `json:"ventanaAbiertaHasta"`
-	Ultimo      string     `json:"ultimoMensaje,omitempty"`
-	UltimoEn    *time.Time `json:"ultimoEn,omitempty"`
+	Ultimo       string     `json:"ultimoMensaje,omitempty"`
+	UltimoEn     *time.Time `json:"ultimoEn,omitempty"`
 }
 
 func convOut(c messagingapp.Conversation) convDTO {

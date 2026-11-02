@@ -46,7 +46,7 @@ func (l *Local) Put(_ context.Context, key string, r io.Reader, maxBytes int64) 
 	if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600) // #nosec G304 -- la clave se valida con validKey (solo UUIDs)
 	if err != nil {
 		return err
 	}

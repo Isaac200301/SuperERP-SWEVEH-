@@ -52,9 +52,9 @@ type WhatsApp struct {
 
 // AI configura el proveedor del agente (D-08 abierta). "reglas" = clasificador local sin costo.
 type AI struct {
-	Provider string
-	APIKey   string
-	Model    string
+	Provider           string
+	APIKey             string
+	Model              string
 	MonthlyCapMicroUSD int64
 }
 
@@ -71,11 +71,11 @@ type Worker struct {
 
 func engine(errs *[]error) (WhatsApp, AI) {
 	return WhatsApp{
-			AppSecret: os.Getenv("WHATSAPP_APP_SECRET"), AccessToken: os.Getenv("WHATSAPP_ACCESS_TOKEN"),
-			PhoneNumberID: os.Getenv("WHATSAPP_PHONE_NUMBER_ID"), VerifyToken: os.Getenv("WHATSAPP_VERIFY_TOKEN"),
-			APIBase: get("WHATSAPP_API_BASE", "https://graph.facebook.com/v21.0"),
-		}, AI{Provider: get("AI_PROVIDER", "reglas"), APIKey: os.Getenv("AI_API_KEY"), Model: os.Getenv("AI_MODEL"),
-			MonthlyCapMicroUSD: int64(getInt("AI_MONTHLY_CAP_MICRO_USD", 5_000_000, errs))}
+		AppSecret: os.Getenv("WHATSAPP_APP_SECRET"), AccessToken: os.Getenv("WHATSAPP_ACCESS_TOKEN"),
+		PhoneNumberID: os.Getenv("WHATSAPP_PHONE_NUMBER_ID"), VerifyToken: os.Getenv("WHATSAPP_VERIFY_TOKEN"),
+		APIBase: get("WHATSAPP_API_BASE", "https://graph.facebook.com/v21.0"),
+	}, AI{Provider: get("AI_PROVIDER", "reglas"), APIKey: os.Getenv("AI_API_KEY"), Model: os.Getenv("AI_MODEL"),
+		MonthlyCapMicroUSD: int64(getInt("AI_MONTHLY_CAP_MICRO_USD", 5_000_000, errs))}
 }
 
 // LoadAPI lee la configuración del api.

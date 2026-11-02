@@ -55,12 +55,12 @@ func (h *Handler) Routes(r chi.Router) {
 
 // KPI es un número con su explicación en lenguaje del taller (HU-75, DR-11).
 type KPI struct {
-	Code      string  `json:"codigo"`
-	Label     string  `json:"titulo"`
-	Value     *float64 `json:"valor"`
-	Display   string  `json:"texto"`
-	Detail    string  `json:"detalle"`
-	Meaning   string  `json:"queSignifica"`
+	Code    string   `json:"codigo"`
+	Label   string   `json:"titulo"`
+	Value   *float64 `json:"valor"`
+	Display string   `json:"texto"`
+	Detail  string   `json:"detalle"`
+	Meaning string   `json:"queSignifica"`
 }
 
 func f(v float64) *float64 { return &v }

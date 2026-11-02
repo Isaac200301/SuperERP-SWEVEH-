@@ -8,8 +8,6 @@ import (
 	"sweveh/internal/shared"
 )
 
-var system = shared.Actor{Type: shared.ActorAgent}
-
 // fire ejecuta una automatización de mensaje para una orden, una sola vez por clave (HU-46, HU-48).
 // Reglas: encendida, cliente con autorización (HU-95, RF-22), orden que no sea de ejemplo (HU-05),
 // dentro de la ventana de 24 h o con plantilla (HU-47).

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -32,8 +33,14 @@ func Public(pool *pgxpool.Pool, cfg config.API, log *slog.Logger) func(chi.Route
 				w.WriteHeader(http.StatusForbidden)
 				return
 			}
+			// Meta manda un challenge numérico; se reescribe como número para no reflejar texto del cliente.
+			n, err := strconv.ParseUint(q.Get("hub.challenge"), 10, 64)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
 			w.Header().Set("Content-Type", "text/plain")
-			_, _ = w.Write([]byte(q.Get("hub.challenge")))
+			_, _ = w.Write([]byte(strconv.FormatUint(n, 10)))
 		})
 		r.Post("/webhooks/whatsapp", func(w http.ResponseWriter, r *http.Request) {
 			body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)) // cuerpo crudo: la firma se calcula sobre estos bytes

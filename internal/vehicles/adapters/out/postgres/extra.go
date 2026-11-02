@@ -34,7 +34,7 @@ const vCols = `id, taller_id, cliente_id, tipo, placa, formato_placa, marca, lin
 
 func (r vRow) domain() domain.Vehicle {
 	return domain.Vehicle{ID: r.ID, TallerID: r.TallerID, CustomerID: r.ClienteID, Kind: domain.Kind(r.Tipo),
-		Plate: domain.RestorePlate(r.Placa, domain.PlateFormat(r.FormatoPlaca)),
+		Plate:   domain.RestorePlate(r.Placa, domain.PlateFormat(r.FormatoPlaca)),
 		Details: domain.Details{Brand: r.Marca, Line: r.Linea, Year: r.ModeloAnio, Mileage: r.Kilometraje},
 		Engine:  domain.Engine{DisplacementCC: r.CilindrajeCc, Turbo: r.Turbo}, Version: r.Version, CreatedAt: r.CreatedAt}
 }

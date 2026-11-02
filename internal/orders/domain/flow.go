@@ -12,14 +12,14 @@ import (
 var Flow = []State{StatePending, StateReceived, StateDiagnosis, StateAwaitingOK, StateRepair, StateReady, StateDelivered}
 
 var (
-	ErrStateUnknown   = shared.Validation("estado_invalido", "Ese estado no existe.").WithField("estado")
-	ErrStep           = shared.Rule("salto_de_estado", "Solo puedes avanzar al siguiente estado o devolverte uno.")
-	ErrClosed         = shared.Rule("orden_cerrada", "La orden ya está cerrada.")
-	ErrChecklist      = shared.Rule("checklist_incompleto", "Completa el checklist de recepción antes de pasar a Recibido.")
-	ErrNeedsQuote     = shared.Rule("falta_cotizacion", "Envía la cotización al cliente para pasar a Esperando aprobación.")
-	ErrNeedsApproval  = shared.Rule("falta_aprobacion", "El cliente no ha aprobado. El dueño puede continuar escribiendo el motivo.")
-	ErrPickup         = shared.Validation("entrega_incompleta", "Escribe quién recoge y confirma los accesorios del checklist.").WithField("recogidoPor")
-	ErrCancelReason   = shared.Validation("motivo_requerido", "Escribe el motivo.").WithField("motivo")
+	ErrStateUnknown  = shared.Validation("estado_invalido", "Ese estado no existe.").WithField("estado")
+	ErrStep          = shared.Rule("salto_de_estado", "Solo puedes avanzar al siguiente estado o devolverte uno.")
+	ErrClosed        = shared.Rule("orden_cerrada", "La orden ya está cerrada.")
+	ErrChecklist     = shared.Rule("checklist_incompleto", "Completa el checklist de recepción antes de pasar a Recibido.")
+	ErrNeedsQuote    = shared.Rule("falta_cotizacion", "Envía la cotización al cliente para pasar a Esperando aprobación.")
+	ErrNeedsApproval = shared.Rule("falta_aprobacion", "El cliente no ha aprobado. El dueño puede continuar escribiendo el motivo.")
+	ErrPickup        = shared.Validation("entrega_incompleta", "Escribe quién recoge y confirma los accesorios del checklist.").WithField("recogidoPor")
+	ErrCancelReason  = shared.Validation("motivo_requerido", "Escribe el motivo.").WithField("motivo")
 )
 
 func ParseState(s string) (State, error) {
@@ -37,8 +37,8 @@ type TransitionInput struct {
 	To                State
 	EnginePending     bool
 	ChecklistComplete bool
-	FromQuote         bool   // la mueve la cotización (enviada o aprobada por el cliente), no una persona
-	CanOverride       bool   // permiso del dueño para avanzar sin aprobación (HU-20, criterio 2)
+	FromQuote         bool // la mueve la cotización (enviada o aprobada por el cliente), no una persona
+	CanOverride       bool // permiso del dueño para avanzar sin aprobación (HU-20, criterio 2)
 	Reason            string
 	PickedUpBy        string
 	AccessoriesOK     bool

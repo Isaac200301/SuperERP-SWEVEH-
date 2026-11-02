@@ -19,12 +19,12 @@ type Extra interface {
 
 // ConsentRecord es la prueba de la autorización del cliente (Ley 1581, Decreto 1377 art. 8).
 type ConsentRecord struct {
-	Text      string
-	Version   string
-	Channel   string // whatsapp | mostrador | importacion
-	Ref       string // id del mensaje si llegó por WhatsApp
-	At        time.Time
-	By        *shared.ID
+	Text    string
+	Version string
+	Channel string // whatsapp | mostrador | importacion
+	Ref     string // id del mensaje si llegó por WhatsApp
+	At      time.Time
+	By      *shared.ID
 }
 
 func (s *Service) SetExtra(e Extra) { s.extra = e }

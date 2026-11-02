@@ -13,16 +13,16 @@ import (
 type Repository struct{}
 
 type qRow struct {
-	ID          shared.ID  `db:"id"`
-	TallerID    shared.ID  `db:"taller_id"`
-	OrdenID     shared.ID  `db:"orden_id"`
-	Numero      int        `db:"numero"`
-	Estado      string     `db:"estado"`
-	EnviadaEn   *time.Time `db:"enviada_en"`
-	Respondida  *time.Time `db:"respondida_en"`
-	Canal       *string    `db:"canal_respuesta"`
-	Ref         *string    `db:"respuesta_ref"`
-	Version     int        `db:"version"`
+	ID         shared.ID  `db:"id"`
+	TallerID   shared.ID  `db:"taller_id"`
+	OrdenID    shared.ID  `db:"orden_id"`
+	Numero     int        `db:"numero"`
+	Estado     string     `db:"estado"`
+	EnviadaEn  *time.Time `db:"enviada_en"`
+	Respondida *time.Time `db:"respondida_en"`
+	Canal      *string    `db:"canal_respuesta"`
+	Ref        *string    `db:"respuesta_ref"`
+	Version    int        `db:"version"`
 }
 
 type lRow struct {

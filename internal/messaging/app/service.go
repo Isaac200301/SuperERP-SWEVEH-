@@ -296,7 +296,9 @@ func (s *Service) Deliver(ctx context.Context, tallerID, msgID shared.ID) error 
 	now := s.clock.Now()
 	if !ok {
 		e := "el taller no tiene número de WhatsApp conectado"
-		return s.tx.Do(ctx, func(ctx context.Context) error { return s.repo.UpdateDelivery(ctx, tallerID, msgID, "fallido", nil, &e, now) })
+		return s.tx.Do(ctx, func(ctx context.Context) error {
+			return s.repo.UpdateDelivery(ctx, tallerID, msgID, "fallido", nil, &e, now)
+		})
 	}
 	var p struct {
 		Buttons []domain.Button `json:"botones"`
@@ -318,7 +320,9 @@ func (s *Service) Deliver(ctx context.Context, tallerID, msgID shared.ID) error 
 	if wamid != "" {
 		w = &wamid
 	}
-	if uerr := s.tx.Do(ctx, func(ctx context.Context) error { return s.repo.UpdateDelivery(ctx, tallerID, msgID, state, w, errMsg, now) }); uerr != nil {
+	if uerr := s.tx.Do(ctx, func(ctx context.Context) error {
+		return s.repo.UpdateDelivery(ctx, tallerID, msgID, state, w, errMsg, now)
+	}); uerr != nil {
 		return uerr
 	}
 	return err // el worker reintenta con retroceso si falló el canal

@@ -80,13 +80,13 @@ func (Repository) UpsertChannel(ctx context.Context, c app.ChannelInfo) error {
 }
 
 type convRow struct {
-	ID          shared.ID  `db:"id"`
-	TallerID    shared.ID  `db:"taller_id"`
-	ClienteID   *shared.ID `db:"cliente_id"`
-	Celular     string     `db:"celular"`
-	Ultimo      *time.Time `db:"ultimo_entrante_en"`
-	Modo        string     `db:"modo"`
-	PideHumano  bool       `db:"pide_humano"`
+	ID         shared.ID  `db:"id"`
+	TallerID   shared.ID  `db:"taller_id"`
+	ClienteID  *shared.ID `db:"cliente_id"`
+	Celular    string     `db:"celular"`
+	Ultimo     *time.Time `db:"ultimo_entrante_en"`
+	Modo       string     `db:"modo"`
+	PideHumano bool       `db:"pide_humano"`
 }
 
 func (r convRow) conv() app.Conversation {
@@ -122,22 +122,22 @@ func (Repository) SetMode(ctx context.Context, tallerID, convID shared.ID, mode 
 }
 
 type msgRow struct {
-	ID         shared.ID       `db:"id"`
-	TallerID   shared.ID       `db:"taller_id"`
-	ConvID     shared.ID       `db:"conversacion_id"`
-	Direccion  string          `db:"direccion"`
-	WAMID      *string         `db:"wamid"`
-	Tipo       string          `db:"tipo"`
-	Cuerpo     *string         `db:"cuerpo"`
-	Payload    json.RawMessage `db:"payload"`
-	Estado     string          `db:"estado"`
-	Origen     string          `db:"origen"`
-	Categoria  *string         `db:"categoria"`
-	OrdenID    *shared.ID      `db:"orden_id"`
-	Automat    *string         `db:"automatizacion"`
-	Error      *string         `db:"error"`
-	CreatedAt  time.Time       `db:"created_at"`
-	EnviadoEn  *time.Time      `db:"enviado_en"`
+	ID        shared.ID       `db:"id"`
+	TallerID  shared.ID       `db:"taller_id"`
+	ConvID    shared.ID       `db:"conversacion_id"`
+	Direccion string          `db:"direccion"`
+	WAMID     *string         `db:"wamid"`
+	Tipo      string          `db:"tipo"`
+	Cuerpo    *string         `db:"cuerpo"`
+	Payload   json.RawMessage `db:"payload"`
+	Estado    string          `db:"estado"`
+	Origen    string          `db:"origen"`
+	Categoria *string         `db:"categoria"`
+	OrdenID   *shared.ID      `db:"orden_id"`
+	Automat   *string         `db:"automatizacion"`
+	Error     *string         `db:"error"`
+	CreatedAt time.Time       `db:"created_at"`
+	EnviadoEn *time.Time      `db:"enviado_en"`
 }
 
 func (r msgRow) msg() app.Message {

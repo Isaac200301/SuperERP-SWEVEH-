@@ -43,10 +43,10 @@ func (f *Flow) SetQuoteReader(q ports.QuoteReader) { f.quotes = q }
 const MaxPhotoBytes = 8 << 20
 
 var (
-	ErrPhotoType  = shared.Validation("foto_tipo", "La foto debe ser JPG, PNG o WEBP.").WithField("foto")
-	ErrPhotoSize  = shared.Validation("foto_grande", "La foto pesa más de 8 MB.").WithField("foto")
-	ErrEvidence   = shared.NotFound("evidencia_no_encontrada", "No encontramos esa foto en la orden.")
-	ErrEmptyEvid  = shared.Validation("evidencia_vacia", "Agrega una foto o escribe una nota.")
+	ErrPhotoType = shared.Validation("foto_tipo", "La foto debe ser JPG, PNG o WEBP.").WithField("foto")
+	ErrPhotoSize = shared.Validation("foto_grande", "La foto pesa más de 8 MB.").WithField("foto")
+	ErrEvidence  = shared.NotFound("evidencia_no_encontrada", "No encontramos esa foto en la orden.")
+	ErrEmptyEvid = shared.Validation("evidencia_vacia", "Agrega una foto o escribe una nota.")
 )
 
 // TransitionCmd es un cambio de estado pedido por una persona.
@@ -243,7 +243,7 @@ func (f *Flow) SaveChecklist(ctx context.Context, tallerID, orderID shared.ID, a
 			return err
 		}
 		return f.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "orden.checklist", Entity: "orden", EntityID: o.ID,
-			After: map[string]any{"kilometraje": in.Km, "combustible": in.Fuel, "accesorios": in.Accessories, "salvedades": len(in.Exceptions)},
+			After:      map[string]any{"kilometraje": in.Km, "combustible": in.Fuel, "accesorios": in.Accessories, "salvedades": len(in.Exceptions)},
 			OccurredAt: now})
 	})
 	if err != nil {

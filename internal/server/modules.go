@@ -36,11 +36,11 @@ import (
 
 // Modules son los servicios de negocio ya cableados. Los comparten el api y el worker.
 type Modules struct {
-	Tx        *db.TxManager
-	Audit     audit.Log
-	Events    outbox.Publisher
-	Clock     clock.Clock
-	Log       *slog.Logger
+	Tx     *db.TxManager
+	Audit  audit.Log
+	Events outbox.Publisher
+	Clock  clock.Clock
+	Log    *slog.Logger
 
 	Workshops tenancy.Workshops
 	Admin     *tenancy.Admin

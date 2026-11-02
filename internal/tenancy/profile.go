@@ -33,17 +33,17 @@ type Settings struct {
 }
 
 type settingsRow struct {
-	ID          shared.ID       `db:"id"`
-	Nombre      string          `db:"nombre"`
-	Atiende     *string         `db:"atiende"`
-	Especial    []string        `db:"especialidades"`
-	Ciudad      *string         `db:"ciudad"`
-	Tamano      *string         `db:"tamano"`
-	Horario     json.RawMessage `db:"horario"`
-	ContratoV   *string         `db:"contrato_version"`
-	ContratoEn  *time.Time      `db:"contrato_aceptado_en"`
-	Onboarding  bool            `db:"onboarding_completo"`
-	Version     int             `db:"version"`
+	ID         shared.ID       `db:"id"`
+	Nombre     string          `db:"nombre"`
+	Atiende    *string         `db:"atiende"`
+	Especial   []string        `db:"especialidades"`
+	Ciudad     *string         `db:"ciudad"`
+	Tamano     *string         `db:"tamano"`
+	Horario    json.RawMessage `db:"horario"`
+	ContratoV  *string         `db:"contrato_version"`
+	ContratoEn *time.Time      `db:"contrato_aceptado_en"`
+	Onboarding bool            `db:"onboarding_completo"`
+	Version    int             `db:"version"`
 }
 
 // Admin agrupa los casos de uso de configuración del taller.

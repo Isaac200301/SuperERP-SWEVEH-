@@ -40,7 +40,9 @@ type OpenOrder struct {
 }
 
 // SetExampleMarker conecta el repositorio que marca órdenes de ejemplo.
-func (s *Service) SetExampleMarker(f func(ctx context.Context, tallerID, id shared.ID) error) { s.markExample = f }
+func (s *Service) SetExampleMarker(f func(ctx context.Context, tallerID, id shared.ID) error) {
+	s.markExample = f
+}
 
 // Open crea la orden con su número, historial, auditoría y evento en una sola transacción.
 func (s *Service) Open(ctx context.Context, cmd OpenOrder) (domain.Order, error) {
