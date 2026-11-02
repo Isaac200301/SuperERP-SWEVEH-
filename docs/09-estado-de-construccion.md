@@ -67,13 +67,13 @@
 | HU-37 | Importar inventario desde Excel o CSV | T6 | no | ⬜ Pendiente | | |
 | HU-38 | Devolver al inventario lo que no se usó | T6 | no | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
 | HU-39 | Proveedores, órdenes de compra y bodegas | T7 | no | ⬜ Pendiente | | |
-| HU-40 | Ver el catálogo de automatizaciones | T4 | sí | ⬜ Pendiente | | |
-| HU-41 | Encender y apagar una automatización | T2 | sí | ⬜ Pendiente | | |
-| HU-42 | Editar el texto de un aviso | T4 | no | ⬜ Pendiente | | |
+| HU-40 | Ver el catálogo de automatizaciones | T4 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
+| HU-41 | Encender y apagar una automatización | T2 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
+| HU-42 | Editar el texto de un aviso | T4 | no | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
 | HU-43 | Saber que mi vehículo está listo | T2 | sí | ⬜ Pendiente | | |
 | HU-44 | Recordatorio de la cita | T6 | no | ⬜ Pendiente | | |
 | HU-45 | Recordatorio de vehículo sin recoger | T6 | sí | ⬜ Pendiente | | |
-| HU-46 | Registrar cada ejecución de una automatización | T2 | sí | ⬜ Pendiente | | |
+| HU-46 | Registrar cada ejecución de una automatización | T2 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
 | HU-47 | Respetar la ventana de 24 horas | T2 | no | ⬜ Pendiente | | |
 | HU-48 | Enviar el aviso correcto al cambiar el estado | T2 | sí | ⬜ Pendiente | | |
 | HU-49 | Seguimiento de garantía y garantía por orden | T7 | no | ⬜ Pendiente | | |
@@ -89,21 +89,21 @@
 | HU-59 | Pedir hablar con una persona | T3 | no | ⬜ Pendiente | | |
 | HU-60 | Mandar notas de voz | T6 | no | ⬜ Pendiente | | |
 | HU-61 | Respuesta fuera de horario | T6 | no | ⬜ Pendiente | | |
-| HU-62 | Revisar y enviar el borrador | T3 | sí | ⬜ Pendiente | | |
-| HU-63 | Editar el borrador antes de enviarlo | T3 | no | ⬜ Pendiente | | |
-| HU-64 | Saber de dónde salió cada dato | T3 | no | ⬜ Pendiente | | |
-| HU-65 | Ver qué tan seguido edito los borradores | T3 | no | ⬜ Pendiente | | |
+| HU-62 | Revisar y enviar el borrador | T3 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
+| HU-63 | Editar el borrador antes de enviarlo | T3 | no | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
+| HU-64 | Saber de dónde salió cada dato | T3 | no | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
+| HU-65 | Ver qué tan seguido edito los borradores | T3 | no | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
 | HU-66 | Enterarme de que hay algo por revisar | T6 | no | ⬜ Pendiente | | |
 | HU-67 | Auto-envío para respuestas exactas | T7 | no | ⬜ Pendiente | | |
-| HU-68 | Ver órdenes abiertas por estado | T4 | sí | ⬜ Pendiente | | |
-| HU-69 | Ver aprobaciones pendientes y cuánto llevan | T4 | sí | ⬜ Pendiente | | |
-| HU-70 | Ver el tiempo promedio por orden | T4 | sí | ⬜ Pendiente | | |
-| HU-71 | Ver el ticket promedio | T4 | sí | ⬜ Pendiente | | |
+| HU-68 | Ver órdenes abiertas por estado | T4 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
+| HU-69 | Ver aprobaciones pendientes y cuánto llevan | T4 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
+| HU-70 | Ver el tiempo promedio por orden | T4 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
+| HU-71 | Ver el ticket promedio | T4 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
 | HU-72 | Ver cuántos clientes vuelven | T6 | no | ⬜ Pendiente | | |
-| HU-73 | Ver cuánto me demoro en contestar WhatsApp | T4 | sí | ⬜ Pendiente | | |
+| HU-73 | Ver cuánto me demoro en contestar WhatsApp | T4 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
 | HU-74 | Ver el consumo de mensajes y el costo de IA de cada taller | T4 | sí | ⬜ Pendiente | | |
 | HU-75 | Preguntar qué significa un número | T6 | sí | ⬜ Pendiente | | |
-| HU-76 | Ver qué tengo pendiente hoy | T6 | sí | ⬜ Pendiente | | |
+| HU-76 | Ver qué tengo pendiente hoy | T6 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
 | HU-77 | Que el asistente también guíe al mecánico | T7 | no | ⬜ Pendiente | | |
 | HU-78 | Hacerle preguntas libres al asistente | T7 | no | ⬜ Pendiente | | |
 | HU-79 | Que mis datos no los vea otro taller | T0 | no | 🟦 En curso | | RLS forzado + `SET LOCAL` probado (incluida meta-prueba de todas las tablas) y 404 entre talleres por HTTP. Falta: "el intento queda registrado" (criterio 1) y repetir contra el pooler de Supabase |
