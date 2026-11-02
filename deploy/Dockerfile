@@ -2,7 +2,7 @@
 # El frontend compilado va dentro y lo sirve el api desde el mismo origen (ADR-18).
 # Las imágenes base se fijan por versión; fijarlas por digest es la siguiente mejora (Snyk Container).
 
-FROM node:24-bookworm AS web
+FROM node:26-bookworm AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
