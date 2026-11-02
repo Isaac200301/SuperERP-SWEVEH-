@@ -19,7 +19,12 @@ type Repository interface {
 	// AddStock suma (o resta si n < 0 sin bajar de cero) y registra el movimiento. Devuelve false si no alcanzó.
 	Move(ctx context.Context, m Movement) (bool, error)
 	Low(ctx context.Context, tallerID shared.ID) ([]domain.Part, error)
+	// Returnable bloquea el repuesto y dice cuánto descontó la orden y no se ha devuelto (HU-38).
+	Returnable(ctx context.Context, tallerID, partID, orderID shared.ID) (int, error)
 }
+
+// ErrReturnTooMany evita que una devolución infle la existencia por encima de lo que la orden usó (HU-38).
+var ErrReturnTooMany = shared.Rule("devolucion_excede", "No puedes devolver más unidades de las que esa orden descontó.").WithField("cantidad")
 
 // Movement es un movimiento del libro de inventario.
 type Movement struct {
@@ -63,16 +68,6 @@ func (s *Service) Search(ctx context.Context, tallerID shared.ID, q string, all 
 	err := s.uow.Do(ctx, func(ctx context.Context) error {
 		var err error
 		out, err = s.repo.Search(ctx, tallerID, q, !all, 50)
-		return err
-	})
-	return out, err
-}
-
-func (s *Service) Get(ctx context.Context, tallerID, id shared.ID) (domain.Part, error) {
-	var out domain.Part
-	err := s.uow.Do(ctx, func(ctx context.Context) error {
-		var err error
-		out, err = s.repo.Get(ctx, tallerID, id)
 		return err
 	})
 	return out, err
@@ -229,6 +224,13 @@ func (s *Service) Return(ctx context.Context, actor shared.Actor, tallerID, part
 	return s.uow.Do(ctx, func(ctx context.Context) error {
 		if _, err := s.repo.Get(ctx, tallerID, partID); err != nil {
 			return err
+		}
+		left, err := s.repo.Returnable(ctx, tallerID, partID, orderID)
+		if err != nil {
+			return err
+		}
+		if qty > left {
+			return ErrReturnTooMany
 		}
 		if _, err := s.repo.Move(ctx, Movement{TallerID: tallerID, PartID: partID, Qty: qty, Reason: "devolucion", OrderID: &orderID, UserID: &actor.ID}); err != nil {
 			return err

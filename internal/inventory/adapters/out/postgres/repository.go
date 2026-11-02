@@ -107,6 +107,15 @@ func (Repository) Move(ctx context.Context, m app.Movement) (bool, error) {
 	return err == nil, err
 }
 
+// Returnable bloquea el repuesto (FOR UPDATE, R-07) y dice cuántas unidades descontó la orden y aún no se han devuelto.
+func (Repository) Returnable(ctx context.Context, tallerID, partID, orderID shared.ID) (int, error) {
+	if _, err := db.Scalar[int](ctx, `SELECT 1 FROM inventory.articulo WHERE taller_id = $1 AND id = $2 FOR UPDATE`, tallerID, partID); err != nil {
+		return 0, err
+	}
+	return db.Scalar[int](ctx, `SELECT COALESCE(-SUM(cantidad), 0)::int FROM inventory.movimiento
+		WHERE taller_id = $1 AND articulo_id = $2 AND orden_id = $3 AND motivo IN ('salida_orden', 'devolucion')`, tallerID, partID, orderID)
+}
+
 func (Repository) Low(ctx context.Context, tallerID shared.ID) ([]domain.Part, error) {
 	return list(db.Many[row](ctx, `SELECT `+cols+` FROM inventory.articulo WHERE taller_id = $1 AND activo AND existencia <= minimo
 		ORDER BY nombre`, tallerID))
