@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Registro del taller, paso 2</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Manrope',system-ui,sans-serif;color:#0F1F1D}
+a{color:#005F54}a:hover{color:#004A42}
+.chip{min-height:44px;padding:0 16px;border-radius:999px;border:1.5px solid #7F9591;background:#FFFFFF;font:inherit;font-weight:700;font-size:15px;color:#0F1F1D;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.chip.on{background:#E2F1EE;border-color:#005F54;color:#005F54}
+.lbl{font-weight:800;font-size:15px;margin:0 0 10px}
+.row{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #D3DCDA;font-size:14px}
+.ok{width:22px;height:22px;border-radius:50%;background:#1E7A46;color:#FFFFFF;display:grid;place-items:center;flex:none}
+</style>
+</helmet>
+<div style="width:1280px;height:860px;box-sizing:border-box;background:#E9EEED;padding:20px;display:flex;gap:20px">
+
+  <aside style="width:300px;flex:none;background:#0A1413;color:#EAF3F1;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <svg width="36" height="36" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#005F54"/><path d="M17.5 27 L24.75 46 L32 33 L39.25 46 L46.5 27" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="18" r="5" fill="#FFB000"/></svg>
+      <b style="font-size:20px">SWEVEH</b>
+    </div>
+    <div style="background:#112220;border:1px solid #22403C;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:13px;color:#A9BEBA">Llevas</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:34px;font-weight:700;color:#6FE5D2">01:42</span>
+      <span style="font-size:13px;color:#A9BEBA">La meta es tu primera orden antes de 5 minutos.</span>
+    </div>
+    <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:18px">
+      <li style="display:flex;gap:12px;align-items:flex-start"><span class="ok" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg></span><span><b>Tu cuenta</b><br><span style="font-size:13px;color:#A9BEBA">Celular verificado y datos autorizados</span></span></li>
+      <li style="display:flex;gap:12px;align-items:flex-start"><span style="width:22px;height:22px;border-radius:50%;background:#DDF47B;color:#0F1F1D;display:grid;place-items:center;font-weight:800;font-size:12px;flex:none">2</span><span><b>Tu taller</b><br><span style="font-size:13px;color:#A9BEBA">Qué haces y para qué vehículos</span></span></li>
+      <li style="display:flex;gap:12px;align-items:flex-start"><span style="width:22px;height:22px;border-radius:50%;border:2px solid #43685F;display:grid;place-items:center;font-weight:800;font-size:12px;flex:none;color:#A9BEBA">3</span><span><b style="color:#A9BEBA">Primera orden</b><br><span style="font-size:13px;color:#7F9490">Con una placa real o de ejemplo</span></span></li>
+    </ol>
+    <p style="margin:auto 0 0;font-size:13px;color:#7F9490">NIT, logo, horario y precios se piden cuando hagan falta, no ahora.</p>
+  </aside>
+
+  <main style="flex:1;min-width:0;background:#FFFFFF;border-radius:28px;padding:36px 40px;display:flex;flex-direction:column;gap:24px">
+    <div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#005F54;font-weight:700">PASO 2 DE 3</span>
+      <h1 style="margin:6px 0 6px;font-size:32px;letter-spacing:-.02em">¿Qué tipo de taller tienes?</h1>
+      <p style="margin:0;color:#4C5F5C;font-size:16px">Con esto te dejamos servicios, checklist y avisos listos. Lo puedes cambiar después.</p>
+    </div>
+    <fieldset style="border:0;margin:0;padding:0"><legend class="lbl">Atiendes</legend>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="chip on" type="button" aria-pressed="true">Carros</button><button class="chip on" type="button" aria-pressed="true">Motos</button></div>
+    </fieldset>
+    <fieldset style="border:0;margin:0;padding:0"><legend class="lbl">Lo que más haces (elige varios)</legend>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="chip on" type="button" aria-pressed="true">Mecánica general</button>
+        <button class="chip on" type="button" aria-pressed="true">Frenos y suspensión</button>
+        <button class="chip" type="button" aria-pressed="false">Eléctrico</button>
+        <button class="chip" type="button" aria-pressed="false">Diagnóstico con escáner</button>
+        <button class="chip" type="button" aria-pressed="false">Llantas y alineación</button>
+        <button class="chip" type="button" aria-pressed="false">Latonería y pintura</button>
+        <button class="chip" type="button" aria-pressed="false">Otro</button>
+      </div>
+    </fieldset>
+    <fieldset style="border:0;margin:0;padding:0"><legend class="lbl">¿Cuántos trabajan?</legend>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="chip" type="button" aria-pressed="false">Solo yo</button><button class="chip on" type="button" aria-pressed="true">2 a 5</button><button class="chip" type="button" aria-pressed="false">6 o más</button></div>
+      <p style="margin:8px 0 0;font-size:13px;color:#4C5F5C">Si eliges “Solo yo”, ocultamos la gestión de usuarios.</p>
+    </fieldset>
+    <div style="margin-top:auto;display:flex;gap:12px;align-items:center">
+      <a href="#atras" style="font-weight:700;padding:0 12px">Atrás</a>
+      <a href="Panel.dc.html" style="flex:1;min-height:52px;border-radius:14px;background:#005F54;color:#FFFFFF;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;text-decoration:none">Armar mi taller</a>
+    </div>
+  </main>
+
+  <aside style="width:340px;flex:none;background:#F4F7F6;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:12px">
+    <b style="font-size:17px">Esto te dejamos listo</b>
+    <span style="font-size:13px;color:#4C5F5C">Se actualiza con lo que eliges.</span>
+    <div class="row"><span class="ok" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg></span>12 servicios comunes, sin precio todavía</div>
+    <div class="row"><span class="ok" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg></span>7 estados de orden, de Por recibir a Entregado</div>
+    <div class="row"><span class="ok" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg></span>Checklist de recepción de carro y de moto</div>
+    <div class="row"><span class="ok" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg></span>5 avisos de WhatsApp encendidos</div>
+    <div class="row"><span class="ok" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg></span>Tablero con 6 números del taller</div>
+    <div class="row" style="border-bottom:0"><span class="ok" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg></span>Roles de dueño, mecánico y recepción</div>
+    <div style="margin-top:auto;background:#FFFFFF;border-radius:18px;padding:16px;font-size:13px;color:#4C5F5C"><b style="color:#0F1F1D">Siguiente:</b> escribe una placa (ABC123 o una moto ABC12D) y verás el aviso “vehículo recibido” que le llegaría a tu cliente.</div>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":860}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

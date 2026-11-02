@@ -1,0 +1,28 @@
+# Secretos y configuración local (nunca al repositorio)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Cachés y binarios
+.cache/
+bin/
+dist/
+coverage/
+cover.out
+*.test
+
+# Frontend
+web/node_modules/
+web/dist/
+web/coverage/
+web/playwright-report/
+web/test-results/
+
+# Editor y sistema
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

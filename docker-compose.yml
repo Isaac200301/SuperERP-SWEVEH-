@@ -1,0 +1,31 @@
+# Entorno local de SWEVEH. Solo datos Ficticio. Las contraseñas son de desarrollo y
+# no sirven en ningún otro entorno (staging y producción usan el gestor de secretos).
+name: sweveh
+
+services:
+  postgres:
+    # Postgres 16: alinear con la versión del proyecto de Supabase al crearlo (`Sin dato` hasta entonces).
+    image: postgres:16-alpine
+    container_name: sweveh-pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev_only
+      POSTGRES_DB: postgres
+      SWEVEH_ROLE_PASSWORD: sweveh_dev_only
+    ports:
+      - "54329:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/local/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      retries: 20
+    networks: [sweveh]
+
+volumes:
+  pgdata:
+
+networks:
+  sweveh:
+    name: sweveh

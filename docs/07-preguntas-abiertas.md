@@ -1,0 +1,125 @@
+# Preguntas abiertas, decisiones provisionales y decisiones tomadas
+
+> Fuente única de "lo que falta saber o decidir". Reglas de uso en `docs/02-reglas-de-decision.md`, **R-04**. Tres series: **Q-xx** (backlog de HU), **D-xx** (documento del MVP) y **AQ-xx** (arquitectura). Siguiente número libre: Q-33, D-14, AQ-13.
+
+## 1. Cómo se usa esta tabla
+
+1. Antes de construir una HU, busca aquí las preguntas que la afectan (columna "Afecta").
+2. Si la pregunta es ⛔ (bloquea) → **para y pregunta** a Isaac o Pablo.
+3. Si no es ⛔ y tiene recomendación → aplícala como **decisión provisional**: anótala en la sección 2 con fecha y HU, y escribe el código para que sea fácil de cambiar.
+4. Cuando Isaac o Pablo respondan, mueve la fila a la sección 3 ("Decididas") con fecha y quién respondió, y actualiza lo que dependía de ella.
+5. Si encuentras una pregunta nueva, agrégala con el siguiente número y una recomendación.
+
+## 2. Decisiones provisionales en uso (las llena el agente al aplicar una recomendación)
+
+| Fecha | Pregunta | Qué se aplicó | HU afectadas | Dónde está aislado en el código | Quién debe confirmarla |
+|---|---|---|---|---|---|
+| 1-nov-2026 | AQ-12 / Q-26 (fecha de demo y dedicación) | Sin fecha: el plan sigue por dependencias, con dos hitos: demo (T0 a T5) y MVP completo (T0 a T7) | Todas | `docs/05` (orden por tramos), sin calendario clavado | Isaac / Pablo cuando tengan fecha |
+| 1-nov-2026 | Q-01 (placa de moto) | Carro `ABC123`; moto `ABC12D` y antigua `ABC12`; "especial" de 5 a 7 alfanuméricos, solo tras confirmar y con tipo | HU-10 | `internal/vehicles/domain/plate.go` y `web/src/shared/lib/plate.ts` (las expresiones están en un solo lugar en cada lado) | Isaac / Pablo tras consultar RUNT/Mintransporte |
+| 1-nov-2026 | Q-04 / Q-05 (estados) | 7 estados del flujo + Cancelada fuera del flujo, como `CHECK` en `orders.orden` | HU-16, HU-20, HU-26 | `internal/orders/domain/order.go` (`State`) y migración `00007_orders.sql` | Isaac / Pablo |
+| 1-nov-2026 | Q-23 (motor) | Cilindraje (siempre en cc) y turbo opcionales al crear; "motor pendiente" bloquea abrir o pasar la orden a Recibido; en moto el turbo viene en No | HU-11, HU-16, HU-20 | `internal/vehicles/domain/engine.go`, `internal/orders/domain/order.go` (`ErrEngineRequired`) | Isaac / Pablo |
+| 1-nov-2026 | Q-13 / AQ-03 (canal del OTP) | Sin proveedor real todavía: en `APP_ENV=local` el código se imprime en la consola del api; fuera de local el api **no arranca** sin un proveedor real | HU-01 | Puerto `OTPSender` (`internal/identity/ports`), adaptadores en `internal/identity/adapters/out/otp`, validación en `internal/platform/config` | Isaac / Pablo (cotizar SMS vs plantilla de WhatsApp) |
+| 1-nov-2026 | AQ-07 (límite de tasa) | En memoria por IP en el inicio de sesión (10/min, configurable con `LOGIN_RATE_PER_MINUTE`) y reenvío de código cada 60 s por celular | HU-01 | `internal/platform/httpx/ratelimit.go`, `internal/identity/domain/otp.go` | Isaac / Pablo cuando haya varias instancias |
+| 1-nov-2026 | HU-02 / HU-90 (versión de la política) | La autorización del dueño se guarda con texto, canal, fecha y versión `borrador-sin-validar-2026-11-01`; la página de política dice que es borrador | HU-02 | `internal/identity/domain/account.go`, `web/src/features/auth/PolicyPage.tsx` | Isaac / Pablo con asesoría jurídica (AQ-10) |
+| 1-nov-2026 | HU-06 (datos mínimos) | El taller se crea al registrar al dueño con nombre provisional "Taller de {nombre}"; el tipo de taller (HU-03) llega después | HU-01, HU-03 | `internal/identity/domain/account.go` (`DefaultWorkshopName`) | Isaac / Pablo |
+
+## 3. Decididas
+
+| Fecha | Pregunta | Respuesta | Quién |
+|---|---|---|---|
+| 31-oct-2026 | D-05 ¿Carros solamente o también motos? | **Carros y motos** dentro del MVP | Equipo |
+| 1-nov-2026 | VIN al registrar vehículos | **No se pide ni se guarda** | Equipo |
+| 1-nov-2026 | Características del motor | Todo vehículo tiene motor con cilindraje (cc) y turbo (sí/no); otras características siguen abiertas en Q-23 | Equipo |
+| 1-nov-2026 | ¿Quién ve el medidor de mensajes y el costo de IA? (HU-74) | El **Administrador del ERP**; el costo de IA va dentro de la suscripción. Falta lo del dueño y la escena 9 (Q-24) | Equipo |
+| 1-nov-2026 | HU-50 (recordatorio de técnico-mecánica) | **Cancelada**; el ERP no recuerda ese tipo de servicios | Equipo |
+| 1-nov-2026 | Prioridad de las HU | **Todas Must** | Equipo |
+| 1-nov-2026 | Stack y arquitectura | Go, Supabase, React + TS + Vite + Tailwind, JWT + RBAC + cookies, monolito modular hexagonal, GitHub Actions + SonarQube + Snyk | Equipo |
+| 1-nov-2026 | AQ-01 ¿Fly.io o Cloud Run? | **Google Cloud Run** (se aparta de la recomendación Fly.io). Detalle en `docs/adr/0022-computo-en-cloud-run.md`. Pendiente: cotización antes de crear la cuenta | Isaac |
+| 1-nov-2026 | AQ-02 Región de Supabase | **`sa-east-1` (Brasil)**. Condición: el asesor jurídico (AQ-10) avala la transmisión internacional antes de cualquier dato real; en staging solo datos sintéticos | Isaac |
+| 1-nov-2026 | AQ-04 ¿Auth propia o Supabase Auth? | **Auth propia** (OTP por celular, JWT ES256, refresh rotativo, RBAC, dos realms) | Isaac |
+
+## 4. Preguntas del backlog de HU (Q-01 a Q-28)
+
+| # | Pregunta | Recomendación | Afecta | Estado |
+|---|---|---|---|---|
+| Q-01 | ¿Cuál es la norma oficial del formato de placa de moto? Solo se encontró en Wikipedia, sin cita a resolución. [13] | Aceptar los dos formatos (con y sin letra final) más "placa especial" y confirmar con el RUNT o Mintransporte antes de construir. | HU-10 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-02 | ¿Qué servicios y qué checklist usa un taller de motos? Ninguna visita fue a uno. | Visitar 2 talleres de motos y agregar 3 preguntas a la encuesta antes de fijar la precarga. | HU-04, HU-18 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-03 | ¿Cuántos talleres atienden carros y motos a la vez? Sin dato. | Preguntarlo en la encuesta; el diseño "Ambos" sirve igual. | HU-03 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-04 | ¿6 o 7 estados? El MVP dice 6 en la precarga y lista 7. | 7, como en la lista de M3. | HU-20 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-05 | ¿Cómo sale una orden que no siguió? | Estado "Cancelada" fuera del flujo, con motivo. | HU-26 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-06 | ¿El recibo debe llevar dirección del cliente, abonos y término de garantía, como pide la Ley 1480 art. 18? [10] | Dirección opcional en el cliente y garantía como texto fijo del taller en el recibo; consultar con un abogado. | HU-19 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-07 | ¿Cómo se avisa a un cliente que no escribió primero? Queda fuera de la ventana de 24 h y necesita plantilla aprobada; con el número de prueba no se sabe si se pueden crear propias. [1][2] | En la demo, todos escriben primero. En el piloto, plantilla de utilidad aprobada para AU-01. | HU-86, HU-47 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-08 | ¿Un toque en "Acepto" de WhatsApp es prueba suficiente de autorización ante la SIC? La norma admite mecanismos técnicos y conductas inequívocas, pero no se encontró postura sobre botones. [8][18] | Guardar texto, versión, id del mensaje y hora; validar con un abogado antes del piloto. | HU-85 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-09 | ¿Qué pasa si el cliente no autoriza? | Su mensaje no pasa por la IA y lo atiende el dueño a mano. | HU-85 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-10 | ¿Quién envía la cotización, el mecánico o el dueño? | Interruptor en configuración; por defecto el mecánico, porque en la demo lo hace Jhon. | HU-27 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-11 | ¿Se puede aprobar un repuesto sin existencias? | Sí, con aviso y movimiento pendiente; el inventario nunca baja de cero. | HU-27, HU-33 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-12 | ¿Notas de voz en el MVP? | Entra como todas; medir en el concierge cuántos clientes mandan audio para decidir si se mantiene. | HU-60 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-13 | ¿Por dónde llega el código de registro: SMS o plantilla de autenticación de WhatsApp, y cuánto cuesta? | Sin dato de costo en Colombia; decidir al montar la cuenta de Meta. | HU-01 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-14 | ¿Qué ve un mecánico si el taller no asigna órdenes? | Todas las abiertas del taller. | HU-23 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-15 | El equipo dijo que el asistente sirve al dueño, al cliente y al mecánico. ¿Qué parte va primero? (D-06) | Dueño primero (explicar KPIs y pendientes); mecánico y cliente después. | HU-74, HU-77 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-16 | El número de prueba escribe a 5 números verificados. ¿Alcanzan con la moto? [1] | Sí, usando el celular D para Sebastián; queda uno de reserva. | HU-98 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-17 | Si el dueño edita el texto de un aviso que va por plantilla, ¿cuánto tarda Meta en aprobarlo? | Sin dato; medirlo en el montaje y avisarlo en la tarjeta. | HU-42 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-18 | ¿Cómo se entera el dueño de una tarjeta nueva sin gastar mensajes? | Notificación del navegador y contador en la app. | HU-66 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-19 | ¿Qué es "la app del teléfono"? No existe definición escrita. [24] | La vista de Piso de la misma web, instalable. Si es otra cosa, escribirla. | Todo Piso | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-20 | ¿Web instalable o solo navegador? | Instalable. | HU Piso | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-21 | ¿Hay internet estable en el piso del taller? Sin dato. | Preguntarlo en la encuesta; sin conexión queda fuera del MVP. | HU Piso | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-22 | ¿Qué ve el dueño en el celular? | El panel completo adaptado. | HU Panel | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-23 | Motor: además de cilindraje y turbo, ¿se piden combustible, número de cilindros, código de motor o, en motos, 2 o 4 tiempos? ¿Desde cuándo son obligatorios cilindraje y turbo? | Cilindraje y turbo obligatorios antes de pasar la orden a Recibido; los demás campos opcionales y solo si un taller los pide en la encuesta. Guardar el cilindraje siempre en cc. | HU-11, HU-20 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-24 | Si el costo de IA va dentro de la suscripción y solo lo ve el administrador: ¿el dueño ve cuántos mensajes lleva? ¿La escena 9 muestra el medidor o se muestra solo en la vista del administrador? ¿La tarjeta del catálogo sigue diciendo "cuánto cuesta en mensajes" (RF-13)? ¿La suscripción incluye una bolsa de mensajes (D-04)? | El dueño no ve costos de IA. Si el plan incluye una bolsa de mensajes, que vea solo "usados de incluidos"; si no, que no vea nada. La escena 9 se mantiene con los 6 KPIs y el medidor se muestra aparte en una vista de administrador. | HU-74, HU-40 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-25 | Con HU-50 cancelada, ¿el seguimiento de garantía (AU-09) también sale? Es posventa, no recordatorio de técnico-mecánica, y por eso la dejé como "próximamente". | Mantenerla en Later hasta que el equipo diga; si "ese tipo de servicios" incluye posventa, cancelarla igual. | HU-49 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-26 | ¿Cuál es la fecha del demo y cuántas horas a la semana dedican cada uno? Sin dato; sin eso no se puede decir si las 101 historias caben. | Poner dos fechas: demo (T0 a T5) y MVP completo (T0 a T7). | Todas | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-27 | El auto-envío (HU-67) choca con RF-18, CA-09 y D-07: nada redactado por la IA sale sin aprobación. ¿Se cambia la regla o se limita el auto-envío a plantillas con datos, sin texto de la IA? | Limitarlo a plantillas con datos (como AU-05) y dejar la regla intacta. | HU-67 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-28 | Cuadernos y chats (HU-96): sin dato de precisión en español y un chat exportado contiene datos de terceros. ¿Se ofrece a talleres reales o solo se mide? | Solo medir con 100 líneas hasta tener dato; no ofrecerla antes. | HU-96 | Abierta; aplicar recomendación como provisional (R-04) |
+| Q-29 | Las tablas de autenticación (`identity.usuario`, `otp_desafio`, `otp_bloqueo`, `sesion`, `refresh_token`, `autorizacion_titular`) se leen **antes** de conocer el taller (inicio de sesión), así que no llevan RLS por `taller_id`. ¿Se acepta? | Aceptar: son tablas de plataforma, solo las toca `identity` y no tienen datos del negocio del taller. `identity.membresia` sí tiene RLS (por taller o por el propio usuario). Revisar si se agrega RLS por `app.usuario_id`/celular cuando haya auditoría externa. | HU-01, HU-79 | Aplicada como provisional (1-nov-2026); la meta-prueba de RLS la excluye por nombre |
+| Q-30 | La matriz RBAC de `docs/06` §6.6 dice que el mecánico **no** abre órdenes, pero HU-09, HU-10, HU-11 y HU-16 dicen que el mecánico registra clientes, vehículos y abre órdenes. | Seguir las HU (mandan sobre la arquitectura, `docs/02` §1): el mecánico tiene `order:create`, `customer:create` y `vehicle:*`, pero no `customer:read_all`. Corregir la tabla de `docs/06` si el equipo lo confirma. | HU-09, HU-16, HU-81 | Aplicada como provisional (1-nov-2026) en `internal/identity/domain/roles.go` |
+| Q-31 | Rotación estricta del refresh: si dos pestañas refrescan **a la vez**, la segunda ve el token ya usado y se revoca toda la sesión (detección de reutilización, `docs/06` §6.3). | Mantener la regla estricta en el MVP (es la propuesta de seguridad) y medir si pasa en el piloto; si molesta, agregar una ventana de gracia corta (p. ej., 10 s) para el token recién rotado. | HU-01 | Abierta; comportamiento actual = estricto |
+| Q-32 | La cookie de refresh usa `Path=/api/v1/auth` en lugar de `/api/v1/auth/refresh` (`docs/06` §6.3) para que también llegue al cierre de sesión y se pueda revocar. | Aceptar `Path=/api/v1/auth`: sigue limitada a las rutas de autenticación. | HU-01 | Aplicada como provisional (1-nov-2026) en `internal/platform/authn/middleware.go` |
+
+> Q-26 (fecha de la demo y dedicación) es el mismo bloqueo que **AQ-12 ⛔**: sin esa información no se puede calendarizar ni juzgar si las 101 HU caben.
+
+## 5. Decisiones abiertas del documento del MVP (D-01 a D-13)
+
+| # | Pregunta | Recomendación | Estado |
+|---|---|---|---|
+| D-01 | ¿WhatsApp de la demo con número de prueba de Meta o con WAHA? | Número de prueba de Meta: oficial, gratis, el código sirve para producción. | Abierta; aplicar recomendación como provisional (R-04) |
+| D-02 | ¿Constituir WEVEH Group (o usar RUT de persona natural) y empezar ya el trámite de Tech Provider? | Empezar ya, en paralelo; no bloquea la demo pero sí el primer piloto. | Abierta; aplicar recomendación como provisional (R-04) |
+| D-03 | ¿Implementación acompañada obligatoria u opcional? | Opcional en el producto, obligatoria en los pilotos (concierge). | Abierta; aplicar recomendación como provisional (R-04) |
+| D-04 | ¿Precio del plan y tamaño de la bolsa de conversaciones? | No fijarlo antes de la encuesta; mostrar en la demo solo el medidor. | Abierta; aplicar recomendación como provisional (R-04) |
+| D-05 | ¿Carros solamente o también motos? | Solo carros en el MVP; motos no están investigadas. | **Decidida (31-oct):** motos dentro del MVP |
+| D-06 | ¿Qué hace primero el asistente que guía al dueño? | Explicar KPIs y listar pendientes del día, sin preguntas libres. | Abierta; aplicar recomendación como provisional (R-04) |
+| D-07 | ¿El agente envía solo o siempre con aprobación? | Siempre con aprobación en el MVP; medir % sin editar antes de soltar. | Abierta; relacionada con Q-27 |
+| D-08 | ¿Qué proveedor y modelo de IA para empezar? | Elegir con los 30 mensajes de prueba midiendo acierto y costo. | Abierta; aplicar recomendación como provisional (R-04) |
+| D-09 | ¿Foto de lista de precios dentro de la demo? | Sí como escena opcional; se salta si no está estable. | Abierta; aplicar recomendación como provisional (R-04) |
+| D-10 | ¿Cómo ve el taller la marca: SWEVEH, WEVEH Group o ambas? | "SWEVEH" al frente y "by WEVEH Group" en el pie (pendiente D-15 anterior). | Abierta; aplicar recomendación como provisional (R-04) |
+| D-11 | ¿Aprobación de cotización completa o ítem por ítem? | Completa en el MVP, ítem por ítem después. | Abierta; aplicar recomendación como provisional (R-04) |
+| D-12 | ¿Facturación electrónica dentro del MVP? | Fuera; integrar Siigo/Alegra después como ya decidieron, aunque Ingo y Kreski la incluyan. | Abierta; aplicar recomendación como provisional (R-04) |
+| D-13 | ¿Con qué taller real se hace la primera demo? | El taller del amigo (perfil objetivo, sin sistema). | Abierta; aplicar recomendación como provisional (R-04) |
+
+## 6. Preguntas abiertas de arquitectura (AQ-01 a AQ-12)
+
+| # | Pregunta | Por qué importa | Recomendación | Estado |
+|---|---|---|---|---|
+| AQ-01 | ¿Fly.io o Cloud Run para el cómputo? | Define workflow de despliegue, secretos y costo | Fly.io `gru`, previa cotización y prueba | **Decidida 1-nov-2026: Cloud Run** (ver sección 3) |
+| AQ-02 | ¿Región de Supabase: `sa-east-1` (Brasil) o EE. UU.? | Latencia frente a tratamiento legal de datos | `sa-east-1` si el asesor jurídico lo avala | **Decidida 1-nov-2026: `sa-east-1`**, condicionada a AQ-10 para datos reales |
+| AQ-03 | ¿Cómo se entrega el OTP: SMS o plantilla de autenticación de WhatsApp? | Costo por inicio de sesión y experiencia | Cotizar ambos; WhatsApp si el costo es menor y ya hay canal | Abierta; aplicar recomendación como provisional (R-04) |
+| AQ-04 | ¿Auth propia o Supabase Auth? | Alcance de seguridad que debemos mantener | Propia, por roles y cookies a medida; revisar si el tiempo aprieta | **Decidida 1-nov-2026: propia** |
+| AQ-05 | ¿Qué debe funcionar sin conexión en el piso (Q-21)? | Complejidad de la PWA | Solo cola de fotos al inicio | Abierta; aplicar recomendación como provisional (R-04) |
+| AQ-06 | ¿mTLS en el webhook de WhatsApp? | Endurecimiento extra en el borde | Posponer; firma HMAC es obligatoria desde el día 1 | Abierta; aplicar recomendación como provisional (R-04) |
+| AQ-07 | ¿Límite de tasa en memoria o en Redis? | Exactitud entre instancias | En memoria al inicio | Abierta; aplicar recomendación como provisional (R-04) |
+| AQ-08 | ¿Qué backend de observabilidad y qué planes de Sonar/Snyk? | Costos y límites no verificados | Cotizar antes de comprometerse; OTLP mantiene la salida abierta | Abierta; aplicar recomendación como provisional (R-04) |
+| AQ-09 | ¿Qué proveedor(es) de IA y bajo qué términos de datos? | Privacidad y costo | Contrato sin entrenamiento con nuestros datos; capa multi-proveedor | Abierta; aplicar recomendación como provisional (R-04) |
+| AQ-10 ⛔ | Asesoría jurídica: contrato de transmisión de datos, RNBD, retención de auditoría, transmisión internacional | Obligaciones legales antes de clientes reales | Consultar antes del primer taller de verdad | ⛔ **Abierta, bloquea** |
+| AQ-11 | ¿El plan de GitHub permite revisores requeridos en repos privados? | Aprobación manual de producción | Verificar; si no, aprobación por etiqueta + regla de rama | Abierta; aplicar recomendación como provisional (R-04) |
+| AQ-12 | ¿Fecha de la demo y dedicación semanal (Q-26)? | Sin ellas no se puede ordenar el plan ni juzgar viabilidad | Definirla antes de cerrar el plan de la sección 15 | Decisión provisional 1-nov-2026: sin fecha, plan por dependencias (ver sección 2); sigue pendiente el dato |
+
+## 7. Cosas que se dijeron `Sin dato` y hay que averiguar (no inventar)
+
+- Plantillas propias, media y botones en el **número de prueba** de Meta; duración del token temporal.
+- Tiempos de verificación de WEVEH Group con Meta; disponibilidad de la **coexistencia** en Colombia; tarifas oficiales de Meta en Colombia; si el agente de IA de Meta ya está disponible en Colombia.
+- Costo del OTP en Colombia (SMS vs. plantilla de autenticación de WhatsApp).
+- Límites numéricos del plan gratuito de **Snyk** para repositorios privados; precios de Supabase, Fly.io, Cloud Run y backend de observabilidad.
+- Comportamiento de `SET LOCAL` + RLS con el pooler de Supabase (**Inferencia**: probar en el Sprint 0).
+- Precisión de la IA en listas de precios y cuadernos de talleres en español; qué modelo usar (D-08, se mide con los 30 mensajes de prueba).
+- Si los dueños pagarían y cuánto (encuesta y concierge); línea base de minutos que un taller pierde en WhatsApp.
+- Internet estable en el piso del taller (Q-21); servicios y checklist de un taller de **motos** (Q-02).
+- Aplicabilidad legal concreta (contrato de transmisión, RNBD, retención de auditoría, transmisión a Brasil): requiere abogado (AQ-10).

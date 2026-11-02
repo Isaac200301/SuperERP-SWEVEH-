@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Piso: checklist de recepción</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Manrope',system-ui,sans-serif;color:#0F1F1D}
+a{color:#005F54}a:hover{color:#004A42}
+.lbl{font-weight:800;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+.inp{min-height:52px;border:1.5px solid #7F9591;border-radius:14px;padding:0 14px;font:inherit;font-size:18px;width:100%;box-sizing:border-box}
+.seg{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;background:#F4F7F6;border-radius:999px;padding:4px}
+.seg button{min-height:44px;border:0;border-radius:999px;background:transparent;font:inherit;font-weight:700;font-size:13px;color:#4C5F5C}
+.ph{aspect-ratio:1;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:13px;font-weight:700}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:#FFFFFF;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:none;padding:18px 18px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #DCE5E3">
+    <a href="PisoOrdenes.dc.html" aria-label="Volver" style="width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:#F4F7F6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div style="flex:1"><b style="font-size:17px">Recibir KLM482</b><div style="font-size:13px;color:#4C5F5C">Spark GT · Laura · OS-0045</div></div>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#005F54">3/5</span>
+  </div>
+
+  <div style="flex:1;overflow:hidden;padding:14px 18px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;background:#F4F7F6;border-radius:999px;padding:4px" role="tablist" aria-label="Tipo de vehículo">
+      <button type="button" role="tab" aria-selected="true" style="min-height:40px;border:0;border-radius:999px;background:#E2F1EE;color:#005F54;font:inherit;font-weight:800">Carro</button>
+      <button type="button" role="tab" aria-selected="false" style="min-height:40px;border:0;border-radius:999px;background:transparent;color:#4C5F5C;font:inherit;font-weight:700">Moto</button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <label class="lbl" for="km">Kilometraje <span style="color:#17693A;font-size:13px">✓</span></label>
+      <div style="position:relative"><input id="km" class="inp" value="62.480" style="font-family:'JetBrains Mono',monospace;font-weight:700;padding-right:52px"><span style="position:absolute;right:14px;top:15px;color:#5A6E6A;font-weight:700">km</span></div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span class="lbl">Combustible <span style="color:#17693A;font-size:13px">✓</span></span>
+      <div class="seg" role="radiogroup" aria-label="Combustible"><button type="button" role="radio" aria-checked="false">Res.</button><button type="button" role="radio" aria-checked="true" style="background:#005F54;color:#FFFFFF">¼</button><button type="button" role="radio" aria-checked="false">½</button><button type="button" role="radio" aria-checked="false">¾</button><button type="button" role="radio" aria-checked="false">Lleno</button></div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;background:#FFF5C2;border-radius:18px;padding:12px">
+      <span class="lbl" style="color:#6F5200"><span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><path d="M12 4l9 16H3z"/></svg> Motor pendiente</span></span>
+      <div style="display:flex;gap:8px">
+        <label style="flex:1;display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700">Cilindraje<input class="inp" placeholder="1.2 L o 1200 cc" style="font-size:15px;background:#FFFFFF"></label>
+        <fieldset style="border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700"><legend style="padding:0;margin-bottom:4px">Turbo</legend><div style="display:flex;gap:4px"><button type="button" aria-pressed="false" style="min-height:52px;min-width:52px;border-radius:12px;border:1.5px solid #7F9591;background:#FFFFFF;font:inherit;font-weight:700">Sí</button><button type="button" aria-pressed="true" style="min-height:52px;min-width:52px;border-radius:12px;border:2px solid #005F54;background:#E2F1EE;color:#005F54;font:inherit;font-weight:800">No</button></div></fieldset>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span class="lbl">Fotos de los 4 lados <span style="font-size:13px;color:#4C5F5C">3 de 4</span></span>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+        <div class="ph" style="background:#DCE5E3;color:#33443F">Frente</div>
+        <div class="ph" style="background:#DCE5E3;color:#33443F">Atrás</div>
+        <div class="ph" style="background:#DCE5E3;color:#33443F">Izq.</div>
+        <button type="button" class="ph" style="border:2px dashed #005F54;background:#E2F1EE;color:#005F54;font:inherit;font-weight:800;font-size:13px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Der.</button>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <label class="lbl" for="nt">Golpes y objetos dentro</label>
+      <input id="nt" class="inp" value="Rayón puerta trasera der. · gato" style="font-size:15px">
+      <span style="font-size:12px;color:#4C5F5C">También puedes dictarlo con el micrófono del teclado.</span>
+    </div>
+  </div>
+
+  <div style="flex:none;padding:12px 18px 18px;border-top:1px solid #DCE5E3;display:flex;flex-direction:column;gap:6px">
+    <button type="button" disabled="disabled" style="min-height:56px;border:1.5px dashed #7F9591;border-radius:14px;background:#F4F7F6;color:#5A6E6A;font:inherit;font-weight:800;font-size:16px">Pasar a Recibido</button>
+    <span style="font-size:13px;color:#4C5F5C;text-align:center">Falta 1 foto y el motor. Al pasar, Laura recibe el resumen con las fotos.</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

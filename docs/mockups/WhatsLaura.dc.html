@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>WhatsApp: cliente nueva</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0;font-family:'Manrope',system-ui,sans-serif;color:#111B21}
+.in{align-self:flex-start;background:#FFFFFF;border-radius:4px 14px 14px 14px;padding:8px 10px;font-size:14px;line-height:1.4;max-width:82%;box-shadow:0 1px 0 rgba(0,0,0,.08)}
+.out{align-self:flex-end;background:#D9FDD3;border-radius:14px 4px 14px 14px;padding:8px 10px;font-size:14px;line-height:1.4;max-width:82%;box-shadow:0 1px 0 rgba(0,0,0,.08)}
+.t{display:block;text-align:right;font-size:11px;color:#667781;margin-top:2px}
+.qb{display:flex;flex-direction:column;gap:4px;align-self:flex-start;width:82%}
+.qb span{background:#FFFFFF;border-radius:10px;min-height:40px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#00796B;box-shadow:0 1px 0 rgba(0,0,0,.08)}
+.tag{font-size:10px;font-weight:800;letter-spacing:.06em;color:#005F54;font-family:monospace}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;background:#EFE7DD">
+  <div style="flex:none;background:#FFFFFF;padding:14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #E0E0E0">
+    <svg width="40" height="40" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="#0F3D37"/><text x="32" y="40" text-anchor="middle" font-family="Manrope" font-size="22" font-weight="800" fill="#FFFFFF">SP</text></svg>
+    <div style="flex:1"><b style="font-size:16px">Servitaller El Pistón</b><div style="font-size:12px;color:#667781">Cuenta de empresa</div></div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:14px;display:flex;flex-direction:column;gap:8px">
+    <span style="align-self:center;background:#FFFFFF;border-radius:8px;padding:4px 10px;font-size:12px;color:#54656F">Hoy</span>
+    <div class="out">Hola, mi Spark GT chilla al frenar. ¿Cuánto vale revisar y me lo pueden ver el jueves? Placa KLM482<span class="t">10:40</span></div>
+    <div class="in"><span class="tag">AUTOMÁTICO · AUTORIZACIÓN</span><br>Hola, te escribe Servitaller El Pistón. Antes de seguir, ¿aceptas el tratamiento de tus datos para atender tu servicio?<span class="t">10:40</span></div>
+    <div class="qb"><span>Acepto</span><span>Ver política</span></div>
+    <div class="out">Acepto<span class="t">10:41</span></div>
+    <div class="in"><span class="tag">REVISADO POR EL TALLER</span><br>Hola Laura. La revisión de frenos vale $40.000 y tarda unos 45 minutos. El jueves 6 de noviembre tenemos espacio a las 9:00 a. m. ¿Te la dejo agendada?<span class="t">10:44</span></div>
+    <div class="out">Sí, porfa<span class="t">10:45</span></div>
+    <span style="align-self:center;background:#FFFFFF;border-radius:8px;padding:4px 10px;font-size:12px;color:#54656F">Jueves</span>
+    <div class="in" style="padding:6px"><span class="tag" style="padding:0 4px">AU-01 · VEHÍCULO RECIBIDO</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:6px 0"><span style="aspect-ratio:4/3;border-radius:8px;background:#C9D5D2"></span><span style="aspect-ratio:4/3;border-radius:8px;background:#C9D5D2"></span><span style="aspect-ratio:4/3;border-radius:8px;background:#C9D5D2"></span><span style="aspect-ratio:4/3;border-radius:8px;background:#C9D5D2;display:grid;place-items:center;font-size:12px;font-weight:700;color:#33443F">+1</span></div>
+      <div style="padding:0 4px">Recibimos tu Spark GT KLM482 a las 9:04 con 62.480 km y ¼ de tanque. Anotamos un rayón en la puerta trasera derecha.</div><span class="t">9:06</span></div>
+    <div class="qb"><span>Estoy de acuerdo</span><span>Tengo una duda</span></div>
+  </div>
+  <div style="flex:none;display:flex;gap:8px;align-items:center;padding:8px 10px 14px">
+    <span style="flex:1;background:#FFFFFF;border-radius:999px;min-height:44px;display:flex;align-items:center;padding:0 16px;color:#667781;font-size:15px">Mensaje</span>
+    <span style="width:44px;height:44px;border-radius:50%;background:#00A884;display:grid;place-items:center" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

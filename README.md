@@ -25,7 +25,33 @@ No es un ERP ni compite con los grandes ERP, y tampoco es "solo IA". Su valor es
 
 ## Estado del proyecto
 
-Fase de ideación y validación (aún sin construcción). Siguiente paso: Determinar demo y construir.
+**Sprint 0 en curso** (noviembre de 2026). Ya funciona en local la primera rebanada: crear la cuenta del taller con el celular y un código, registrar cliente y vehículo (carro o moto, con motor) y abrir una orden con número consecutivo. El detalle por historia está en [`docs/09-estado-de-construccion.md`](docs/09-estado-de-construccion.md).
+
+## Cómo correrlo en local
+
+Necesitas Docker, Go 1.27, Node 24 y `make` (en Windows, desde Git Bash). Solo se usan datos ficticios.
+
+```sh
+cp .env.example .env      # valores de desarrollo; nunca pongas secretos reales
+make up migrate           # Postgres en Docker (puerto 54329) y migraciones
+make dev-api              # api en http://localhost:8080; el código de entrada sale en esta terminal
+make dev-worker           # (otra terminal) despacha los eventos del outbox
+npm --prefix web install  # una sola vez
+make dev-web              # (otra terminal) panel en http://localhost:5173
+```
+
+Abre `http://localhost:5173/registro`, crea la cuenta y copia el código que imprime la terminal del api (`[SOLO DESARROLLO]`). En staging y producción el api no arranca sin un proveedor real de códigos.
+
+| Comando | Qué hace |
+|---|---|
+| `make test` | Pruebas de Go con `-race` contra Postgres real (aislamiento entre talleres y concurrencia incluidos) y Vitest |
+| `make cover` | Cobertura de Go; falla si dominio o aplicación quedan por debajo del 80 % |
+| `make lint` | `golangci-lint` (con `depguard`), ESLint y `tsc` |
+| `make gen` | Regenera las consultas `sqlc` y los tipos TypeScript del contrato `api/openapi.yaml` |
+| `make ci` | Lo mismo que el pipeline de GitHub Actions |
+| `make image` | Imagen de contenedor (api, worker y migrate, sin root) |
+
+La documentación para construir está en [`docs/`](docs/) y las reglas para agentes en [`CLAUDE.md`](CLAUDE.md).
 
 ## Origen
 

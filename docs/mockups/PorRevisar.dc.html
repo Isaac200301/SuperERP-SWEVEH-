@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Bandeja Por revisar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Manrope',system-ui,sans-serif;color:#0F1F1D;background:#E9EEED}
+a{color:#005F54}a:hover{color:#004A42}
+.nav a{display:flex;align-items:center;min-height:44px;padding:0 16px;border-radius:999px;background:#F4F7F6;color:#33443F;text-decoration:none;font-weight:600;font-size:15px}
+.nav a.on{background:#DDF47B;color:#0F1F1D;font-weight:800}
+.box{background:#FFFFFF;border-radius:24px;padding:20px;min-width:0}
+.mono{font-family:'JetBrains Mono',monospace}
+.src{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;border-radius:999px;padding:2px 8px;background:#E2F1EE;color:#005F54}
+.btn{min-height:48px;padding:0 20px;border-radius:14px;border:0;font:inherit;font-weight:800;font-size:15px;cursor:pointer}
+.it{display:flex;flex-direction:column;gap:4px;padding:14px;border-radius:18px;text-decoration:none;color:#0F1F1D}
+.f{display:grid;grid-template-columns:130px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #E3EAE8;font-size:14px}
+.f span:first-child{color:#4C5F5C}
+</style>
+</helmet>
+<div style="box-sizing:border-box;padding:20px;display:flex;flex-wrap:wrap;gap:20px;max-width:1600px;margin:0 auto">
+  <aside style="flex:1 1 200px;max-width:220px;display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 6px 0"><svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#005F54"/><path d="M17.5 27 L24.75 46 L32 33 L39.25 46 L46.5 27" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="18" r="5" fill="#FFB000"/></svg><b style="font-size:18px">SWEVEH</b></div>
+    <nav class="nav" aria-label="Secciones del panel" style="display:flex;flex-direction:column;gap:8px">
+      <a href="Panel.dc.html">Hoy</a><a href="Orden.dc.html">Órdenes</a><a class="on" href="PorRevisar.dc.html" aria-current="page">Por revisar · 2</a><a href="#clientes">Clientes y vehículos</a><a href="#inventario">Inventario</a><a href="Automatizaciones.dc.html">Automatizaciones</a><a href="#ajustes">Ajustes y usuarios</a>
+    </nav>
+  </aside>
+
+  <main style="flex:999 1 760px;min-width:0;display:flex;flex-direction:column;gap:20px">
+    <header style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between">
+      <div><h1 style="margin:0;font-size:28px;letter-spacing:-.02em">Por revisar</h1><p style="margin:2px 0 0;color:#4C5F5C">Lo que el asistente propone. Nada sale hasta que tú lo envíes.</p></div>
+      <div style="background:#FFFFFF;border-radius:999px;padding:8px 16px;font-size:14px;color:#33443F">Esta semana editaste <b>3 de 10</b> borradores antes de enviarlos</div>
+    </header>
+
+    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+      <section class="box" style="flex:1 1 280px;display:flex;flex-direction:column;gap:8px;background:#F4F7F6" aria-label="Pendientes">
+        <a class="it" href="#laura" style="background:#FFFFFF;box-shadow:inset 0 0 0 2px #005F54"><span style="display:flex;justify-content:space-between"><b>Laura Gómez</b><span class="mono" style="font-size:12px;color:#4C5F5C">hace 2 min</span></span><span style="font-size:13px;color:#4C5F5C">Cliente nueva · frenos · pide cita el jueves</span><span class="src" style="align-self:flex-start">Mensaje de WhatsApp</span></a>
+        <a class="it" href="#lista" style="background:#FFFFFF"><span style="display:flex;justify-content:space-between"><b>Foto de lista de precios</b><span class="mono" style="font-size:12px;color:#4C5F5C">ayer</span></span><span style="font-size:13px;color:#4C5F5C">7 filas leídas · 1 con duda</span><span class="src" style="align-self:flex-start;background:#EEE9FD;color:#4B3A8C">Migración</span></a>
+        <p style="margin:8px 4px 0;font-size:13px;color:#4C5F5C">Cuando hay algo nuevo te avisamos dentro del panel y en el celular de recepción.</p>
+      </section>
+
+      <section class="box" style="flex:3 1 560px;display:flex;flex-direction:column;gap:18px" aria-labelledby="hl">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 id="hl" style="margin:0;font-size:20px">Laura Gómez · <span class="mono" style="font-size:16px">+57 301 *** 2290</span></h2><span style="display:inline-flex;gap:6px;align-items:center;background:#E5F4EA;color:#17693A;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:800">Autorizó datos · 10:41</span></div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:16px">
+          <div style="flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:8px">
+            <b style="font-size:14px;color:#4C5F5C">1 · Lo que escribió</b>
+            <div style="background:#EFE7DD;border-radius:18px;padding:14px"><div style="background:#FFFFFF;border-radius:12px 12px 12px 4px;padding:10px 12px;font-size:14px;line-height:1.5">Hola, mi Spark GT chilla al frenar. ¿Cuánto vale revisar y me lo pueden ver el jueves? Placa KLM482</div></div>
+          </div>
+          <div style="flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:2px">
+            <b style="font-size:14px;color:#4C5F5C;margin-bottom:6px">2 · Lo que entendió (de dónde salió cada dato)</b>
+            <div class="f"><span>Vehículo</span><b>Chevrolet Spark GT · <span class="mono">KLM482</span></b><span class="src">del mensaje</span></div>
+            <div class="f"><span>Síntoma</span><b>Chilla al frenar</b><span class="src">del mensaje</span></div>
+            <div class="f"><span>Servicio</span><b>Revisión de frenos · $40.000</b><span class="src">lista de precios</span></div>
+            <div class="f"><span>Cita</span><b>Jueves 6 nov · 9:00 a. m.</b><span class="src">horario del taller</span></div>
+            <div class="f" style="border-bottom:0"><span>Motor</span><b style="color:#6F5200">Pendiente</b><span class="src" style="background:#FFF5C2;color:#6F5200">se pide al recibir</span></div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label for="bor" style="font-weight:800;font-size:14px;color:#4C5F5C">3 · Borrador de respuesta (puedes editarlo)</label>
+          <textarea id="bor" rows="4" style="border:2px dashed #3CCFB6;border-radius:16px;padding:14px;font:inherit;font-size:15px;line-height:1.55;resize:vertical">Hola Laura, te escribe Servitaller El Pistón. La revisión de frenos vale $40.000 y tarda unos 45 minutos. El jueves 6 de noviembre tenemos espacio a las 9:00 a. m. ¿Te la dejo agendada?</textarea>
+          <label style="display:flex;gap:10px;align-items:center;font-size:14px;min-height:44px"><input type="checkbox" checked="checked" style="width:22px;height:22px;accent-color:#005F54">Al enviar, crear la orden “Por recibir” de KLM482 para el jueves</label>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button class="btn" type="button" style="background:#005F54;color:#FFFFFF">Enviar</button>
+          <button class="btn" type="button" style="background:#E2F1EE;color:#005F54">Guardar cambios</button>
+          <button class="btn" type="button" style="background:#F4F7F6;color:#0F1F1D">Responder yo</button>
+          <button class="btn" type="button" style="background:transparent;color:#A5231F;margin-left:auto">Descartar</button>
+        </div>
+        <p style="margin:0;font-size:13px;color:#4C5F5C">El asistente solo usa tus precios y horarios. Si un servicio no tiene precio, el borrador dice que el taller lo confirma.</p>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":960}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

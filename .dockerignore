@@ -1,0 +1,11 @@
+.git
+.cache
+.env
+.env.*
+**/node_modules
+web/dist
+web/coverage
+docs
+agent-skills
+*.pem
+*.key

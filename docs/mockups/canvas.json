@@ -1,0 +1,23 @@
+{"v":3,"createdOnFiles":{"v":1,"at":"2026-11-01T22:55:00Z"},"title":"Mockups MVP SWEVEH","launch":{"view":"canvas"},"pages":[],
+"boards":{
+"Main.dc.html":{"x":0,"y":0,"w":1440,"h":3700,"title":"1 · Landing SWEVEH","expand":"fill"},
+"Registro.dc.html":{"x":0,"y":4200,"w":1280,"h":860,"title":"2 · Registro en 3 pasos (HU-01..05)"},
+"Panel.dc.html":{"x":1360,"y":4200,"w":1440,"h":1080,"title":"3 · Panel del dueño: Hoy y KPIs (HU-68..76)","expand":"fill"},
+"Orden.dc.html":{"x":2880,"y":4200,"w":1440,"h":1080,"title":"4 · Orden de servicio (HU-11, 13, 20..27)","expand":"fill"},
+"PorRevisar.dc.html":{"x":4400,"y":4200,"w":1440,"h":960,"title":"5 · Bandeja Por revisar (HU-62..66)","expand":"fill"},
+"Automatizaciones.dc.html":{"x":5920,"y":4200,"w":1440,"h":960,"title":"6 · Catálogo de automatizaciones (HU-40..42)","expand":"fill"},
+"PisoOrdenes.dc.html":{"x":0,"y":5700,"w":390,"h":844,"title":"7 · Piso: mis órdenes (HU-23, 81)"},
+"PisoChecklist.dc.html":{"x":470,"y":5700,"w":390,"h":844,"title":"8 · Piso: checklist de recepción (HU-17, 18, 21)"},
+"WhatsLaura.dc.html":{"x":940,"y":5700,"w":390,"h":844,"title":"9 · WhatsApp: cliente nueva (HU-51, 85, 19)"},
+"WhatsAndres.dc.html":{"x":1410,"y":5700,"w":390,"h":844,"title":"10 · WhatsApp: ¿ya está mi carro? (HU-56, 28, 43)"},
+"Admin.dc.html":{"x":1880,"y":5700,"w":1440,"h":960,"title":"11 · Admin del ERP: medidor de IA (HU-74, 97..101)","expand":"fill"}
+},
+"order":["Main.dc.html","Registro.dc.html","Panel.dc.html","Orden.dc.html","PorRevisar.dc.html","Automatizaciones.dc.html","PisoOrdenes.dc.html","PisoChecklist.dc.html","WhatsLaura.dc.html","WhatsAndres.dc.html","Admin.dc.html"],
+"notes":{
+"t1":{"x":0,"y":-300,"text":"Landing: entrada fácil, suscripción","kind":"title1","maxW":1440},
+"t2":{"x":0,"y":3900,"text":"Panel web del dueño y recepción","kind":"title1","maxW":7360},
+"t3":{"x":0,"y":5400,"text":"Piso (celular del mecánico), WhatsApp del cliente y Admin del ERP","kind":"title1","maxW":3320},
+"s1":{"x":1520,"y":0,"w":420,"size":"m","fill":"teal","text":"Sistema visual\n• Paleta WEVEH: teal #005F54 para actuar, neutros con tinte teal, estados Bien/Atención/Urgente siempre con ícono + palabra.\n• Del dashboard de referencia: sidebar de píldoras, tarjetas de KPI pastel, acento lima solo para la navegación activa y el dato resaltado del gráfico.\n• Ámbar #FFB000 solo en el punto del logo (regla heredada de WEVEH).\n• Manrope + JetBrains Mono para placas y cifras.\nDatos: taller ficticio Servitaller El Pistón (docs/03)."},
+"s2":{"x":1520,"y":620,"w":420,"size":"m","fill":"orange","text":"Pendiente del equipo\n• Precio del plan: [PRECIO POR DEFINIR] (D-04).\n• Qué ve el dueño del costo de IA (Q-24): aquí el dueño NO lo ve; solo el Admin del ERP.\n• AU-09 garantía queda como “Próximamente” (Q-25)."}
+},
+"designSystems":[]}

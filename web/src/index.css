@@ -1,0 +1,58 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/manrope';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/700.css';
+
+/* Tokens de docs/10-mockups-y-diseno.md §2. Fuentes autoalojadas: sin peticiones a terceros. */
+@theme {
+  --color-primary: #005f54;
+  --color-primary-pressed: #004a42;
+  --color-primary-tint: #e2f1ee;
+  --color-ink: #0f1f1d;
+  --color-ink-2: #4c5f5c;
+  --color-ink-3: #667774;
+  --color-surface: #f4f7f6;
+  --color-surface-2: #e8eeec;
+  --color-line: #d3dcda;
+  --color-ok: #1e7a46;
+  --color-ok-tint: #e5f4ea;
+  --color-ok-ink: #17693a;
+  --color-warn: #f9e03f;
+  --color-warn-tint: #fff5c2;
+  --color-warn-ink: #6f5200;
+  --color-err: #c9302c;
+  --color-err-tint: #fce9e7;
+  --color-err-ink: #a5231f;
+  /* DR-02: el lima solo marca dónde estás; el limón (warn) siempre es atención. */
+  --color-nav: #ddf47b;
+  --color-kpi-peach: #fff1e2;
+  --color-kpi-lilac: #eee9fd;
+  --color-kpi-aqua: #ddf5f1;
+  --color-plate: #f9e03f;
+  /* DR-03: el ámbar solo va en el punto del logo. */
+  --color-amber: #ffb000;
+  --color-night: #0a1413;
+  --color-night-card: #112220;
+  --color-night-line: #22403c;
+  --color-night-text: #eaf3f1;
+  --color-night-text-2: #a9beba;
+  --color-night-accent: #6fe5d2;
+
+  --font-sans: 'Manrope Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius-card: 24px;
+  --radius-btn: 14px;
+}
+
+html {
+  color: var(--color-ink);
+  background: var(--color-surface-2);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}

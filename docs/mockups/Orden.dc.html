@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Orden de servicio OS-0043</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Manrope',system-ui,sans-serif;color:#0F1F1D;background:#E9EEED}
+a{color:#005F54}a:hover{color:#004A42}
+.nav a{display:flex;align-items:center;min-height:44px;padding:0 16px;border-radius:999px;background:#F4F7F6;color:#33443F;text-decoration:none;font-weight:600;font-size:15px}
+.nav a.on{background:#DDF47B;color:#0F1F1D;font-weight:800}
+.box{background:#FFFFFF;border-radius:24px;padding:20px;min-width:0}
+.h{margin:0 0 12px;font-size:16px}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #E3EAE8;font-size:14px}
+.kv span{color:#4C5F5C}
+.plate{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;border:2px solid #0F1F1D;border-radius:7px;padding:2px 10px;letter-spacing:.06em;background:#F9E03F}
+.mono{font-family:'JetBrains Mono',monospace}
+.btn{min-height:48px;padding:0 20px;border-radius:14px;border:0;font:inherit;font-weight:800;font-size:15px;cursor:pointer}
+.ph{aspect-ratio:4/3;border-radius:14px;background:#DCE5E3;display:flex;align-items:flex-end;padding:8px;font-size:12px;font-weight:700;color:#33443F}
+td,th{padding:10px 8px;border-bottom:1px solid #E3EAE8;font-size:14px;text-align:left}
+th{font-size:12px;color:#4C5F5C;text-transform:uppercase;letter-spacing:.05em}
+.b-in{background:#FFFFFF;border-radius:12px 12px 12px 4px;padding:8px 10px;font-size:13px;max-width:85%}
+.b-out{align-self:flex-end;background:#D9FDD3;border-radius:12px 12px 4px 12px;padding:8px 10px;font-size:13px;max-width:85%}
+</style>
+</helmet>
+<div style="box-sizing:border-box;padding:20px;display:flex;flex-wrap:wrap;gap:20px;max-width:1600px;margin:0 auto">
+  <aside style="flex:1 1 200px;max-width:220px;display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 6px 0"><svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#005F54"/><path d="M17.5 27 L24.75 46 L32 33 L39.25 46 L46.5 27" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="18" r="5" fill="#FFB000"/></svg><b style="font-size:18px">SWEVEH</b></div>
+    <nav class="nav" aria-label="Secciones del panel" style="display:flex;flex-direction:column;gap:8px">
+      <a href="Panel.dc.html">Hoy</a><a class="on" href="Orden.dc.html" aria-current="page">Órdenes</a><a href="PorRevisar.dc.html">Por revisar · 2</a><a href="#clientes">Clientes y vehículos</a><a href="#inventario">Inventario</a><a href="Automatizaciones.dc.html">Automatizaciones</a><a href="#ajustes">Ajustes y usuarios</a>
+    </nav>
+  </aside>
+
+  <main style="flex:999 1 760px;min-width:0;display:flex;flex-direction:column;gap:20px">
+    <header style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <a href="#ordenes" style="font-size:14px;font-weight:700">← Órdenes</a>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="margin:0;font-size:28px;letter-spacing:-.02em" class="mono">OS-0043</h1><span class="plate">HTR315</span><span style="color:#4C5F5C">Andrés Restrepo · Renault Logan 2018</span></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn" type="button" style="background:#F4F7F6;color:#A5231F">Cancelar orden</button>
+        <button class="btn" type="button" style="background:#005F54;color:#FFFFFF">Pasar a Listo</button>
+      </div>
+    </header>
+
+    <section class="box" aria-label="Estado de la orden" style="padding:16px 20px">
+      <ol style="list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;font-size:13px;text-align:center">
+        <li style="display:flex;flex-direction:column;gap:6px;align-items:center"><span style="height:8px;width:100%;border-radius:999px;background:#005F54"></span><b>Por recibir</b><span class="mono" style="color:#4C5F5C">Jue 8:10</span></li>
+        <li style="display:flex;flex-direction:column;gap:6px;align-items:center"><span style="height:8px;width:100%;border-radius:999px;background:#005F54"></span><b>Recibido</b><span class="mono" style="color:#4C5F5C">Jue 8:42</span></li>
+        <li style="display:flex;flex-direction:column;gap:6px;align-items:center"><span style="height:8px;width:100%;border-radius:999px;background:#005F54"></span><b>En diagnóstico</b><span class="mono" style="color:#4C5F5C">Jue 9:05</span></li>
+        <li style="display:flex;flex-direction:column;gap:6px;align-items:center"><span style="height:8px;width:100%;border-radius:999px;background:#005F54"></span><b>Esperando aprobación</b><span class="mono" style="color:#4C5F5C">Jue 9:50</span></li>
+        <li style="display:flex;flex-direction:column;gap:6px;align-items:center"><span style="height:8px;width:100%;border-radius:999px;background:#DDF47B;box-shadow:inset 0 0 0 2px #6F7F1D"></span><b style="font-weight:800">En reparación</b><span class="mono" style="color:#4C5F5C">Jue 10:12</span></li>
+        <li style="display:flex;flex-direction:column;gap:6px;align-items:center;color:#667774"><span style="height:8px;width:100%;border-radius:999px;background:#DCE5E3"></span>Listo<span>Prometido hoy 5:00 p. m.</span></li>
+        <li style="display:flex;flex-direction:column;gap:6px;align-items:center;color:#667774"><span style="height:8px;width:100%;border-radius:999px;background:#DCE5E3"></span>Entregado<span>—</span></li>
+      </ol>
+    </section>
+
+    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+      <div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:20px">
+        <section class="box">
+          <h2 class="h">Vehículo y motor</h2>
+          <div class="kv"><span>Marca y línea</span><b>Renault Logan</b></div>
+          <div class="kv"><span>Modelo (año)</span><b>2018</b></div>
+          <div class="kv"><span>Kilometraje al recibir</span><b class="mono">84.120 km</b></div>
+          <div class="kv"><span>Cilindraje</span><b class="mono">1.598 cc</b></div>
+          <div class="kv"><span>Turbo</span><b>No</b></div>
+          <div class="kv" style="border-bottom:0"><span>Cliente</span><b>Andrés · <span class="mono">+57 300 *** 4412</span></b></div>
+          <a href="#historial" style="display:inline-block;margin-top:8px;font-weight:700;font-size:14px">Ver historial de HTR315 (3 órdenes)</a>
+        </section>
+        <section class="box">
+          <div style="display:flex;justify-content:space-between;align-items:center"><h2 class="h" style="margin:0">Recepción y fotos</h2><span style="font-size:13px;color:#17693A;font-weight:700">Cliente de acuerdo · Jue 8:51</span></div>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px"><div class="ph">Frente</div><div class="ph">Atrás</div><div class="ph">Izquierda</div><div class="ph">Derecha</div></div>
+          <p style="margin:10px 0 0;font-size:14px;color:#4C5F5C">Combustible ¼ · Rayón puerta trasera izquierda · Gato y llanta de repuesto dentro.</p>
+        </section>
+      </div>
+
+      <div style="flex:2 1 420px;min-width:0;display:flex;flex-direction:column;gap:20px">
+        <section class="box">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 class="h" style="margin:0">Cotización</h2><span style="display:inline-flex;gap:6px;align-items:center;background:#E5F4EA;color:#17693A;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:800"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>Aprobada por WhatsApp · Jue 10:12</span></div>
+          <table style="width:100%;border-collapse:collapse;margin-top:8px">
+            <thead><tr><th>Ítem</th><th>Tipo</th><th style="text-align:right">Cant.</th><th style="text-align:right">Valor</th></tr></thead>
+            <tbody>
+              <tr><td>Revisión de frenos</td><td>Servicio</td><td style="text-align:right">1</td><td style="text-align:right" class="mono">$40.000</td></tr>
+              <tr><td>Cambio de pastillas delanteras</td><td>Servicio</td><td style="text-align:right">1</td><td style="text-align:right" class="mono">$60.000</td></tr>
+              <tr><td>Líquido de frenos DOT 4 <span class="mono" style="color:#4C5F5C;font-size:12px">LF-DOT4</span></td><td>Repuesto · descontado</td><td style="text-align:right">1</td><td style="text-align:right" class="mono">$28.000</td></tr>
+              <tr><td colspan="3" style="text-align:right;font-weight:800;border-bottom:0">Total</td><td style="text-align:right;font-weight:800;border-bottom:0" class="mono">$128.000</td></tr>
+            </tbody>
+          </table>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"><button class="btn" type="button" style="background:#E2F1EE;color:#005F54">+ Cotización adicional</button><button class="btn" type="button" style="background:#F4F7F6;color:#0F1F1D">Agregar foto o nota</button></div>
+        </section>
+        <section class="box" style="display:flex;flex-wrap:wrap;gap:16px">
+          <label style="flex:1 1 200px;display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:14px">Mecánico asignado<select style="min-height:48px;border-radius:12px;border:1.5px solid #7F9591;font:inherit;padding:0 12px"><option>Jhon</option></select></label>
+          <label style="flex:1 1 200px;display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:14px">Fecha prometida<input value="Sáb 1 nov · 5:00 p. m." style="min-height:48px;border-radius:12px;border:1.5px solid #7F9591;font:inherit;padding:0 12px"></label>
+        </section>
+      </div>
+
+      <div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:20px">
+        <section class="box" style="background:#EFE7DD;display:flex;flex-direction:column;gap:8px">
+          <h2 class="h" style="margin:0 0 4px">WhatsApp de esta orden</h2>
+          <div class="b-out">Tu Logan HTR315 quedó recibido. Así quedó registrado, con 4 fotos. <i style="color:#4C5F5C">AU-01</i></div>
+          <div class="b-in">De acuerdo ✔</div>
+          <div class="b-out">Cotización: $128.000. [Aprobar] [Ver detalle] [Llamar] <i style="color:#4C5F5C">AU-02</i></div>
+          <div class="b-in">Aprobar</div>
+          <div class="b-in">¿Ya está mi carro?</div>
+          <div class="b-out">Está en reparación. Te lo tenemos prometido para hoy a las 5:00 p. m. <i style="color:#4C5F5C">AU-05</i></div>
+        </section>
+        <section class="box">
+          <h2 class="h">Quién cambió qué</h2>
+          <ul style="list-style:none;margin:0;padding:0;font-size:13px;color:#4C5F5C;display:flex;flex-direction:column;gap:8px">
+            <li><b style="color:#0F1F1D">Cliente</b> aprobó la cotización · 10:12</li>
+            <li><b style="color:#0F1F1D">Jhon</b> pasó a Esperando aprobación · 9:50</li>
+            <li><b style="color:#0F1F1D">Jhon</b> cambió cilindraje 1.600 → 1.598 cc · 9:02</li>
+            <li><b style="color:#0F1F1D">Hernán</b> asignó a Jhon · 8:15</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
