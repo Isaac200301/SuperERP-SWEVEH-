@@ -3,11 +3,16 @@ import { NavLink, Outlet, useNavigate } from 'react-router';
 import type { Sesion } from '../../shared/api/client';
 import { roles } from '../../shared/i18n/es-CO';
 import { Brand } from '../../shared/ui/Logo';
-import { IconLogout, IconOrders } from '../../shared/ui/icons';
+import { IconCar, IconLogout, IconOrders, IconTeam, IconTool } from '../../shared/ui/icons';
 import { useLogout } from '../auth/api';
 
 /** Navegación del panel. Solo aparecen las secciones que ya existen (el resto llega con sus HU). */
-const nav = [{ to: '/panel/ordenes', label: 'Órdenes', icon: IconOrders }];
+const nav = [
+  { to: '/panel/ordenes', label: 'Órdenes', icon: IconOrders },
+  { to: '/panel/catalogo', label: 'Servicios y repuestos', icon: IconTool },
+  { to: '/panel/equipo', label: 'Equipo', icon: IconTeam },
+  { to: '/panel/taller', label: 'Mi taller', icon: IconCar },
+];
 
 export function PanelLayout({ session }: { session: Sesion }) {
   const navigate = useNavigate();

@@ -33,3 +33,5 @@ export const IconLogout = (p: IconProps) => <Base {...p}><path d="M15 4h4v16h-4M
 export const IconCar = (p: IconProps) => <Base {...p}><path d="M4 17v-4l2-5h12l2 5v4" /><path d="M4 13h16" /><circle cx="7.5" cy="17" r="1.8" /><circle cx="16.5" cy="17" r="1.8" /></Base>;
 export const IconBack = (p: IconProps) => <Base {...p}><path d="M15 6l-6 6 6 6" /></Base>;
 export const IconX = (p: IconProps) => <Base {...p}><path d="M6 6l12 12M18 6L6 18" /></Base>;
+export const IconTool = (p: IconProps) => <Base {...p}><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" /></Base>;
+export const IconTeam = (p: IconProps) => <Base {...p}><circle cx="9" cy="8" r="3.2" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><path d="M16 4.5a3 3 0 0 1 0 6M21 20c0-2.6-1.6-4.8-4-5.6" /></Base>;

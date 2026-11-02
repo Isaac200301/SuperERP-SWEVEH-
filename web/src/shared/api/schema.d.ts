@@ -372,7 +372,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Cotización de la orden (HU-27). Permiso quote:read */
+        /** Cotización vigente de la orden; si aún no hay, devuelve {"cotizacion":null} (HU-27). Permiso quote:read */
         get: operations["getQuote"];
         put?: never;
         post?: never;
@@ -1832,7 +1832,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Cotizacion"];
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cotizacion"] | {
+                        cotizacion: Record<string, never> | null;
+                    };
+                };
+            };
             404: components["responses"]["Problem"];
         };
     };
@@ -1914,7 +1924,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    decision: string;
+                    /** @enum {string} */
+                    decision: "aprobar" | "rechazar" | "dudas";
                     /** @enum {string} */
                     canal: "telefono" | "mostrador";
                     itemsAprobados?: string[];

@@ -8,6 +8,7 @@ import { IconBack, IconCheck, IconWarn } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
 import { StatePill } from '../../shared/ui/StatePill';
 import { useOrder } from './api';
+import { OrderActions, QuotePanel, ReceptionPanel } from './OrderWork';
 
 /** Stepper de los 7 estados con la hora de cada paso (docs/10 §4.3). */
 export function StateStepper({ orden }: { orden: Orden }) {
@@ -90,6 +91,9 @@ export function OrderDetailPage() {
           ) : null}
         </section>
       </div>
+      <OrderActions orden={o} />
+      <ReceptionPanel orden={o} />
+      {o.estado !== 'por_recibir' ? <QuotePanel orden={o} /> : null}
     </>
   );
 }

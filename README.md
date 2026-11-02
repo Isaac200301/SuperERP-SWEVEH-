@@ -25,7 +25,23 @@ No es un ERP ni compite con los grandes ERP, y tampoco es "solo IA". Su valor es
 
 ## Estado del proyecto
 
-**Sprint 0 en curso** (noviembre de 2026). Ya funciona en local la primera rebanada: crear la cuenta del taller con el celular y un código, registrar cliente y vehículo (carro o moto, con motor) y abrir una orden con número consecutivo. El detalle por historia está en [`docs/09-estado-de-construccion.md`](docs/09-estado-de-construccion.md).
+**MVP en construcción** (noviembre de 2026). Todavía no hay entorno de staging ni datos reales: corre en local con datos ficticios.
+
+Lo que ya se puede hacer desde el panel:
+
+| Área | Qué hace | HU |
+|---|---|---|
+| Cuenta | Crear el taller con el celular y un código; autorización de datos | HU-01, HU-02 |
+| Mi taller | Tipo de taller, especialidades, contrato de transmisión y horario semanal | HU-03, HU-08, HU-89 |
+| Equipo | Agregar mecánico o recepción por celular, desactivar a quien se va | HU-80, HU-84 |
+| Servicios y repuestos | Precios y duración de servicios; repuestos con existencia, mínimo y entradas | HU-07, HU-32, HU-35 |
+| Órdenes | Abrir desde la placa (carro o moto, con motor), mover por los 7 estados, entregar | HU-09…11, HU-16, HU-20, HU-25 |
+| Recepción | Checklist con kilometraje, combustible, accesorios y fotos por lado; notas | HU-17, HU-21 |
+| Cotización | Armar con servicios y repuestos de la lista del taller, enviar y registrar la respuesta | HU-27, HU-29 |
+
+Ya existen en el backend, sin pantalla todavía: WhatsApp y agente, automatizaciones, bandeja "Por revisar" y KPIs. El estado por historia está en [`docs/09-estado-de-construccion.md`](docs/09-estado-de-construccion.md).
+
+**Calidad:** cada PR pasa por GitHub Actions con pruebas de Go con `-race` contra Postgres real, cobertura mínima del 80 % en dominio y aplicación, `golangci-lint`, Vitest, gitleaks, govulncheck, **Snyk** y **SonarQube Cloud**. Se trabaja en la rama `developer` y se integra a `main` por pull request revisado.
 
 ## Cómo correrlo en local
 
