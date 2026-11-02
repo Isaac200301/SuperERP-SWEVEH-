@@ -62,7 +62,8 @@ async function sessionFetch(input: Request): Promise<Response> {
 }
 
 export const api = createClient<paths>({
-  baseUrl: '/api/v1',
+  // Mismo origen; absoluto para que también funcione fuera del navegador (pruebas con jsdom).
+  baseUrl: `${globalThis.location.origin}/api/v1`,
   credentials: 'same-origin',
   headers: { 'X-Requested-With': 'sweveh' },
   fetch: sessionFetch,
