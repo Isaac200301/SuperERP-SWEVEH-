@@ -104,10 +104,8 @@ export function useQuote(id: string, enabled = true) {
   return useQuery({
     queryKey: keys.quote(id),
     enabled,
-    queryFn: async (): Promise<Cotizacion | null> => {
-      const r = unwrap(await api.GET('/orders/{id}/quote', { params: { path: { id } } }));
-      return 'id' in r ? r : null;
-    },
+    queryFn: async (): Promise<Cotizacion | null> =>
+      unwrap(await api.GET('/orders/{id}/quote', { params: { path: { id } } })).cotizacion,
   });
 }
 

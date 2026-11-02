@@ -372,7 +372,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Cotización vigente de la orden; si aún no hay, devuelve {"cotizacion":null} (HU-27). Permiso quote:read */
+        /** Cotización vigente de la orden; si aún no hay, cotizacion es null (HU-27). Permiso quote:read */
         get: operations["getQuote"];
         put?: never;
         post?: never;
@@ -1077,13 +1077,15 @@ export interface components {
                 "application/json": components["schemas"]["Checklist"];
             };
         };
-        /** @description OK */
+        /** @description OK. Todas las operaciones de cotización responden envueltas: {"cotizacion": ...} */
         Cotizacion: {
             headers: {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Cotizacion"];
+                "application/json": {
+                    cotizacion: components["schemas"]["Cotizacion"] | null;
+                };
             };
         };
         /** @description OK */
@@ -1834,17 +1836,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Cotizacion"] | {
-                        cotizacion: Record<string, never> | null;
-                    };
-                };
-            };
+            200: components["responses"]["Cotizacion"];
             404: components["responses"]["Problem"];
         };
     };
