@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Admin del ERP: medidor de IA y mensajes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Manrope',system-ui,sans-serif;color:#EAF3F1;background:#061211}
+a{color:#5FDCC8}a:hover{color:#3CCFB6}
+.nav a{display:flex;align-items:center;min-height:44px;padding:0 16px;border-radius:999px;background:#0E1E1C;color:#B3C7C3;text-decoration:none;font-weight:600;font-size:15px}
+.nav a.on{background:#DDF47B;color:#0F1F1D;font-weight:800}
+.box{background:#0E1E1C;border:1px solid #22403C;border-radius:24px;padding:20px;min-width:0}
+.mono{font-family:'JetBrains Mono',monospace}
+.kn{font-size:30px;font-weight:800;letter-spacing:-.02em;font-family:'JetBrains Mono',monospace}
+.kl{font-size:14px;color:#A3B8B4;font-weight:600}
+th{text-align:left;font-size:12px;color:#A3B8B4;font-weight:700;padding:10px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #22403C}
+td{padding:12px 10px;border-bottom:1px solid #1B302D;font-size:14px;white-space:nowrap}
+.bar{height:10px;border-radius:999px;background:#172E2B;width:140px;display:inline-block;vertical-align:middle;margin-right:8px}
+.bar i{display:block;height:100%;border-radius:999px}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800}
+.btn{min-height:44px;padding:0 16px;border-radius:12px;border:0;font:inherit;font-weight:800;font-size:14px;cursor:pointer}
+</style>
+</helmet>
+<div style="box-sizing:border-box;padding:20px;display:flex;flex-wrap:wrap;gap:20px;max-width:1600px;margin:0 auto">
+  <aside style="flex:1 1 220px;max-width:240px;display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 6px 0"><svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#3CCFB6"/><path d="M17.5 27 L24.75 46 L32 33 L39.25 46 L46.5 27" fill="none" stroke="#03211D" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="18" r="5" fill="#FFB000"/></svg><span style="display:flex;flex-direction:column;line-height:1.1"><b style="font-size:17px">SWEVEH Admin</b><span style="font-size:12px;color:#A3B8B4">WEVEH Group · solo equipo</span></span></div>
+    <nav class="nav" aria-label="Secciones de administración" style="display:flex;flex-direction:column;gap:8px">
+      <a href="#talleres">Talleres</a>
+      <a class="on" href="Admin.dc.html" aria-current="page">Mensajes y costo de IA</a>
+      <a href="#llamadas">Llamadas a la IA</a>
+      <a href="#registro">Registro de mensajes</a>
+      <a href="#numero">Número de WhatsApp</a>
+      <a href="#politica">Política de datos</a>
+      <a href="#demo">Demo</a>
+    </nav>
+    <div class="box" style="display:flex;flex-direction:column;gap:10px">
+      <b style="font-size:14px">Taller ficticio de la demo</b>
+      <span style="font-size:13px;color:#A3B8B4">Servitaller El Pistón · número de prueba de Meta</span>
+      <button class="btn" type="button" style="background:#3CCFB6;color:#03211D">Reiniciar demo</button>
+      <button class="btn" type="button" style="background:#172E2B;color:#EAF3F1">Agregar la moto</button>
+    </div>
+  </aside>
+
+  <main style="flex:999 1 760px;min-width:0;display:flex;flex-direction:column;gap:20px">
+    <header style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between">
+      <div><h1 style="margin:0;font-size:28px;letter-spacing:-.02em">Mensajes y costo de IA</h1><p style="margin:2px 0 0;color:#A3B8B4">Noviembre 2026 · el costo de IA va dentro de la suscripción; los talleres no ven esta pantalla.</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" style="background:#0E1E1C;color:#EAF3F1;border:1px solid #22403C">Noviembre ▾</button><button class="btn" type="button" style="background:#0E1E1C;color:#EAF3F1;border:1px solid #22403C">Exportar CSV</button></div>
+    </header>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">
+      <div class="box" style="background:#2A2416;border-color:#4A3F22"><span class="kl">Mensajes enviados (todos)</span><div class="kn">412</div><span style="font-size:13px;color:#A3B8B4">Servicio 318 · utilidad 94 · marketing 0</span></div>
+      <div class="box" style="background:#221E35;border-color:#3A3260"><span class="kl">Costo de IA del mes</span><div class="kn">$9.840</div><span style="font-size:13px;color:#A3B8B4">COP · 4 talleres</span></div>
+      <div class="box" style="background:#12302C;border-color:#1F4A44"><span class="kl">Costo por conversación</span><div class="kn">$58</div><span style="font-size:13px;color:#A3B8B4">Promedio · 170 conversaciones</span></div>
+      <div class="box"><span class="kl">Salidas de IA descartadas</span><div class="kn">3,5 %</div><span style="font-size:13px;color:#A3B8B4">No cumplían el esquema o citaban un precio fuera de lista</span></div>
+    </div>
+
+    <section class="box" aria-labelledby="hm">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px"><h2 id="hm" style="margin:0;font-size:17px">Medidor por taller</h2><span style="font-size:13px;color:#A3B8B4">Mensajes de servicio: 1.000 gratis al mes por número; desde ahí, Meta cobra.</span></div>
+      <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;min-width:900px">
+        <thead><tr><th>Taller</th><th>Servicio usados de 1.000</th><th>Utilidad</th><th>Conversaciones IA</th><th>Costo IA mes</th><th>Por conversación</th><th>Estado</th></tr></thead>
+        <tbody>
+          <tr><td><b>Servitaller El Pistón</b><br><span style="font-size:12px;color:#A3B8B4">Demo · número de prueba</span></td><td><span class="bar"><i style="width:3.4%;background:#3CCFB6"></i></span><span class="mono">34</span></td><td class="mono">12</td><td class="mono">21</td><td class="mono">$1.200</td><td class="mono">$57</td><td><span class="pill" style="background:#12391F;color:#6FE29B">✓ Normal</span></td></tr>
+          <tr><td><b>Taller ejemplo B</b><br><span style="font-size:12px;color:#A3B8B4">Concierge</span></td><td><span class="bar"><i style="width:18%;background:#3CCFB6"></i></span><span class="mono">180</span></td><td class="mono">48</td><td class="mono">96</td><td class="mono">$5.300</td><td class="mono">$55</td><td><span class="pill" style="background:#12391F;color:#6FE29B">✓ Normal</span></td></tr>
+          <tr><td><b>Taller ejemplo C</b><br><span style="font-size:12px;color:#A3B8B4">Motos · concierge</span></td><td><span class="bar"><i style="width:9.1%;background:#3CCFB6"></i></span><span class="mono">91</span></td><td class="mono">30</td><td class="mono">41</td><td class="mono">$2.900</td><td class="mono">$71</td><td><span class="pill" style="background:#3B3300;color:#FFE680">▲ Costo alto</span></td></tr>
+          <tr><td><b>Taller ejemplo D</b><br><span style="font-size:12px;color:#A3B8B4">Prueba gratis</span></td><td><span class="bar"><i style="width:1.3%;background:#3CCFB6"></i></span><span class="mono">13</span></td><td class="mono">4</td><td class="mono">12</td><td class="mono">$440</td><td class="mono">$37</td><td><span class="pill" style="background:#12391F;color:#6FE29B">✓ Normal</span></td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <div style="display:flex;flex-wrap:wrap;gap:20px">
+      <section class="box" style="flex:2 1 520px" aria-labelledby="hc">
+        <h2 id="hc" style="margin:0 0 8px;font-size:17px">Últimas llamadas a la IA</h2>
+        <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:640px">
+          <thead><tr><th>Hora</th><th>Taller</th><th>Proveedor · modelo</th><th>Tokens</th><th>Latencia</th><th>Costo</th><th>Resultado</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">10:41:07</td><td>El Pistón</td><td>[proveedor A] · [modelo]</td><td class="mono">1.840</td><td class="mono">1,9 s</td><td class="mono">$31</td><td><span class="pill" style="background:#12391F;color:#6FE29B">Válido</span></td></tr>
+            <tr><td class="mono">10:12:55</td><td>Ejemplo C</td><td>[proveedor A] · [modelo]</td><td class="mono">2.410</td><td class="mono">2,6 s</td><td class="mono">$40</td><td><span class="pill" style="background:#451A18;color:#FF9A93">Descartado: precio fuera de lista</span></td></tr>
+            <tr><td class="mono">09:58:21</td><td>Ejemplo B</td><td>[proveedor B] · [modelo]</td><td class="mono">1.120</td><td class="mono">1,2 s</td><td class="mono">$18</td><td><span class="pill" style="background:#12391F;color:#6FE29B">Válido</span></td></tr>
+          </tbody>
+        </table>
+        </div>
+      </section>
+      <section class="box" style="flex:1 1 280px;display:flex;flex-direction:column;gap:10px" aria-labelledby="hn">
+        <h2 id="hn" style="margin:0;font-size:17px">Número de WhatsApp</h2>
+        <div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:#A3B8B4">El Pistón</span><b>Número de prueba de Meta</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:#A3B8B4">Destinatarios permitidos</span><b class="mono">5</b></div>
+        <button class="btn" type="button" style="background:#172E2B;color:#EAF3F1;margin-top:auto">Cambiar al número del taller</button>
+      </section>
+    </div>
+    <p style="margin:0;font-size:12px;color:#7F9490">Cifras de ejemplo, salvo las del guion de la demo (34 mensajes, IA $1.200). Proveedor y modelo por definir.</p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":960}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

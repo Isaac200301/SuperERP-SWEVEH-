@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Catálogo de automatizaciones</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Manrope',system-ui,sans-serif;color:#0F1F1D;background:#E9EEED}
+a{color:#005F54}a:hover{color:#004A42}
+.nav a{display:flex;align-items:center;min-height:44px;padding:0 16px;border-radius:999px;background:#F4F7F6;color:#33443F;text-decoration:none;font-weight:600;font-size:15px}
+.nav a.on{background:#DDF47B;color:#0F1F1D;font-weight:800}
+.mono{font-family:'JetBrains Mono',monospace}
+.au{background:#FFFFFF;border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.au.off{background:#F4F7F6}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.code{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#4C5F5C}
+.sw{position:relative;width:56px;height:32px;border-radius:999px;border:0;cursor:pointer;flex:none}
+.sw.on{background:#005F54}.sw.no{background:#AEBFBB}
+.sw i{position:absolute;top:4px;width:24px;height:24px;border-radius:50%;background:#FFFFFF}
+.sw.on i{right:4px}.sw.no i{left:4px}
+.row{display:flex;gap:8px;font-size:14px}.row span:first-child{color:#4C5F5C;min-width:96px}
+.msg{background:#EFE7DD;border-radius:14px;padding:10px 12px;font-size:13px;line-height:1.45}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;padding-top:8px;border-top:1px solid #E3EAE8;font-size:13px;color:#4C5F5C}
+</style>
+</helmet>
+<div style="box-sizing:border-box;padding:20px;display:flex;flex-wrap:wrap;gap:20px;max-width:1600px;margin:0 auto">
+  <aside style="flex:1 1 200px;max-width:220px;display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 6px 0"><svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#005F54"/><path d="M17.5 27 L24.75 46 L32 33 L39.25 46 L46.5 27" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="18" r="5" fill="#FFB000"/></svg><b style="font-size:18px">SWEVEH</b></div>
+    <nav class="nav" aria-label="Secciones del panel" style="display:flex;flex-direction:column;gap:8px">
+      <a href="Panel.dc.html">Hoy</a><a href="Orden.dc.html">Órdenes</a><a href="PorRevisar.dc.html">Por revisar · 2</a><a href="#clientes">Clientes y vehículos</a><a href="#inventario">Inventario</a><a class="on" href="Automatizaciones.dc.html" aria-current="page">Automatizaciones</a><a href="#ajustes">Ajustes y usuarios</a>
+    </nav>
+  </aside>
+
+  <main style="flex:999 1 760px;min-width:0;display:flex;flex-direction:column;gap:20px">
+    <header style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between">
+      <div><h1 style="margin:0;font-size:28px;letter-spacing:-.02em">Automatizaciones</h1><p style="margin:2px 0 0;color:#4C5F5C">Avisos y tareas que trabajan solos. Enciende las que quieras; cada tarjeta dice cuándo se dispara y qué envía.</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" role="group" aria-label="Filtro">
+        <button type="button" aria-pressed="true" style="min-height:40px;padding:0 16px;border-radius:999px;border:0;background:#0F1F1D;color:#FFFFFF;font:inherit;font-weight:700">Todas · 9</button>
+        <button type="button" aria-pressed="false" style="min-height:40px;padding:0 16px;border-radius:999px;border:0;background:#FFFFFF;font:inherit;font-weight:700">Encendidas · 5</button>
+        <button type="button" aria-pressed="false" style="min-height:40px;padding:0 16px;border-radius:999px;border:0;background:#FFFFFF;font:inherit;font-weight:700">Apagadas · 3</button>
+      </div>
+    </header>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+      <article class="au"><div class="top"><div><span class="code">AU-01</span><h2 style="margin:2px 0 0;font-size:18px">Vehículo recibido</h2></div><button class="sw on" type="button" role="switch" aria-checked="true" aria-label="Vehículo recibido encendida"><i></i></button></div>
+        <div class="row"><span>Cuándo</span><b>La orden pasa a Recibido</b></div><div class="row"><span>Cuesta</span><b>1 mensaje + fotos</b></div>
+        <div class="msg">Hola {cliente}, recibimos tu {vehículo} {placa}. Así quedó registrado…</div>
+        <div class="foot"><span>Esta semana: 9 envíos</span><a href="#editar" style="font-weight:700">Editar texto</a></div></article>
+
+      <article class="au"><div class="top"><div><span class="code">AU-02</span><h2 style="margin:2px 0 0;font-size:18px">Cotización para aprobar</h2></div><button class="sw on" type="button" role="switch" aria-checked="true" aria-label="Cotización para aprobar encendida"><i></i></button></div>
+        <div class="row"><span>Cuándo</span><b>La orden pasa a Esperando aprobación</b></div><div class="row"><span>Cuesta</span><b>1 mensaje con botones</b></div>
+        <div class="msg">Tu cotización es de {total}. [Aprobar] [Ver detalle] [Llamar]</div>
+        <div class="foot"><span>Esta semana: 6 envíos</span><a href="#editar" style="font-weight:700">Editar texto</a></div></article>
+
+      <article class="au"><div class="top"><div><span class="code">AU-03</span><h2 style="margin:2px 0 0;font-size:18px">Vehículo listo</h2></div><button class="sw on" type="button" role="switch" aria-checked="true" aria-label="Vehículo listo encendida"><i></i></button></div>
+        <div class="row"><span>Cuándo</span><b>La orden pasa a Listo</b></div><div class="row"><span>Cuesta</span><b>1 mensaje</b></div>
+        <div class="msg">Tu {vehículo} está listo. Total {total}. Te esperamos hasta las {cierre}.</div>
+        <div class="foot"><span>Esta semana: 7 envíos</span><a href="#editar" style="font-weight:700">Editar texto</a></div></article>
+
+      <article class="au"><div class="top"><div><span class="code">AU-04</span><h2 style="margin:2px 0 0;font-size:18px">Asistente de WhatsApp</h2></div><button class="sw on" type="button" role="switch" aria-checked="true" aria-label="Asistente de WhatsApp encendida"><i></i></button></div>
+        <div class="row"><span>Cuándo</span><b>Escribe alguien sin orden abierta</b></div><div class="row"><span>Cuesta</span><b>IA incluida en el plan</b></div>
+        <div class="msg">Entiende lo que pide y deja un borrador en “Por revisar”. Tú lo envías.</div>
+        <div class="foot"><span>Esta semana: 12 borradores</span><a href="PorRevisar.dc.html" style="font-weight:700">Ver bandeja</a></div></article>
+
+      <article class="au"><div class="top"><div><span class="code">AU-05</span><h2 style="margin:2px 0 0;font-size:18px">“¿Ya está mi carro?”</h2></div><button class="sw on" type="button" role="switch" aria-checked="true" aria-label="Ya está mi carro encendida"><i></i></button></div>
+        <div class="row"><span>Cuándo</span><b>Un cliente con orden pregunta por ella</b></div><div class="row"><span>Cuesta</span><b>1 mensaje · automático</b></div>
+        <div class="msg">Tu {vehículo} está {estado}. Prometido para {fecha}. [última foto]</div>
+        <div class="foot"><span>Esta semana: 15 respuestas</span><a href="#editar" style="font-weight:700">Editar texto</a></div></article>
+
+      <article class="au off"><div class="top"><div><span class="code">AU-06</span><h2 style="margin:2px 0 0;font-size:18px">Recordatorio de cita</h2></div><button class="sw no" type="button" role="switch" aria-checked="false" aria-label="Recordatorio de cita apagada"><i></i></button></div>
+        <div class="row"><span>Cuándo</span><b>La mañana del día de la cita</b></div><div class="row"><span>Cuesta</span><b>1 mensaje (plantilla)</b></div>
+        <div class="msg">Hola {cliente}, te esperamos hoy a las {hora} con tu {vehículo}.</div>
+        <div class="foot"><span>Apagada</span><a href="#editar" style="font-weight:700">Editar texto</a></div></article>
+
+      <article class="au off"><div class="top"><div><span class="code">AU-07</span><h2 style="margin:2px 0 0;font-size:18px">Vehículo sin recoger</h2></div><button class="sw no" type="button" role="switch" aria-checked="false" aria-label="Vehículo sin recoger apagada"><i></i></button></div>
+        <div class="row"><span>Cuándo</span><b>Lleva 3 días en Listo</b></div><div class="row"><span>Cuesta</span><b>1 mensaje (plantilla)</b></div>
+        <div class="msg">Tu {vehículo} sigue listo para recoger desde el {fecha}.</div>
+        <div class="foot"><span>Apagada</span><a href="#editar" style="font-weight:700">Editar texto</a></div></article>
+
+      <article class="au off"><div class="top"><div><span class="code">AU-08</span><h2 style="margin:2px 0 0;font-size:18px">Repuesto bajo el mínimo</h2></div><button class="sw no" type="button" role="switch" aria-checked="false" aria-label="Repuesto bajo el mínimo apagada"><i></i></button></div>
+        <div class="row"><span>Cuándo</span><b>El inventario baja del mínimo</b></div><div class="row"><span>Cuesta</span><b>Nada: es aviso interno</b></div>
+        <div class="msg" style="background:#E2F1EE">Te avisa en “Hoy tienes pendiente”. No le escribe al cliente.</div>
+        <div class="foot"><span>Apagada</span><span></span></div></article>
+
+      <article class="au off" style="border:2px dashed #AEBFBB;background:transparent"><div class="top"><div><span class="code">AU-09</span><h2 style="margin:2px 0 0;font-size:18px">Seguimiento de garantía</h2></div><span style="background:#EEE9FD;color:#4B3A8C;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800">Próximamente</span></div>
+        <div class="row"><span>Cuándo</span><b>Días después de entregar</b></div>
+        <p style="margin:0;font-size:14px;color:#4C5F5C">El catálogo crece con el tiempo. Sin fecha prometida.</p></article>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":960}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

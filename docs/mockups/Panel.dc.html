@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Panel del dueño: Hoy</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Manrope',system-ui,sans-serif;color:#0F1F1D;background:#E9EEED}
+a{color:#005F54}a:hover{color:#004A42}
+.nav a{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 16px;border-radius:999px;background:#F4F7F6;color:#33443F;text-decoration:none;font-weight:600;font-size:15px}
+.nav a.on{background:#DDF47B;color:#0F1F1D;font-weight:800}
+.nav svg{flex:none}
+.box{background:#FFFFFF;border-radius:24px;padding:20px;min-width:0}
+.kpi{border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:6px}
+.kn{font-size:32px;font-weight:800;letter-spacing:-.02em}
+.kl{font-size:14px;color:#33443F;font-weight:600}
+.q{align-self:flex-start;border:0;background:rgba(255,255,255,.7);border-radius:999px;min-height:32px;padding:0 12px;font:inherit;font-size:13px;font-weight:700;color:#005F54;cursor:pointer}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:700;white-space:nowrap}
+.p-ok{background:#E5F4EA;color:#17693A}.p-warn{background:#FFF5C2;color:#6F5200}.p-err{background:#FCE9E7;color:#A5231F}.p-neu{background:#E2F1EE;color:#005F54}
+.plate{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;border:1.5px solid #0F1F1D;border-radius:6px;padding:1px 7px;letter-spacing:.05em}
+th{text-align:left;font-size:13px;color:#4C5F5C;font-weight:700;padding:10px 12px;background:#F4F7F6}
+th:first-child{border-radius:12px 0 0 12px}th:last-child{border-radius:0 12px 12px 0}
+td{padding:12px;border-bottom:1px solid #E3EAE8;font-size:14px;white-space:nowrap}
+.pend{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #E3EAE8}
+.ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none}
+</style>
+</helmet>
+<div style="box-sizing:border-box;padding:20px;display:flex;flex-wrap:wrap;gap:20px;max-width:1600px;margin:0 auto">
+
+  <aside style="flex:1 1 220px;max-width:240px;display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 6px 0">
+      <svg width="36" height="36" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#005F54"/><path d="M17.5 27 L24.75 46 L32 33 L39.25 46 L46.5 27" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="18" r="5" fill="#FFB000"/></svg>
+      <span style="display:flex;flex-direction:column;line-height:1.1"><b style="font-size:18px">SWEVEH</b><span style="font-size:12px;color:#4C5F5C">Servitaller El Pistón</span></span>
+    </div>
+    <nav class="nav" aria-label="Secciones del panel" style="display:flex;flex-direction:column;gap:8px">
+      <a class="on" href="Panel.dc.html" aria-current="page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>Hoy</a>
+      <a href="Orden.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8l1 3H7z"/><rect x="5" y="7" width="14" height="14" rx="2"/><path d="M9 12h6M9 16h4"/></svg>Órdenes</a>
+      <a href="PorRevisar.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13l3-8h10l3 8v6H4z"/><path d="M4 13h5l1 2h4l1-2h5"/></svg>Por revisar<span style="margin-left:auto;background:#005F54;color:#FFFFFF;border-radius:999px;font-size:12px;font-weight:800;padding:1px 8px">2</span></a>
+      <a href="#clientes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17v-4l2-5h12l2 5v4"/><path d="M4 13h16"/><circle cx="7.5" cy="17" r="1.8"/><circle cx="16.5" cy="17" r="1.8"/></svg>Clientes y vehículos</a>
+      <a href="#inventario"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/></svg>Inventario</a>
+      <a href="Automatizaciones.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>Automatizaciones</a>
+      <a href="#ajustes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>Ajustes y usuarios</a>
+      <a href="#ayuda"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.6 2.2c-.8.5-1.1 1-1.1 1.8M12 17h.01"/></svg>Ayuda</a>
+    </nav>
+    <div style="background:#0A1413;color:#EAF3F1;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:8px">
+      <b style="font-size:14px">Asistente</b>
+      <span style="font-size:13px;color:#A9BEBA">“¿Por qué bajó el ticket esta semana?”</span>
+      <a href="#asistente" style="color:#6FE5D2;font-weight:700;font-size:14px">Preguntar</a>
+    </div>
+  </aside>
+
+  <main style="flex:999 1 720px;min-width:0;display:flex;flex-direction:column;gap:20px">
+    <header style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">
+      <div><h1 style="margin:0;font-size:28px;letter-spacing:-.02em">Buen día, Hernán</h1><p style="margin:2px 0 0;color:#4C5F5C">Sábado 1 de noviembre · así va el taller hoy</p></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#F4F7F6;border-radius:999px;padding:6px">
+        <label style="display:flex;align-items:center;gap:8px;background:#FFFFFF;border-radius:999px;padding:0 14px;min-height:40px;min-width:280px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4C5F5C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input aria-label="Buscar" placeholder="Buscar placa, cliente o celular" style="border:0;outline:0;font:inherit;font-size:14px;flex:1;background:transparent"></label>
+        <button type="button" aria-label="Avisos internos, 2 nuevos" style="width:40px;height:40px;border-radius:50%;border:0;background:#FFFFFF;position:relative;cursor:pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F1F1D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><span style="position:absolute;top:6px;right:8px;width:9px;height:9px;border-radius:50%;background:#C9302C"></span></button>
+        <a href="Orden.dc.html" style="min-height:40px;padding:0 18px;border-radius:999px;background:#005F54;color:#FFFFFF;font-weight:800;font-size:14px;display:flex;align-items:center;text-decoration:none">+ Nueva orden</a>
+      </div>
+    </header>
+
+    <div style="display:flex;flex-wrap:wrap;gap:20px">
+      <section class="box" style="flex:1 1 300px;background:#F4F7F6;display:flex;flex-direction:column;gap:12px" aria-labelledby="hk">
+        <h2 id="hk" style="margin:0 0 2px;font-size:17px">Taller en números</h2>
+        <div class="kpi" style="background:#FFF1E2"><div style="display:flex;justify-content:space-between;align-items:center"><span class="kn">7</span><span class="pill p-neu">abiertas</span></div><span class="kl">Órdenes abiertas</span><button class="q" type="button">¿Qué significa?</button></div>
+        <div class="kpi" style="background:#EEE9FD"><div style="display:flex;justify-content:space-between;align-items:center"><span class="kn">1</span><span class="pill p-warn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"/></svg>hace 26 h</span></div><span class="kl">Aprobaciones pendientes</span><button class="q" type="button">¿Qué significa?</button></div>
+        <div class="kpi" style="background:#DDF5F1"><div style="display:flex;justify-content:space-between;align-items:center"><span class="kn">1,8 días</span></div><span class="kl">Tiempo promedio por orden (30 días)</span><button class="q" type="button">¿Qué significa?</button></div>
+      </section>
+
+      <section class="box" style="flex:2 1 460px;display:flex;flex-direction:column;gap:14px" aria-labelledby="he">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 id="he" style="margin:0;font-size:17px">Órdenes abiertas por estado</h2><span style="font-size:13px;color:#4C5F5C">Toca un estado para ver sus órdenes</span></div>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:14px">
+          <div style="display:grid;grid-template-columns:170px minmax(0,1fr) 30px;gap:12px;align-items:center"><span>Por recibir</span><span style="height:22px;border-radius:999px;background:#F4F7F6"><span style="display:block;height:100%;width:28%;border-radius:999px;background:#9ED9CE"></span></span><b>2</b></div>
+          <div style="display:grid;grid-template-columns:170px minmax(0,1fr) 30px;gap:12px;align-items:center"><span>Recibido</span><span style="height:22px;border-radius:999px;background:#F4F7F6"><span style="display:block;height:100%;width:14%;border-radius:999px;background:#9ED9CE"></span></span><b>1</b></div>
+          <div style="display:grid;grid-template-columns:170px minmax(0,1fr) 30px;gap:12px;align-items:center"><span>En diagnóstico</span><span style="height:22px;border-radius:999px;background:#F4F7F6"><span style="display:block;height:100%;width:14%;border-radius:999px;background:#9ED9CE"></span></span><b>1</b></div>
+          <div style="display:grid;grid-template-columns:170px minmax(0,1fr) 30px;gap:12px;align-items:center"><span style="font-weight:800">Esperando aprobación</span><span style="height:22px;border-radius:999px;background:#F4F7F6;position:relative"><span style="display:block;height:100%;width:14%;border-radius:999px;background:#DDF47B;box-shadow:inset 0 0 0 2px #6F7F1D"></span></span><b>1</b></div>
+          <div style="display:grid;grid-template-columns:170px minmax(0,1fr) 30px;gap:12px;align-items:center"><span>En reparación</span><span style="height:22px;border-radius:999px;background:#F4F7F6"><span style="display:block;height:100%;width:14%;border-radius:999px;background:#9ED9CE"></span></span><b>1</b></div>
+          <div style="display:grid;grid-template-columns:170px minmax(0,1fr) 30px;gap:12px;align-items:center"><span>Listo</span><span style="height:22px;border-radius:999px;background:#F4F7F6"><span style="display:block;height:100%;width:14%;border-radius:999px;background:#005F54"></span></span><b>1</b></div>
+        </div>
+        <p style="margin:0;font-size:13px;color:#4C5F5C">Entregado no cuenta como abierta. El estado resaltado en lima es el que espera al cliente.</p>
+      </section>
+
+      <section class="box" style="flex:1 1 300px;display:flex;flex-direction:column;gap:12px" aria-labelledby="hp">
+        <h2 id="hp" style="margin:0;font-size:17px">Hoy tienes pendiente</h2>
+        <div class="pend"><span class="ic" style="background:#FCE9E7;color:#A5231F"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"/></svg></span><div style="flex:1;min-width:0"><b style="font-size:14px">Mazda 2 JNX907 sin recoger</b><div style="font-size:13px;color:#4C5F5C">Listo hace 4 días · aviso enviado</div></div></div>
+        <div class="pend"><span class="ic" style="background:#FFF5C2;color:#6F5200"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"/></svg></span><div style="flex:1;min-width:0"><b style="font-size:14px">Diego no ha aprobado</b><div style="font-size:13px;color:#4C5F5C">OS-0044 · cotización enviada hace 26 h</div></div></div>
+        <div class="pend"><span class="ic" style="background:#E2F1EE;color:#005F54"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 13l3-8h10l3 8v6H4z"/></svg></span><div style="flex:1;min-width:0"><b style="font-size:14px">2 borradores por revisar</b><div style="font-size:13px;color:#4C5F5C">Laura Gómez y 1 foto de lista de precios</div></div></div>
+        <div class="pend" style="border-bottom:0"><span class="ic" style="background:#FFF5C2;color:#6F5200"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"/></svg></span><div style="flex:1;min-width:0"><b style="font-size:14px">Bombillo H4 agotado</b><div style="font-size:13px;color:#4C5F5C">Filtro FA-SPK en el mínimo (3)</div></div></div>
+      </section>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:20px">
+      <section class="box" style="flex:2 1 520px;display:flex;flex-direction:column;gap:12px" aria-labelledby="ht">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+          <div><h2 id="ht" style="margin:0;font-size:17px">Ticket promedio</h2><div style="display:flex;gap:10px;align-items:baseline"><span class="kn">$186.000</span><span style="color:#17693A;font-weight:700;font-size:14px">▲ 8 % vs. octubre</span></div></div>
+          <button class="q" type="button" style="background:#E2F1EE">¿Qué significa?</button>
+        </div>
+        <svg viewBox="0 0 640 170" role="img" aria-label="Ticket promedio por semana: sube de 150 mil a 186 mil pesos" style="width:100%;height:auto">
+          <g stroke="#E3EAE8" stroke-width="1"><path d="M40 20H630M40 65H630M40 110H630M40 155H630"/></g>
+          <g font-family="JetBrains Mono" font-size="11" fill="#4C5F5C"><text x="34" y="24" text-anchor="end">200k</text><text x="34" y="114" text-anchor="end">150k</text><text x="60" y="168">S1</text><text x="200" y="168">S2</text><text x="340" y="168">S3</text><text x="480" y="168">S4</text><text x="600" y="168">S5</text></g>
+          <path d="M60 112 C130 100 160 120 200 95 S300 70 340 88 S440 60 480 58 S570 40 610 48" fill="none" stroke="#005F54" stroke-width="3" stroke-linecap="round"/>
+          <path d="M60 130 C130 128 160 126 200 120 S300 118 340 116 S440 112 480 110 S570 106 610 104" fill="none" stroke="#9ED9CE" stroke-width="2.5" stroke-dasharray="6 6" stroke-linecap="round"/>
+          <line x1="480" y1="20" x2="480" y2="155" stroke="#0F1F1D" stroke-width="1" stroke-dasharray="3 4"/>
+          <rect x="446" y="28" width="68" height="24" rx="8" fill="#DDF47B"/><text x="480" y="44" text-anchor="middle" font-family="JetBrains Mono" font-size="12" font-weight="700" fill="#0F1F1D">$191k</text>
+          <circle cx="480" cy="58" r="5" fill="#005F54" stroke="#FFFFFF" stroke-width="2"/>
+        </svg>
+        <div style="display:flex;gap:16px;font-size:13px;color:#4C5F5C"><span><span style="display:inline-block;width:14px;height:3px;background:#005F54;vertical-align:middle;margin-right:6px"></span>Noviembre</span><span><span style="display:inline-block;width:14px;height:3px;background:#9ED9CE;vertical-align:middle;margin-right:6px"></span>Octubre</span></div>
+        <div style="background:#0F1F1D;color:#EAF3F1;border-radius:18px;padding:14px 16px;font-size:14px;line-height:1.5" role="note"><b style="color:#6FE5D2">¿Qué significa?</b> Es lo que paga en promedio cada cliente por orden entregada este mes. Subió porque 3 órdenes incluyeron cambio de pastillas con repuesto (OS-0039, OS-0041, OS-0042).</div>
+      </section>
+
+      <section class="box" style="flex:1 1 280px;display:flex;flex-direction:column;gap:12px">
+        <div class="kpi" style="background:#F4F7F6"><span class="kl">Minutos hasta responder un WhatsApp</span><span class="kn">4 min</span><span style="font-size:13px;color:#4C5F5C">Mediana de esta semana</span><button class="q" type="button" style="background:#FFFFFF">¿Qué significa?</button></div>
+        <div class="kpi" style="background:#F4F7F6"><span class="kl">Clientes que vuelven</span><span class="kn">32 %</span><span style="font-size:13px;color:#4C5F5C">Vehículos con más de una orden en 12 meses</span><button class="q" type="button" style="background:#FFFFFF">¿Qué significa?</button></div>
+      </section>
+    </div>
+
+    <section class="box" aria-labelledby="hr">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap"><h2 id="hr" style="margin:0;font-size:17px">Órdenes recientes</h2><a href="Orden.dc.html" style="font-weight:700;font-size:14px">Ver todas</a></div>
+      <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;min-width:820px">
+        <thead><tr><th>Orden</th><th>Placa</th><th>Cliente</th><th>Vehículo</th><th>Estado</th><th>Mecánico</th><th>Prometido</th></tr></thead>
+        <tbody>
+          <tr><td style="font-family:'JetBrains Mono',monospace">OS-0045</td><td><span class="plate">KLM482</span></td><td>Laura Gómez</td><td>Chevrolet Spark GT 2015</td><td><span class="pill p-neu">Recibido</span></td><td>Jhon</td><td>Hoy 4:00 p. m.</td></tr>
+          <tr><td style="font-family:'JetBrains Mono',monospace">OS-0044</td><td><span class="plate">GBW118</span></td><td>Diego Zapata</td><td>Nissan March 2019</td><td><span class="pill p-warn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"/></svg>Esperando aprobación</span></td><td>Jhon</td><td>Lunes</td></tr>
+          <tr><td style="font-family:'JetBrains Mono',monospace">OS-0043</td><td><span class="plate">HTR315</span></td><td>Andrés Restrepo</td><td>Renault Logan 2018</td><td><span class="pill p-neu">En reparación</span></td><td>Jhon</td><td>Hoy 5:00 p. m.</td></tr>
+          <tr><td style="font-family:'JetBrains Mono',monospace">OS-0040</td><td><span class="plate">JNX907</span></td><td>Marta Ospina</td><td>Mazda 2 2020</td><td><span class="pill p-err"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z"/></svg>Listo · 4 días sin recoger</span></td><td>Jhon</td><td>28 oct</td></tr>
+          <tr><td style="font-family:'JetBrains Mono',monospace">OS-0038</td><td><span class="plate">FQD264</span></td><td>Carlos Mejía</td><td>Kia Picanto 2017</td><td><span class="pill p-ok"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>Entregado</span></td><td>Jhon</td><td>25 oct</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p style="margin:10px 0 0;font-size:12px;color:#4C5F5C">Datos de ejemplo del taller ficticio de la demo.</p>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

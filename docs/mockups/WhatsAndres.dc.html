@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>WhatsApp: estado de la orden</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;display=swap">
+<style>
+body{margin:0;font-family:'Manrope',system-ui,sans-serif;color:#111B21}
+.in{align-self:flex-start;background:#FFFFFF;border-radius:4px 14px 14px 14px;padding:8px 10px;font-size:14px;line-height:1.4;max-width:82%;box-shadow:0 1px 0 rgba(0,0,0,.08)}
+.out{align-self:flex-end;background:#D9FDD3;border-radius:14px 4px 14px 14px;padding:8px 10px;font-size:14px;line-height:1.4;max-width:82%;box-shadow:0 1px 0 rgba(0,0,0,.08)}
+.t{display:block;text-align:right;font-size:11px;color:#667781;margin-top:2px}
+.qb{display:flex;flex-direction:column;gap:4px;align-self:flex-start;width:82%}
+.qb span{background:#FFFFFF;border-radius:10px;min-height:40px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#00796B;box-shadow:0 1px 0 rgba(0,0,0,.08)}
+.tag{font-size:10px;font-weight:800;letter-spacing:.06em;color:#005F54;font-family:monospace}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;background:#EFE7DD">
+  <div style="flex:none;background:#FFFFFF;padding:14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #E0E0E0">
+    <svg width="40" height="40" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="#0F3D37"/><text x="32" y="40" text-anchor="middle" font-family="Manrope" font-size="22" font-weight="800" fill="#FFFFFF">SP</text></svg>
+    <div style="flex:1"><b style="font-size:16px">Servitaller El Pistón</b><div style="font-size:12px;color:#667781">Cuenta de empresa</div></div>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:14px;display:flex;flex-direction:column;gap:8px">
+    <div class="in"><span class="tag">AU-02 · COTIZACIÓN</span><br>Andrés, tu Logan HTR315 necesita:<br>• Revisión de frenos $40.000<br>• Pastillas delanteras $60.000<br>• Líquido de frenos $28.000<br><b>Total $128.000</b><span class="t">9:50</span></div>
+    <div class="qb"><span>Aprobar</span><span>Ver detalle</span><span>Llamar al taller</span></div>
+    <div class="out">Aprobar<span class="t">10:12</span></div>
+    <div class="in" style="font-size:13px;color:#33443F">Listo, quedó aprobado. Empezamos la reparación.<span class="t">10:12</span></div>
+    <div class="out">Buenas, ¿ya está mi carro?<span class="t">2:31</span></div>
+    <div class="in" style="padding:6px"><span class="tag" style="padding:0 4px">AU-05 · ESTADO REAL DE LA ORDEN</span>
+      <span style="display:block;aspect-ratio:16/9;border-radius:8px;background:#C9D5D2;margin:6px 0"></span>
+      <div style="padding:0 4px">Hola Andrés. Tu Renault Logan HTR315 está <b>en reparación</b>. Te lo tenemos prometido para hoy a las 5:00 p. m. Esta es la última foto del trabajo.</div><span class="t">2:31</span></div>
+    <div class="in"><span class="tag">AU-03 · VEHÍCULO LISTO</span><br>¡Tu Logan HTR315 está listo! Total $128.000. Te esperamos hasta las 5:30 p. m.<span class="t">4:48</span></div>
+    <div class="qb"><span>Voy en camino</span><span>Hablar con alguien</span></div>
+  </div>
+  <div style="flex:none;display:flex;gap:8px;align-items:center;padding:8px 10px 14px">
+    <span style="flex:1;background:#FFFFFF;border-radius:999px;min-height:44px;display:flex;align-items:center;padding:0 16px;color:#667781;font-size:15px">Mensaje</span>
+    <span style="width:44px;height:44px;border-radius:50%;background:#00A884;display:grid;place-items:center" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
