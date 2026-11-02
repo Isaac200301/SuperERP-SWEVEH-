@@ -11,6 +11,39 @@ import (
 	"github.com/google/uuid"
 )
 
+type AssistantBorrador struct {
+	ID                uuid.UUID
+	TallerID          uuid.UUID
+	ConversacionID    uuid.UUID
+	MensajeEntranteID uuid.UUID
+	Celular           string
+	TextoEntrante     *string
+	Intencion         string
+	TextoPropuesto    string
+	TextoFinal        *string
+	Fuentes           json.RawMessage
+	Accion            json.RawMessage
+	Estado            string
+	Origen            string
+	CreatedAt         time.Time
+	ResueltoEn        *time.Time
+	ResueltoPor       *uuid.UUID
+}
+
+type AssistantLlamadaIum struct {
+	ID            uuid.UUID
+	TallerID      uuid.UUID
+	Proveedor     string
+	Modelo        string
+	Proposito     string
+	TokensEntrada int32
+	TokensSalida  int32
+	CostoMicroUsd int64
+	LatenciaMs    int32
+	Resultado     string
+	CreatedAt     time.Time
+}
+
 type AuditEvento struct {
 	ID         uuid.UUID
 	TallerID   uuid.UUID
@@ -23,6 +56,53 @@ type AuditEvento struct {
 	Despues    json.RawMessage
 	RequestID  *string
 	OcurridoEn time.Time
+}
+
+type AutomationEjecucion struct {
+	ID        uuid.UUID
+	TallerID  uuid.UUID
+	Codigo    string
+	Clave     string
+	OrdenID   *uuid.UUID
+	ClienteID *uuid.UUID
+	Resultado string
+	Detalle   *string
+	MensajeID *uuid.UUID
+	CreatedAt time.Time
+}
+
+type AutomationRegla struct {
+	TallerID  uuid.UUID
+	Codigo    string
+	Activa    bool
+	Texto     *string
+	UpdatedAt time.Time
+}
+
+type CatalogServicio struct {
+	ID           uuid.UUID
+	TallerID     uuid.UUID
+	Nombre       string
+	TipoVehiculo string
+	Precio       *int64
+	DuracionMin  *int32
+	Activo       bool
+	Version      int32
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+type CustomersAutorizacion struct {
+	ID              uuid.UUID
+	TallerID        uuid.UUID
+	ClienteID       uuid.UUID
+	Estado          string
+	Texto           string
+	VersionPolitica string
+	Canal           string
+	Ref             *string
+	OcurridaEn      time.Time
+	UsuarioID       *uuid.UUID
 }
 
 type CustomersCliente struct {
@@ -98,6 +178,97 @@ type IdentityUsuario struct {
 	UpdatedAt time.Time
 }
 
+type InventoryArticulo struct {
+	ID           uuid.UUID
+	TallerID     uuid.UUID
+	Referencia   string
+	Nombre       string
+	TipoVehiculo string
+	Costo        int64
+	PrecioVenta  int64
+	Existencia   int32
+	Minimo       int32
+	Activo       bool
+	Version      int32
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+type InventoryMovimiento struct {
+	ID         uuid.UUID
+	TallerID   uuid.UUID
+	ArticuloID uuid.UUID
+	Cantidad   int32
+	Motivo     string
+	OrdenID    *uuid.UUID
+	LineaID    *uuid.UUID
+	UsuarioID  *uuid.UUID
+	CreatedAt  time.Time
+}
+
+type MessagingCanal struct {
+	ID            uuid.UUID
+	TallerID      uuid.UUID
+	Proveedor     string
+	PhoneNumberID string
+	NumeroVisible *string
+	Activo        bool
+	CreatedAt     time.Time
+}
+
+type MessagingConversacion struct {
+	ID               uuid.UUID
+	TallerID         uuid.UUID
+	ClienteID        *uuid.UUID
+	Celular          string
+	UltimoEntranteEn *time.Time
+	Modo             string
+	PideHumano       bool
+	CreatedAt        time.Time
+}
+
+type MessagingMensaje struct {
+	ID             uuid.UUID
+	TallerID       uuid.UUID
+	ConversacionID uuid.UUID
+	Direccion      string
+	Wamid          *string
+	Tipo           string
+	Cuerpo         *string
+	Payload        json.RawMessage
+	Estado         string
+	Origen         string
+	Categoria      *string
+	OrdenID        *uuid.UUID
+	Automatizacion *string
+	Error          *string
+	Intentos       int32
+	CreatedAt      time.Time
+	EnviadoEn      *time.Time
+}
+
+type MessagingWebhookEvento struct {
+	ID          uuid.UUID
+	RecibidoEn  time.Time
+	Cuerpo      json.RawMessage
+	ProcesadoEn *time.Time
+	Error       *string
+}
+
+type OrdersChecklist struct {
+	OrdenID       uuid.UUID
+	TallerID      uuid.UUID
+	Tipo          string
+	Kilometraje   *int32
+	Combustible   *string
+	Accesorios    []string
+	Salvedades    json.RawMessage
+	CompletadoPor *uuid.UUID
+	CompletadoEn  *time.Time
+	Version       int32
+	UpdatedAt     time.Time
+}
+
 type OrdersContador struct {
 	TallerID uuid.UUID
 	Ultimo   int32
@@ -111,22 +282,43 @@ type OrdersEstadoHistorial struct {
 	Hacia      string
 	UsuarioID  *uuid.UUID
 	OcurridoEn time.Time
+	Motivo     *string
+}
+
+type OrdersEvidencium struct {
+	ID             uuid.UUID
+	TallerID       uuid.UUID
+	OrdenID        uuid.UUID
+	Lado           *string
+	Nota           *string
+	StorageKey     *string
+	ContentType    *string
+	MostrarCliente bool
+	Etapa          string
+	AutorID        *uuid.UUID
+	CreatedAt      time.Time
 }
 
 type OrdersOrden struct {
-	ID           uuid.UUID
-	TallerID     uuid.UUID
-	Numero       int32
-	VehiculoID   uuid.UUID
-	ClienteID    uuid.UUID
-	Placa        string
-	TipoVehiculo string
-	Estado       string
-	Sintoma      string
-	Version      int32
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	CreatedBy    *uuid.UUID
+	ID                uuid.UUID
+	TallerID          uuid.UUID
+	Numero            int32
+	VehiculoID        uuid.UUID
+	ClienteID         uuid.UUID
+	Placa             string
+	TipoVehiculo      string
+	Estado            string
+	Sintoma           string
+	Version           int32
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	CreatedBy         *uuid.UUID
+	MecanicoID        *uuid.UUID
+	FechaPrometida    *time.Time
+	Ejemplo           bool
+	EntregadoA        *string
+	MotivoCancelacion *string
+	CerradaEn         *time.Time
 }
 
 type OutboxEvento struct {
@@ -142,12 +334,60 @@ type OutboxEvento struct {
 	UltimoError    *string
 }
 
+type QuotesCotizacion struct {
+	ID             uuid.UUID
+	TallerID       uuid.UUID
+	OrdenID        uuid.UUID
+	Numero         int32
+	Estado         string
+	Total          int64
+	EnviadaEn      *time.Time
+	RespondidaEn   *time.Time
+	CanalRespuesta *string
+	RespuestaRef   *string
+	Version        int32
+	CreatedAt      time.Time
+	CreatedBy      *uuid.UUID
+}
+
+type QuotesLinea struct {
+	ID             uuid.UUID
+	TallerID       uuid.UUID
+	CotizacionID   uuid.UUID
+	Tipo           string
+	RefID          *uuid.UUID
+	Descripcion    string
+	Cantidad       int32
+	PrecioUnitario int64
+	SinStock       bool
+	Aprobada       *bool
+	CreatedAt      time.Time
+}
+
 type TenancyTaller struct {
-	ID        uuid.UUID
-	Nombre    string
-	Version   int32
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID                 uuid.UUID
+	Nombre             string
+	Version            int32
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	Atiende            *string
+	Especialidades     []string
+	Ciudad             *string
+	Tamano             *string
+	Horario            json.RawMessage
+	ContratoVersion    *string
+	ContratoAceptadoEn *time.Time
+	OnboardingCompleto bool
+}
+
+type VehiclesPropietarioHistorial struct {
+	ID              uuid.UUID
+	TallerID        uuid.UUID
+	VehiculoID      uuid.UUID
+	ClienteAnterior uuid.UUID
+	ClienteNuevo    uuid.UUID
+	CambiadoEn      time.Time
+	UsuarioID       *uuid.UUID
 }
 
 type VehiclesVehiculo struct {
