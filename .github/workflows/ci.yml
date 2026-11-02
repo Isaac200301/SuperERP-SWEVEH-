@@ -93,6 +93,11 @@ jobs:
           fetch-depth: 0
       - name: gitleaks (historial completo)
         run: docker run --rm -v "$PWD:/repo" "$GITLEAKS_IMAGE" git /repo --no-banner --redact --config /repo/.gitleaks.toml
+      # Snyk necesita el binario de Go para resolver el árbol de go.mod.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
       - name: Snyk SCA (dependencias Go y npm)
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
