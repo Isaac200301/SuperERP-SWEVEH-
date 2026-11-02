@@ -777,10 +777,351 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Los 6 KPIs del taller y las órdenes abiertas por estado (HU-68…73). Permiso kpi:read */
+        get: operations["getDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lo que el dueño tiene pendiente hoy (HU-76). Permiso order:read */
+        get: operations["getToday"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catálogo de automatizaciones con interruptor (HU-40). Permiso order:read */
+        get: operations["listAutomations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Encender, apagar o editar el texto de un aviso (HU-41, HU-42). Permiso automation:manage */
+        patch: operations["updateAutomation"];
+        trace?: never;
+    };
+    "/automations/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Registro de cada ejecución de una automatización (HU-46). Permiso automation:manage */
+        get: operations["listAutomationRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bandeja "Por revisar" con los borradores del agente (HU-62). Permiso inbox:manage */
+        get: operations["listDrafts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enviar, editar y enviar, o "Lo contesto yo" (HU-62, HU-63). Nada sale sin que el dueño pulse Enviar (RF-18). Permiso inbox:manage */
+        post: operations["resolveDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Qué tan seguido el dueño edita los borradores (HU-65). Permiso inbox:manage */
+        get: operations["getDraftStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Conversaciones de WhatsApp del taller. Permiso conversation:read */
+        get: operations["listConversations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Una conversación con sus mensajes (HU-24). Permiso conversation:read */
+        get: operations["getConversation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Pasar la conversación al agente o a una persona (HU-59). Permiso inbox:manage */
+        patch: operations["setConversationMode"];
+        trace?: never;
+    };
+    "/conversations/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Una persona del taller contesta directamente; respeta la ventana de 24 h (HU-47, HU-59). Permiso inbox:manage */
+        post: operations["replyConversation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La conversación de WhatsApp dentro de la orden (HU-24). Permiso order:read */
+        get: operations["listOrderMessages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp/channel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Canal de WhatsApp del taller (número de prueba o real, HU-101). Permiso workshop:manage */
+        get: operations["getWhatsAppChannel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/simulator/inbound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Solo fuera de producción: simula un mensaje de cliente por el canal local, con el formato del webhook de Meta (D-01). Permiso workshop:manage */
+        post: operations["simulateInbound"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bitácora de quién cambió qué, con filtros (HU-88). Permiso audit:read */
+        get: operations["listAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Kpi: {
+            codigo: string;
+            titulo: string;
+            valor: number | null;
+            /** @description Valor ya formateado en español de Colombia */
+            texto: string;
+            detalle: string;
+            /** @description Explicación en palabras del taller (HU-75) */
+            queSignifica: string;
+        };
+        Pendiente: {
+            tipo: string;
+            titulo: string;
+            detalle: string;
+            /** Format: uuid */
+            ordenId?: string;
+            /** @enum {string} */
+            tono: "err" | "warn" | "info";
+        };
+        Automatizacion: {
+            codigo: string;
+            nombre: string;
+            disparador: string;
+            activa: boolean;
+            proximamente: boolean;
+            enviaMensaje: boolean;
+            editable: boolean;
+            texto: string;
+            datos: string[] | null;
+            ejecucionesSemana: number;
+            costo: string;
+        };
+        Borrador: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            conversacionId: string;
+            celular: string;
+            mensajeCliente: string;
+            intencion: string;
+            /** @description Texto que propone la IA o la plantilla; no sale sin aprobación (RF-18) */
+            propuesto: string;
+            final?: string | null;
+            /** @description De dónde salió cada dato (HU-64) */
+            fuentes?: string[] | null;
+            /** @description Acción propuesta (p. ej. crear la orden con la placa, HU-55) */
+            accion?: Record<string, never> | null;
+            estado: string;
+            origen: string;
+            /** Format: date-time */
+            creadoEn: string;
+            /** Format: date-time */
+            resueltoEn?: string | null;
+        };
+        Conversacion: {
+            /** Format: uuid */
+            id: string;
+            celular: string;
+            /** Format: uuid */
+            clienteId: string | null;
+            /** @enum {string} */
+            modo: "agente" | "humano";
+            pideHumano: boolean;
+            /** Format: date-time */
+            ventanaAbiertaHasta: string | null;
+            ultimoMensaje?: string;
+            /** Format: date-time */
+            ultimoEn?: string;
+        };
+        Mensaje: {
+            /** Format: uuid */
+            id: string;
+            direccion: string;
+            tipo: string;
+            cuerpo: string;
+            payload?: Record<string, never> | null;
+            estado: string;
+            origen: string;
+            /** Format: uuid */
+            ordenId?: string | null;
+            automatizacion?: string | null;
+            error?: string | null;
+            /** Format: date-time */
+            creadoEn: string;
+        };
         Salvedad: {
             nota: string;
             /** Format: uuid */
@@ -1106,6 +1447,17 @@ export interface components {
             };
             content: {
                 "application/json": components["schemas"]["Taller"];
+            };
+        };
+        /** @description OK */
+        Automatizaciones: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    automatizaciones: components["schemas"]["Automatizacion"][];
+                };
             };
         };
     };
@@ -2547,6 +2899,428 @@ export interface operations {
         responses: {
             200: components["responses"]["Taller"];
             400: components["responses"]["Problem"];
+        };
+    };
+    getDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        kpis: components["schemas"]["Kpi"][];
+                        porEstado: {
+                            [key: string]: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getToday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        pendientes: components["schemas"]["Pendiente"][];
+                    };
+                };
+            };
+        };
+    };
+    listAutomations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Automatizaciones"];
+        };
+    };
+    updateAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    activa?: boolean;
+                    texto?: string | null;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Automatizaciones"];
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    listAutomationRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ejecuciones: {
+                            codigo: string;
+                            resultado: string;
+                            detalle: string;
+                            /** Format: uuid */
+                            ordenId?: string | null;
+                            /** Format: date-time */
+                            creadoEn: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    listDrafts: {
+        parameters: {
+            query?: {
+                /** @description 1 = incluir los ya resueltos */
+                todos?: "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        borradores: components["schemas"]["Borrador"][];
+                    };
+                };
+            };
+        };
+    };
+    resolveDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "enviar" | "lo_contesto_yo" | "descartar";
+                    /** @description Texto editado por el dueño */
+                    texto?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Borrador"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getDraftStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        enviados: number;
+                        editados: number;
+                        porcentajeEditados: number;
+                    };
+                };
+            };
+        };
+    };
+    listConversations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversaciones: components["schemas"]["Conversacion"][];
+                    };
+                };
+            };
+        };
+    };
+    getConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversacion: components["schemas"]["Conversacion"];
+                        mensajes: components["schemas"]["Mensaje"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    setConversationMode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    modo: "agente" | "humano";
+                };
+            };
+        };
+        responses: {
+            /** @description Actualizada */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    replyConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    texto: string;
+                    /** Format: uuid */
+                    ordenId?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Encolado */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Mensaje"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listOrderMessages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        mensajes: components["schemas"]["Mensaje"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    getWhatsAppChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        canal: {
+                            proveedor?: string;
+                            numero?: string;
+                        } | null;
+                    };
+                };
+            };
+        };
+    };
+    simulateInbound: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    celular: string;
+                    nombre?: string;
+                    texto: string;
+                    /** @description id del botón de respuesta, si el cliente pulsó uno */
+                    boton?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Recibido */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    listAudit: {
+        parameters: {
+            query?: {
+                entidad?: string;
+                usuario?: string;
+                desde?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        eventos: {
+                            id: string;
+                            accion: string;
+                            entidad: string;
+                            entidadId?: string | null;
+                            actorTipo: string;
+                            actorId?: string | null;
+                            antes?: Record<string, never> | null;
+                            despues?: Record<string, never> | null;
+                            /** Format: date-time */
+                            ocurridoEn: string;
+                        }[];
+                    };
+                };
+            };
         };
     };
 }
