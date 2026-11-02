@@ -93,7 +93,8 @@ export function OrderDetailPage() {
       </div>
       <OrderActions orden={o} />
       <ReceptionPanel orden={o} />
-      {o.estado !== 'por_recibir' ? <QuotePanel orden={o} /> : null}
+      {/* Se cotiza desde el diagnóstico; en reparación sale la adicional (HU-31). */}
+      {!['por_recibir', 'recibido', 'cancelada'].includes(o.estado) ? <QuotePanel orden={o} /> : null}
     </>
   );
 }

@@ -17,6 +17,7 @@ import {
   useSaveChecklist,
   useTransition,
 } from './work';
+import { usePermission } from '../auth/api';
 
 const ladosCarro = ['frente', 'trasera', 'izquierdo', 'derecho'];
 const ladosMoto = [...ladosCarro, 'tablero'];
@@ -41,6 +42,7 @@ const select = 'min-h-[52px] rounded-btn border-[1.5px] border-line bg-white px-
 /** HU-20 y HU-25: avanzar o devolverse un paso, con las puertas que pide cada estado. */
 export function OrderActions({ orden }: { orden: Orden }) {
   const mover = useTransition(orden.id);
+  const puedeAnular = usePermission('order:override_approval');
   const [motivo, setMotivo] = useState('');
   const [recogido, setRecogido] = useState('');
   const [accesorios, setAccesorios] = useState(false);
@@ -56,7 +58,7 @@ export function OrderActions({ orden }: { orden: Orden }) {
       <h2 id="acciones" className="text-[17px] font-extrabold">
         Mover la orden
       </h2>
-      {sinAprobacion ? (
+      {sinAprobacion && puedeAnular ? (
         <Field
           label="Motivo si el cliente aprobó por fuera (solo el dueño)"
           placeholder="Ej.: aprobó por teléfono"
@@ -239,6 +241,7 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
 export function QuotePanel({ orden }: { orden: Orden }) {
   const q = useQuote(orden.id);
   const act = useQuoteActions(orden.id);
+  const puedeRegistrar = usePermission('quote:register_response');
   const [buscar, setBuscar] = useState('');
   const cat = useCatalog(buscar);
   if (q.isPending) return <p role="status">Cargando cotización…</p>;
@@ -339,7 +342,7 @@ export function QuotePanel({ orden }: { orden: Orden }) {
           </Button>
         </>
       ) : null}
-      {cot.estado === 'enviada' || cot.estado === 'dudas' ? (
+      {puedeRegistrar && (cot.estado === 'enviada' || cot.estado === 'dudas') ? (
         <div className="flex flex-wrap gap-3">
           <Button variant="secondary" onClick={() => act.respond.mutate({ decision: 'aprobar', canal: 'telefono' })}>
             Aprobó por teléfono

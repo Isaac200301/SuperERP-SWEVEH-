@@ -34,7 +34,7 @@
 | HU-04 | Recibir el taller ya armado | T1 | sí | ⬜ Pendiente | | |
 | HU-05 | Hacer mi primera orden antes de terminar | T1 | sí | ⬜ Pendiente | | |
 | HU-06 | Que me pidan los datos solo cuando hagan falta | T6 | no | ⬜ Pendiente | | |
-| HU-07 | Poner el precio y la duración de mis servicios | T1 | sí | ⬜ Pendiente | | |
+| HU-07 | Poner el precio y la duración de mis servicios | T1 | sí | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
 | HU-08 | Cargar el horario del taller | T1 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-09 | Registrar al cliente por su celular | T1 | sí | 🟦 En curso | | Los 3 criterios con prueba, incluida concurrencia del mismo celular. Construida como parte de la rebanada del Sprint 0 |
 | HU-10 | Registrar el vehículo por su placa, sea carro o moto | T1 | sí | 🟦 En curso | | Los 6 criterios con prueba (dominio + HTTP). Formatos de moto provisionales (Q-01) |
@@ -50,22 +50,22 @@
 | HU-20 | Mover la orden por sus estados | T1 | sí | 🟦 En curso | | Código ya existe (dominio, caso de uso, HTTP). Criterios 1–4 con prueba: dominio (`orders/domain/flow_test.go`) y HTTP (`server/flow_test.go`: saltos, 409 por versión, falta de cotización, historial con usuario y hora). 2026-11-02: corregido que devolverse a Recibido pedía el checklist. Falta: prueba del permiso del mecánico (sin anulación del dueño) y pantalla del piso |
 | HU-21 | Agregar fotos y notas en cualquier momento | T1 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-22 | Asignar mecánico y fecha prometida | T6 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
-| HU-23 | Ver mis órdenes en el celular | T1 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
+| HU-23 | Ver mis órdenes en el celular | T1 | sí | 🟦 En curso | | Criterios 1 y 2 con prueba HTTP; vista "Piso" en el panel (2026-11-02). Falta PWA instalable |
 | HU-24 | Ver la conversación de WhatsApp dentro de la orden | T2 | sí | ⬜ Pendiente | | |
 | HU-25 | Entregar el vehículo | T1 | sí | ⬜ Pendiente | | |
 | HU-26 | Cancelar una orden que no siguió | T6 | no | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
-| HU-27 | Armar la cotización con servicios y repuestos | T1 | sí | ⬜ Pendiente | | |
+| HU-27 | Armar la cotización con servicios y repuestos | T1 | sí | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
 | HU-28 | Aprobar la cotización desde WhatsApp | T2 | sí | ⬜ Pendiente | | |
-| HU-29 | Registrar la respuesta del cliente y mover la orden | T2 | sí | ⬜ Pendiente | | |
+| HU-29 | Registrar la respuesta del cliente y mover la orden | T2 | sí | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
 | HU-30 | Aprobar ítem por ítem | T6 | no | ⬜ Pendiente | | |
-| HU-31 | Cotización adicional durante la reparación | T6 | no | ⬜ Pendiente | | |
-| HU-32 | Crear, editar y desactivar repuestos | T1 | sí | ⬜ Pendiente | | |
-| HU-33 | Descontar el repuesto al aprobarse la orden | T2 | sí | ⬜ Pendiente | | |
-| HU-34 | Buscar repuestos al cotizar | T1 | sí | ⬜ Pendiente | | |
-| HU-35 | Registrar entrada de mercancía | T6 | no | ⬜ Pendiente | | |
-| HU-36 | Recibir alerta de repuesto bajo el mínimo | T6 | no | ⬜ Pendiente | | |
+| HU-31 | Cotización adicional durante la reparación | T6 | no | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
+| HU-32 | Crear, editar y desactivar repuestos | T1 | sí | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
+| HU-33 | Descontar el repuesto al aprobarse la orden | T2 | sí | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
+| HU-34 | Buscar repuestos al cotizar | T1 | sí | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
+| HU-35 | Registrar entrada de mercancía | T6 | no | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
+| HU-36 | Recibir alerta de repuesto bajo el mínimo | T6 | no | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
 | HU-37 | Importar inventario desde Excel o CSV | T6 | no | ⬜ Pendiente | | |
-| HU-38 | Devolver al inventario lo que no se usó | T6 | no | ⬜ Pendiente | | |
+| HU-38 | Devolver al inventario lo que no se usó | T6 | no | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
 | HU-39 | Proveedores, órdenes de compra y bodegas | T7 | no | ⬜ Pendiente | | |
 | HU-40 | Ver el catálogo de automatizaciones | T4 | sí | ⬜ Pendiente | | |
 | HU-41 | Encender y apagar una automatización | T2 | sí | ⬜ Pendiente | | |
@@ -108,7 +108,7 @@
 | HU-78 | Hacerle preguntas libres al asistente | T7 | no | ⬜ Pendiente | | |
 | HU-79 | Que mis datos no los vea otro taller | T0 | no | 🟦 En curso | | RLS forzado + `SET LOCAL` probado (incluida meta-prueba de todas las tablas) y 404 entre talleres por HTTP. Falta: "el intento queda registrado" (criterio 1) y repetir contra el pooler de Supabase |
 | HU-80 | Agregar a mi mecánico | T0 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
-| HU-81 | Ver solo lo que me toca como mecánico | T0 | sí | ⬜ Pendiente | | |
+| HU-81 | Ver solo lo que me toca como mecánico | T0 | sí | 🟦 En curso | | Criterios 1 y 2 con prueba HTTP (`mechanic_test.go`): sin costo ni permisos de dinero, 403 en configuración. Menú y botones según permisos |
 | HU-82 | Trabajar como recepción | T6 | no | ⬜ Pendiente | | |
 | HU-83 | Ocultar la gestión de usuarios si trabajo solo | T6 | no | ⬜ Pendiente | | |
 | HU-84 | Desactivar a un usuario que se va | T6 | no | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
@@ -137,6 +137,7 @@
 |---|---|---|---|
 | 2026-11-01 | Claude | Se halló que el repo va por delante de este cuadro (existen `flow`, checklist, stats y cotizaciones en `orders`; el cuadro de HU puede estar desactualizado). Se añadieron pruebas de dominio de HU-20 (`go test` verde; `-race` no corrió: esta máquina no tiene cgo). | Auditar qué HU de T1 ya están en código y corregir este cuadro; pruebas HTTP de HU-20 |
 | 2026-11-02 | Claude | `arch_test.go` regla 5: `internal/wire` exento como composition root (igual que `server`). Suite completa con Postgres local y `-race` (gcc WinLibs instalado; `CGO_ENABLED=1` con `go env -w`): todo verde **salvo** `TestRouterMatchesOpenAPIContract`, porque hay 36 rutas en el router que faltan en `api/openapi.yaml` (cotización, inventario, servicios, usuarios, taller, checklist, evidencias, transición, búsqueda…) | Documentar las 36 rutas en OpenAPI y regenerar el cliente TS; corregir el cuadro de HU |
+| 2026-11-02 | Claude (rama `test/HU-27-cotizacion-inventario`) | Pruebas de servicios, repuestos y cotización con aprobación y descuento; cobertura vigilada ahora en 15 paquetes (todos ≥ 80 %). **Bugs corregidos:** (1) se podía devolver al inventario más de lo que una orden descontó (HU-38), ahora con `FOR UPDATE` y prueba de 5 devoluciones simultáneas; (2) el contrato y la pantalla esperaban la cotización sin envolver y el servidor responde `{"cotizacion": ...}`: la pantalla no mostraba ítems. Se quitó `inventory.Service.Get` sin uso | Mensajería, agente, automatizaciones y KPIs: pruebas y contrato |
 | 2026-11-02 | Claude (rama `developer`, PR #2) | Pantallas del MVP: acciones de estado, recepción con checklist y fotos, cotización en el detalle de la orden; servicios y repuestos; equipo; mi taller (perfil, contrato y horario). Contrato: `decision` con enum y respuesta de cotización vacía. Vitest 16 en verde (incluye envío multipart). README con lo que ya hace el MVP. **No se recorrió en un navegador real** (no hay Playwright instalado) | Probar el recorrido en el navegador; pantalla del piso para el mecánico; pruebas de cotización, inventario y servicios en Go |
 | 2026-11-02 | Claude (rama `developer`, PR #1) | Commits por sesión y push; CI en GitHub. Arreglos para ponerlo en verde: modelos sqlc regenerados, 9 hallazgos de golangci-lint (incluye el `hub.challenge` del webhook que se reflejaba sin validar), Go en el job de Snyk. Cobertura R-11 de 26–70 % a ≥ 82 % en todos los paquetes vigilados con pruebas HTTP de recepción, evidencias, asignación, historial, cancelación, taller, usuarios, clientes y cambio de dueño; se quitó `Service.Recent` sin uso | Merge del PR #1; pruebas de cotización, inventario, servicios, mensajería y KPIs |
 | 2026-11-02 | Claude | `api/openapi.yaml` con las 36 rutas faltantes (órdenes: flujo, checklist, evidencias; cotización; inventario; servicios; usuarios; taller; búsqueda; historial) y campos nuevos de `Orden`. Cliente TS regenerado. **Verde:** `go test -race ./...` con Postgres (incluido el contrato), `tsc`, ESLint y Vitest (14). Enums sin confirmar en el código (`decision`, `tipo` de línea, `atiende`, `tamano`) quedaron como texto libre | Las rutas de `wire` y `analytics` (conversaciones, bandeja, automatizaciones, auditoría, KPIs) no se montan en el router de pruebas y tampoco están en el contrato; corregir el cuadro de HU |

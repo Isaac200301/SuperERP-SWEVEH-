@@ -37,6 +37,15 @@ export function useTransition(id: string) {
   });
 }
 
+/** HU-23: primero las asignadas a mí por fecha prometida; si el taller no asigna, todas las abiertas (Q-14). */
+export function useMyOrders() {
+  return useQuery({
+    queryKey: [...ordersKey, 'mias'],
+    queryFn: async () => unwrap(await api.GET('/orders/mine')).ordenes,
+    refetchInterval: 30_000,
+  });
+}
+
 export function useChecklist(id: string) {
   return useQuery({
     queryKey: keys.checklist(id),
@@ -95,10 +104,8 @@ export function useQuote(id: string, enabled = true) {
   return useQuery({
     queryKey: keys.quote(id),
     enabled,
-    queryFn: async (): Promise<Cotizacion | null> => {
-      const r = unwrap(await api.GET('/orders/{id}/quote', { params: { path: { id } } }));
-      return 'id' in r ? r : null;
-    },
+    queryFn: async (): Promise<Cotizacion | null> =>
+      unwrap(await api.GET('/orders/{id}/quote', { params: { path: { id } } })).cotizacion,
   });
 }
 

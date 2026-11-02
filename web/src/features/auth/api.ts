@@ -22,6 +22,15 @@ export function useSession() {
   });
 }
 
+/** ¿La sesión tiene el permiso? Solo para ocultar botones: el servidor siempre verifica (R-05). */
+export function can(session: Sesion | null | undefined, permiso: string): boolean {
+  return session?.permisos?.includes(permiso) ?? false;
+}
+
+export function usePermission(permiso: string): boolean {
+  return can(useSession().data, permiso);
+}
+
 export function useRequestCode() {
   return useMutation({
     mutationFn: async (celular: string) => unwrap(await api.POST('/auth/otp', { body: { celular: soloCelular(celular) } })),
