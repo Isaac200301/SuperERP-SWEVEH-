@@ -1576,6 +1576,24 @@ _Módulo del MVP: Preparativos. Que la demo corra dos veces seguidas sin tocar c
 
 **Trazabilidad:** Aceptación: CA-02
 
+### HU-103 · Registrar el diagnóstico en la orden
+
+**Épica:** E03 · **Roles:** Mecánico, Recepción, Dueño del taller · **Superficies:** Piso, Panel · **Prioridad:** Must · **Origen:** Pablo (3-nov-2026), propuesta pendiente de confirmar con Isaac · **Aplica a motos:** sí
+
+**Como** mecánico, **quiero** anotar lo que encontré en el vehículo por sistema, con su gravedad y los códigos del escáner, **para** que la cotización salga de un diagnóstico real y el dueño del vehículo entienda qué es urgente y qué puede esperar.
+
+**Criterios de aceptación**
+
+- **Dado** una orden Recibida, En diagnóstico o En reparación, **cuando** registro un hallazgo, **entonces** queda con sistema (motor, frenos, suspensión, dirección, eléctrico, caja, refrigeración, llantas, carrocería u otro), descripción, gravedad (urgente, recomendado o puede esperar), códigos de falla opcionales (como P0301), autor y hora.
+- **Dado** una orden Por recibir, entregada o cancelada, **cuando** intento registrar un hallazgo, **entonces** el sistema no lo permite y dice por qué.
+- **Dado** un hallazgo, **cuando** pulso "Cotizar esto", **entonces** la cotización busca en el catálogo los servicios y repuestos de ese sistema; nunca se inventa un precio.
+- **Dado** una cotización ya enviada, **cuando** intento borrar un hallazgo, **entonces** el sistema no lo permite: lo que vio el cliente no se cambia.
+- **Dado** cualquier hallazgo agregado o borrado, **cuando** reviso la bitácora, **entonces** aparece quién, cuándo y qué.
+
+**Notas:** Lo registra una persona; la IA no diagnostica (decisión del equipo). Decisión provisional: no se exige un hallazgo para enviar la cotización (un cambio de aceite no necesita diagnóstico); se puede volver obligatorio después. Las fotos del diagnóstico usan las evidencias de HU-21.
+
+**Trazabilidad:** Depende de: HU-20, HU-27
+
 ## Referencias citadas en las historias
 
 1. Meta for Developers, "Get started", WhatsApp Cloud API (número de prueba, 5 destinatarios, plantillas preaprobadas). <https://developers.facebook.com/docs/whatsapp/cloud-api/get-started/> (Oficial)

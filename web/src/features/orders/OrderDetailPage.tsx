@@ -9,6 +9,7 @@ import { Plate } from '../../shared/ui/Plate';
 import { StatePill } from '../../shared/ui/StatePill';
 import { useSession } from '../auth/api';
 import { useOrder } from './api';
+import { DiagnosisPanel } from './DiagnosisPanel';
 import { OrderActions, QuotePanel, ReceptionPanel } from './OrderWork';
 
 /** Stepper de los 7 estados con la hora de cada paso (docs/10 §4.3). */
@@ -117,6 +118,7 @@ export function OrderDetailPage() {
       </div>
       <OrderActions orden={o} />
       <ReceptionPanel orden={o} />
+      {!['por_recibir', 'cancelada'].includes(o.estado) ? <DiagnosisPanel orden={o} /> : null}
       {/* Se cotiza desde el diagnóstico; en reparación sale la adicional (HU-31). */}
       {!['por_recibir', 'recibido', 'cancelada'].includes(o.estado) ? <QuotePanel orden={o} /> : null}
     </>

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
 import { ApiError, type Orden } from '../../shared/api/client';
 import { estados, flujo } from '../../shared/i18n/es-CO';
@@ -19,6 +19,7 @@ import {
 } from './work';
 import { usePermission } from '../auth/api';
 
+export const cotizarEvento = 'sweveh:cotizar';
 const ladosCarro = ['frente', 'trasera', 'izquierdo', 'derecho'];
 const ladosMoto = [...ladosCarro, 'tablero'];
 const combustibles: Record<string, string> = {
@@ -244,6 +245,12 @@ export function QuotePanel({ orden }: { orden: Orden }) {
   const puedeRegistrar = usePermission('quote:register_response');
   const [buscar, setBuscar] = useState('');
   const cat = useCatalog(buscar);
+  // "Cotizar esto" desde un hallazgo del diagnóstico: busca en el catálogo con su texto (DiagnosisPanel).
+  useEffect(() => {
+    const onCotizar = (e: Event) => setBuscar((e as CustomEvent<string>).detail);
+    window.addEventListener(cotizarEvento, onCotizar);
+    return () => window.removeEventListener(cotizarEvento, onCotizar);
+  }, []);
   if (q.isPending) return <p role="status">Cargando cotización…</p>;
   if (q.isError) return <Alert>{q.error.message}</Alert>;
   // Sin cotización todavía: se arma una vacía; el primer ítem crea el borrador en el servidor.

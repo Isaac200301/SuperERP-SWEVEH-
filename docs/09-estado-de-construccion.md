@@ -28,6 +28,7 @@
 
 | HU | Título | Tramo | Demo | Estado | PR | Notas |
 |---|---|---|---|---|---|---|
+| 2026-11-03 | Claude (rama `dev/pablo`) | **Bloque 1.6: diagnóstico en la orden (HU-103 propuesta).** Hallazgos por sistema con gravedad y códigos OBD-II, solo desde Recibido hasta En reparación; borrar solo antes de cotizar; bitácora en la misma transacción; panel en el detalle de la orden con "Cotizar esto". **Desviación del plan:** el hallazgo no se exige para enviar la cotización (bloquearía trabajos simples como un cambio de aceite); queda como decisión provisional. **Verde:** `go test ./...`, Vitest 40, `tsc`, ESLint | Confirmar HU-103 con Isaac; Bloque 2 (inventario) |
 | 2026-11-03 | Claude (rama `dev/pablo`) | **Ajuste del Bloque 1 y Bloque 1.5.** Especialidades ampliadas (sistema eléctrico y alto voltaje separados, migración 00010) y precarga por especialidad. **Ficha del vehículo** (decisión de Pablo, DE-17 actualizada; migración 00011, `turbo` queda derivado de la aspiración): tarjeta "Ficha del vehículo" en la nueva orden según carro o moto y la misma regla de pendiente en dominio y UI. VIN y app del cliente siguen fuera (decisión de Pablo). **Verde:** `go test ./...`, `go vet`, Vitest 38, `tsc`, ESLint | Bloque 1.6 (diagnóstico en la orden); recorrido manual |
 | 2026-11-03 | Claude (rama `dev/pablo`) | **Bloque 1: registro y alta del taller.** Nuevo `/panel/arranque` (pasos 2 y 3): tipo de taller con vehículo obligatorio, revisión de la precarga (renombrar, quitar, agregar) y horario; el registro y el panel desvían ahí a un taller sin arranque. Primera orden con "Usar ejemplo" (`ejemplo` en el contrato de `POST /orders`) y vista previa del aviso. HU-83 ("solo yo" oculta Equipo) y versión y fecha en la política. **Verde:** `go test ./...` con Postgres (sin `-race`: falta gcc en esta máquina), `go vet`, Vitest 34, `tsc`, ESLint y build. No se recorrió en un navegador real | Recorrido manual de Isaac/Pablo; Bloque 2 (inventario) |
 | HU-01 | Crear la cuenta con mi celular | T0 | sí | 🟦 En curso | | Criterios 1–3 con prueba (`internal/server/server_test.go`, `errors_test.go`). Falta: canal real del código (Q-13), medir el criterio 4 (< 5 min) en la demo |
@@ -132,6 +133,7 @@
 | HU-100 | Ver el registro técnico de mensajes | T6 | no | ⬜ Pendiente | | |
 | HU-101 | Cambiar del número de prueba al número del taller | T6 | no | ⬜ Pendiente | | |
 | HU-102 | Probar el agente con 30 mensajes reales de estilo | T3 | no | ⬜ Pendiente | | |
+| HU-103 | Registrar el diagnóstico en la orden (propuesta de Pablo, 3-nov) | T1 | no | 🟦 En curso | | Tabla `orders.hallazgo` con RLS (migración 00012), `GET/POST/DELETE /orders/{id}/findings`, permiso `order:diagnose` para todos los roles, panel "Diagnóstico" con "Cotizar esto". Pruebas: dominio, HTTP con aislamiento y bitácora, Vitest. Provisional: no bloquea enviar la cotización. Falta: confirmar alcance con Isaac |
 
 ## Bitácora de sesiones (la más reciente arriba)
 

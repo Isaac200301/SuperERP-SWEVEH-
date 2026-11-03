@@ -55,10 +55,10 @@ export const owner = {
   taller: { id: 't1', nombre: 'Servitaller El Pistón' },
   roles: ['dueno'],
   cuentaNueva: false,
-  permisos: ['order:read', 'order:update_state', 'order:override_approval', 'quote:register_response', 'service:manage', 'user:manage', 'workshop:manage'],
+  permisos: ['order:read', 'order:update_state', 'order:diagnose', 'order:override_approval', 'quote:register_response', 'service:manage', 'user:manage', 'workshop:manage'],
 };
 
-export const mechanic = { ...owner, roles: ['mecanico'], permisos: ['order:read', 'order:update_state'] };
+export const mechanic = { ...owner, roles: ['mecanico'], permisos: ['order:read', 'order:update_state', 'order:diagnose'] };
 
 export function orden(over: Record<string, unknown> = {}) {
   return {

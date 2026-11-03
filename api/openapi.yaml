@@ -460,6 +460,59 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
 
+  /orders/{id}/findings:
+    get:
+      operationId: listFindings
+      summary: Hallazgos del diagnóstico de la orden (HU-103 propuesta). Sin precios. Permiso order:read
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [hallazgos]
+                properties:
+                  hallazgos: { type: array, items: { $ref: '#/components/schemas/Hallazgo' } }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: addFinding
+      summary: Registrar un hallazgo (desde Recibido hasta En reparación). Lo hace una persona, no la IA. Permiso order:diagnose
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sistema, descripcion, gravedad]
+              properties:
+                sistema: { $ref: '#/components/schemas/SistemaVehiculo' }
+                descripcion: { type: string, maxLength: 1000 }
+                gravedad: { $ref: '#/components/schemas/Gravedad' }
+                codigosFalla: { type: array, maxItems: 10, items: { type: string, example: 'P0301' } }
+      responses:
+        '201':
+          description: Hallazgo registrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Hallazgo' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /orders/{id}/findings/{fid}:
+    delete:
+      operationId: deleteFinding
+      summary: Borrar un hallazgo antes de enviar la cotización. Permiso order:diagnose
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: fid, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Borrado }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /orders/{id}/evidence:
     get:
       operationId: listEvidence
@@ -1438,6 +1491,22 @@ components:
               ordenId: { type: string, format: uuid, description: 'Obligatorio en devoluciones' }
 
   schemas:
+    SistemaVehiculo:
+      type: string
+      enum: [motor, frenos, suspension, direccion, electrico, transmision, refrigeracion, llantas, carroceria, otro]
+    Gravedad:
+      type: string
+      enum: [urgente, recomendado, puede_esperar]
+    Hallazgo:
+      type: object
+      required: [id, sistema, descripcion, gravedad, codigosFalla, creadoEn]
+      properties:
+        id: { type: string, format: uuid }
+        sistema: { $ref: '#/components/schemas/SistemaVehiculo' }
+        descripcion: { type: string }
+        gravedad: { $ref: '#/components/schemas/Gravedad' }
+        codigosFalla: { type: array, items: { type: string } }
+        creadoEn: { type: string, format: date-time }
     Kpi:
       type: object
       required: [codigo, titulo, valor, texto, detalle, queSignifica]

@@ -52,6 +52,7 @@ type Modules struct {
 	VehDir    vehicles.Directory
 	Orders    *ordersapp.Service
 	Flow      *ordersapp.Flow
+	Findings  *ordersapp.Findings
 	OrdersF   orders.Orders
 	Inventory *inventoryapp.Service
 	InvF      inventory.Inventory
@@ -80,6 +81,7 @@ func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger
 	m.Orders.SetExampleMarker(flowRepo.MarkExample)
 	m.Flow = ordersapp.NewFlow(tx, flowRepo, m.Orders, vdir, ordersstorage.New(st), m.Audit, m.Events, clk)
 	m.OrdersF = orders.New(m.Flow)
+	m.Findings = ordersapp.NewFindings(tx, flowRepo, orderspg.Findings{}, m.Audit, clk)
 
 	m.Inventory = inventoryapp.NewService(tx, inventorypg.Repository{}, m.Audit, m.Events, clk)
 	m.InvF = inventory.New(m.Inventory)

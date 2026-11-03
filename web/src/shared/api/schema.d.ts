@@ -330,6 +330,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orders/{id}/findings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hallazgos del diagnóstico de la orden (HU-103 propuesta). Sin precios. Permiso order:read */
+        get: operations["listFindings"];
+        put?: never;
+        /** Registrar un hallazgo (desde Recibido hasta En reparación). Lo hace una persona, no la IA. Permiso order:diagnose */
+        post: operations["addFinding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{id}/findings/{fid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Borrar un hallazgo antes de enviar la cotización. Permiso order:diagnose */
+        delete: operations["deleteFinding"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/orders/{id}/evidence": {
         parameters: {
             query?: never;
@@ -1037,6 +1072,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        SistemaVehiculo: "motor" | "frenos" | "suspension" | "direccion" | "electrico" | "transmision" | "refrigeracion" | "llantas" | "carroceria" | "otro";
+        /** @enum {string} */
+        Gravedad: "urgente" | "recomendado" | "puede_esperar";
+        Hallazgo: {
+            /** Format: uuid */
+            id: string;
+            sistema: components["schemas"]["SistemaVehiculo"];
+            descripcion: string;
+            gravedad: components["schemas"]["Gravedad"];
+            codigosFalla: string[];
+            /** Format: date-time */
+            creadoEn: string;
+        };
         Kpi: {
             codigo: string;
             titulo: string;
@@ -2208,6 +2257,88 @@ export interface operations {
             200: components["responses"]["Checklist"];
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    listFindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        hallazgos: components["schemas"]["Hallazgo"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    addFinding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    sistema: components["schemas"]["SistemaVehiculo"];
+                    descripcion: string;
+                    gravedad: components["schemas"]["Gravedad"];
+                    codigosFalla?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Hallazgo registrado */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Hallazgo"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    deleteFinding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                fid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Borrado */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     listEvidence: {
