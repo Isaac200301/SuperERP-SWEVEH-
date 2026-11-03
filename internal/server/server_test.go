@@ -27,11 +27,13 @@ import (
 	"sweveh/internal/outbox"
 	"sweveh/internal/platform/authn"
 	"sweveh/internal/platform/clock"
+	"sweveh/internal/platform/config"
 	"sweveh/internal/platform/db"
 	"sweveh/internal/platform/storage"
 	"sweveh/internal/platform/testdb"
 	"sweveh/internal/server"
 	"sweveh/internal/shared"
+	"sweveh/internal/wire"
 )
 
 type env struct {
@@ -68,6 +70,7 @@ func newEnv(t *testing.T) *env {
 		Verifier:  authn.NewVerifier(map[string]*ecdsa.PublicKey{"test-1": &key.PublicKey}, clk),
 		OTPSender: mem, OTPPepper: []byte("pepper-de-pruebas-de-32-caracteres!!"),
 		AllowedOrigins: []string{origin}, LoginPerMinute: 100000, Storage: st,
+		Extra: wire.Extra(config.API{Env: config.EnvLocal}),
 	})
 	srv.Config.Handler = mux
 	srv.StartTLS()

@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router';
 import type { Sesion } from '../../shared/api/client';
 import { roles } from '../../shared/i18n/es-CO';
 import { Brand } from '../../shared/ui/Logo';
-import { IconCar, IconClock, IconLogout, IconOrders, IconTeam, IconTool } from '../../shared/ui/icons';
+import { IconCar, IconCheck, IconClock, IconLogout, IconOrders, IconPlus, IconTeam, IconTool, IconWarn } from '../../shared/ui/icons';
 import { can, useLogout } from '../auth/api';
 
 /**
@@ -11,8 +11,11 @@ import { can, useLogout } from '../auth/api';
  * (HU-81: el mecánico no ve configuración). Ocultar no protege: el servidor responde 403 igual.
  */
 const nav = [
+  { to: '/panel/tablero', label: 'Tablero', icon: IconCheck, perm: 'kpi:read' },
   { to: '/panel/piso', label: 'Piso', icon: IconClock, perm: 'order:read' },
   { to: '/panel/ordenes', label: 'Órdenes', icon: IconOrders, perm: 'order:read' },
+  { to: '/panel/por-revisar', label: 'Por revisar', icon: IconWarn, perm: 'inbox:manage' },
+  { to: '/panel/automatizaciones', label: 'Automatizaciones', icon: IconPlus, perm: 'order:read' },
   { to: '/panel/catalogo', label: 'Servicios y repuestos', icon: IconTool, perm: 'service:manage' },
   { to: '/panel/equipo', label: 'Equipo', icon: IconTeam, perm: 'user:manage' },
   { to: '/panel/taller', label: 'Mi taller', icon: IconCar, perm: 'workshop:manage' },
