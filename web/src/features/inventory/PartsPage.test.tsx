@@ -68,7 +68,7 @@ describe('PartsPage (HU-32, HU-34 a HU-37)', () => {
           { fila: 2, referencia: 'FA-10', nombre: 'Filtro', estado: 'ok', errores: [] },
           { fila: 3, referencia: 'BH-1', nombre: 'Bombillo', estado: 'error', errores: ['precio: es obligatorio'] },
         ],
-        conError: 1, importadas: 0,
+        conError: 1, importadas: 0, avisos: ['La columna "Notas" no la reconocemos y se ignora.'],
       },
     });
     renderPage(<PartsPage />);
@@ -77,6 +77,7 @@ describe('PartsPage (HU-32, HU-34 a HU-37)', () => {
     await userEvent.upload(screen.getByLabelText('Archivo CSV'), file);
     expect(await screen.findByText('precio: es obligatorio')).toBeInTheDocument();
     expect(screen.getByText(/1 de 2 filas tienen errores/)).toBeInTheDocument();
+    expect(screen.getByText(/La columna "Notas" no la reconocemos/)).toBeInTheDocument();
     expect(screen.getByText('Corrige las filas con error antes de importar.')).toBeInTheDocument();
     expect(calls.find((c) => c.method === 'POST')?.path).toBe('/parts/import?confirmar=0');
   });

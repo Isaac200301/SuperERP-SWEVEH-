@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"testing"
 )
 
@@ -104,5 +105,38 @@ func TestInventory_SheetSearchMovementsAndImport(t *testing.T) {
 	other := e.register("3105550199", "Otro Taller")
 	if r := other.do("GET", "/api/v1/parts/"+id+"/movements", nil); r.status != http.StatusNotFound {
 		t.Fatalf("otro taller ve movimientos: %d", r.status)
+	}
+}
+
+// El archivo de prueba de Pablo (3-nov-2026), tal como lo exportó: encabezados de la pantalla, "Para" y
+// categorías en texto. Debe pasar completo: antes se rechazaba entero por no reconocer "Precio de venta (COP)".
+func TestInventory_ImportsPablosSpreadsheet(t *testing.T) {
+	e := newEnv(t)
+	c := e.register("3105550195", "Pablo Rodríguez")
+	data, err := os.ReadFile("testdata/inventario-repuestos-prueba.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := c.must(http.StatusOK, c.uploadCSV("/api/v1/parts/import", string(data)))
+	filas := r.body["filas"].([]any)
+	for _, f := range filas {
+		if m := f.(map[string]any); m["estado"] != "ok" {
+			t.Errorf("fila %v con error: %v", m["fila"], m["errores"])
+		}
+	}
+	if r.body["conError"] != float64(0) || len(filas) != 95 {
+		t.Fatalf("vista previa: %d filas, %v con error", len(filas), r.body["conError"])
+	}
+	r = c.must(http.StatusOK, c.uploadCSV("/api/v1/parts/import?confirmar=1", string(data)))
+	if r.body["importadas"] != float64(95) {
+		t.Fatalf("importar: %v", r.body["importadas"])
+	}
+	p := c.must(http.StatusOK, c.do("GET", "/api/v1/parts?q=CAJ-0001", nil)).body["repuestos"].([]any)[0].(map[string]any)
+	if p["categoria"] != "transmision" || p["tipoVehiculo"] != "carro" || p["precioVenta"] != float64(580000) || p["existencia"] != float64(2) {
+		t.Fatalf("repuesto importado: %v", p)
+	}
+	low := c.must(http.StatusOK, c.do("GET", "/api/v1/parts/low", nil)).body["repuestos"].([]any)
+	if len(low) == 0 {
+		t.Fatal("LUB-0005 (3 de mínimo 10) y FRE-0008 (agotado) debían quedar bajo el mínimo")
 	}
 }

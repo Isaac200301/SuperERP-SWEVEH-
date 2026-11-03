@@ -185,6 +185,12 @@ function PartDetail({ p, onClose }: { p: Repuesto; onClose: () => void }) {
   );
 }
 
+function resumen(v: Importacion): string {
+  if (v.importadas > 0) return `Listo: se importaron ${v.importadas} repuestos.`;
+  if (v.conError) return `${v.conError} de ${v.filas.length} filas tienen errores. Corrígelas en el archivo y vuelve a subirlo.`;
+  return `Las ${v.filas.length} filas están bien.`;
+}
+
 /** HU-37: subir el CSV, revisar fila por fila y confirmar. Con una fila en error no se importa nada. */
 function ImportParts() {
   const imp = useImport();
@@ -213,12 +219,13 @@ function ImportParts() {
       {vista ? (
         <>
           <p role="status" className={vista.conError ? 'font-bold text-warn-ink' : 'font-bold text-ok'}>
-            {vista.importadas > 0
-              ? `Listo: se importaron ${vista.importadas} repuestos.`
-              : vista.conError
-                ? `${vista.conError} de ${vista.filas.length} filas tienen errores. Corrígelas en el archivo y vuelve a subirlo.`
-                : `Las ${vista.filas.length} filas están bien.`}
+            {resumen(vista)}
           </p>
+          {(vista.avisos ?? []).map((a) => (
+            <p key={a} className="text-sm font-semibold text-warn-ink">
+              {a}
+            </p>
+          ))}
           <ul className="flex max-h-72 flex-col gap-1 overflow-auto text-sm">
             {vista.filas.map((r) => (
               <li key={r.fila} className={`flex flex-wrap gap-3 rounded-xl px-3 py-2 ${r.estado === 'error' ? 'bg-err-tint' : ''}`}>

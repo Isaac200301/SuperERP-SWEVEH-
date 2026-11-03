@@ -1531,6 +1531,8 @@ export interface components {
             };
             content: {
                 "application/json": {
+                    /** @description Lo que no impide importar, p. ej. columnas que no se reconocen */
+                    avisos: string[];
                     conError: number;
                     importadas: number;
                     filas: {

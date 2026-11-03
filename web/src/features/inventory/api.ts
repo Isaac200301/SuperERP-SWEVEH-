@@ -4,7 +4,12 @@ import { api, ApiError, unwrap, type Schemas } from '../../shared/api/client';
 
 export type Repuesto = Schemas['Repuesto'];
 export type Categoria = Schemas['Categoria'];
-export type Importacion = { filas: { fila: number; referencia: string; nombre: string; estado: 'ok' | 'error'; errores: string[] }[]; conError: number; importadas: number };
+export type Importacion = {
+  filas: { fila: number; referencia: string; nombre: string; estado: 'ok' | 'error'; errores: string[] }[];
+  conError: number;
+  importadas: number;
+  avisos: string[];
+};
 
 // Mismas claves que inventory/domain.Categories; coinciden con los sistemas del diagnóstico.
 export const categorias: Record<Categoria, string> = {
@@ -94,6 +99,7 @@ export function useImport() {
   });
 }
 
+// Encabezados y valores como los muestra la pantalla; el servidor también acepta las claves internas (domain.columnAliases).
 export const plantillaCSV =
-  'referencia;nombre;tipo;marca;categoria;ubicacion;referencia_oem;costo;precio;existencia;minimo\n' +
-  'PF-20;Pastillas de freno delanteras;carro;Bosch;frenos;Estante A3;0986494;40000;65000;4;2\n';
+  'Referencia;Nombre;Marca;Categoría;Para;Ubicación;Referencia original (OEM);Precio de venta (COP);Costo (COP);Existencia;Mínimo\n' +
+  'PF-20;Pastillas de freno delanteras;Bosch;Frenos;Carro;Estante A3;0986494;65000;40000;4;2\n';

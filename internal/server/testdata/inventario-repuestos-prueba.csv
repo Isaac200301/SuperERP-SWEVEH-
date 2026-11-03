@@ -1,0 +1,96 @@
+Referencia,Nombre,Marca,Categoría,Para,Ubicación,Referencia original (OEM),Precio de venta (COP),Costo (COP),Existencia,Mínimo
+FIL-0001,Filtro de aceite roscado compacto,Fram,Filtros,Carro,A-01-01,15208-5X001,22000,14000,24,8
+FIL-0002,Filtro de aceite roscado grande,Mann-Filter,Filtros,Carro,A-01-02,15208-6X102,32000,21000,12,6
+FIL-0003,Filtro de aire motor 1600cc,Mann-Filter,Filtros,Carro,A-01-03,17220-5R002,38000,24000,10,4
+FIL-0004,Filtro de combustible gasolina,Bosch,Filtros,Carro,A-01-04,23300-3Y301,45000,29000,7,4
+FIL-0005,Filtro de cabina con carbón activado,Bosch,Filtros,Carro,A-01-05,87139-0Q010,42000,26000,9,4
+FIL-0006,Filtro de aceite moto 150-200cc,Hiflofiltro,Filtros,Moto,A-02-01,15412-KY4-001,18000,11000,30,10
+FIL-0007,Filtro de aire moto 125-160cc,Sakura,Filtros,Moto,A-02-02,17210-K2B-900,16000,9500,18,8
+LUB-0001,Aceite 20W-50 mineral 1 galón,Terpel,Lubricantes,Carro,B-01-01,,78000,56000,20,8
+LUB-0002,Aceite 10W-40 semisintético 1 galón,Mobil,Lubricantes,Carro,B-01-02,,98000,70000,16,8
+LUB-0003,Aceite 5W-30 sintético 1 cuarto,Castrol,Lubricantes,Carro,B-01-03,,36000,25000,40,16
+LUB-0004,Aceite 20W-50 4T moto 1 litro,Motul,Lubricantes,Moto,B-02-01,,42000,29000,36,12
+LUB-0005,Aceite 10W-40 sintético 4T moto 1 litro,Yamalube,Lubricantes,Moto,B-02-02,,58000,41000,3,10
+LUB-0006,Líquido de frenos DOT 4 500 ml,Bosch,Lubricantes,Carro y moto,B-03-01,,24000,15500,22,8
+LUB-0007,Grasa multipropósito 400 g,Mobil,Lubricantes,Carro y moto,B-03-02,,32000,21000,14,6
+LUB-0008,Lubricante de cadena en spray 400 ml,Motul,Lubricantes,Moto,B-02-03,,48000,32000,11,5
+FRE-0001,Pastillas de freno delanteras cerámicas,Brembo,Frenos,Carro,C-01-01,04465-0K010,165000,112000,8,4
+FRE-0002,Pastillas de freno traseras,Brembo,Frenos,Carro,C-01-02,04466-0K020,125000,84000,6,4
+FRE-0003,Pastillas de freno delanteras económicas,Frasle,Frenos,Carro,C-01-03,04465-1A030,85000,56000,14,6
+FRE-0004,Disco de freno delantero ventilado,Brembo,Frenos,Carro,C-02-01,43512-0K040,220000,150000,4,2
+FRE-0005,Disco de freno trasero sólido,Frasle,Frenos,Carro,C-02-02,42431-0K050,140000,95000,3,2
+FRE-0006,Zapatas de freno traseras de tambor,Frasle,Frenos,Carro,C-02-03,,78000,52000,5,3
+FRE-0007,Pastillas de freno delanteras moto 150cc,Cobreq,Frenos,Moto,C-03-01,45105-KY4-901,32000,19500,25,10
+FRE-0008,Pastillas de freno traseras moto 150cc,Cobreq,Frenos,Moto,C-03-02,43105-KY4-902,28000,17000,0,8
+FRE-0009,Cable de freno trasero moto,Genérico,Frenos,Moto,C-03-03,,14000,8000,12,5
+FRE-0010,Bomba principal de freno,ATE,Frenos,Carro,C-04-01,46010-5B050,260000,180000,2,1
+SUS-0001,Amortiguador delantero a gas,Monroe,Suspensión,Carro,D-01-01,54302-3X100,230000,158000,6,2
+SUS-0002,Amortiguador trasero a gas,KYB,Suspensión,Carro,D-01-02,55302-3X200,190000,130000,6,2
+SUS-0003,Rótula de suspensión inferior,TRW,Suspensión,Carro,D-02-01,51350-4R010,85000,55000,8,4
+SUS-0004,Buje de barra estabilizadora,Febi,Suspensión,Carro,D-02-02,48815-5A020,18000,10500,20,8
+SUS-0005,Resorte espiral delantero,Sachs,Suspensión,Carro,D-03-01,48131-6B010,175000,120000,4,2
+SUS-0006,Soporte de amortiguador con rodamiento,Monroe,Suspensión,Carro,D-03-02,48609-6B020,95000,62000,5,2
+SUS-0007,Amortiguador trasero moto (par),Genérico,Suspensión,Moto,D-04-01,52400-K2B-001,185000,125000,5,2
+SUS-0008,Kit de retenes de barra moto 150cc,NOK,Suspensión,Moto,D-04-02,51490-K2B-002,26000,15000,9,4
+DIR-0001,Terminal de dirección exterior,TRW,Dirección,Carro,E-01-01,45046-5C010,68000,44000,10,4
+DIR-0002,Terminal de dirección interior axial,TRW,Dirección,Carro,E-01-02,45503-5C020,58000,37000,8,4
+DIR-0003,Fuelle de cremallera de dirección,Febi,Dirección,Carro,E-01-03,,24000,14000,12,4
+DIR-0004,Bomba de dirección hidráulica,Bosch,Dirección,Carro,E-02-01,44310-5D030,520000,370000,1,1
+DIR-0005,Cremallera de dirección reconstruida,ZF,Dirección,Carro,E-02-02,45510-5D040,980000,720000,1,1
+DIR-0006,Juego de rodamientos de dirección moto,NSK,Dirección,Moto,E-03-01,53310-K2B-003,38000,23000,7,3
+ELE-0001,Batería 12V 45Ah sellada,MAC,Eléctrico,Carro,F-01-01,,380000,275000,5,2
+ELE-0002,Batería 12V 7Ah para moto,MAC,Eléctrico,Moto,F-01-02,,95000,64000,9,4
+ELE-0003,Bujía de iridio,NGK,Eléctrico,Carro,F-02-01,90919-01234,38000,24000,36,16
+ELE-0004,Bujía estándar para moto,NGK,Eléctrico,Moto,F-02-02,31916-K2B-004,12000,6500,50,20
+ELE-0005,Alternador 90A reconstruido,Bosch,Eléctrico,Carro,F-03-01,27060-5E050,650000,470000,2,1
+ELE-0006,Motor de arranque,Denso,Eléctrico,Carro,F-03-02,28100-5E060,590000,420000,2,1
+ELE-0007,Regulador rectificador para moto,Genérico,Eléctrico,Moto,F-03-03,31600-K2B-005,48000,29000,6,3
+ELE-0008,Bobina de encendido,Denso,Eléctrico,Carro,F-04-01,90919-02345,125000,82000,8,4
+ELE-0009,Bombillo H4 12V 60/55W,Philips,Eléctrico,Carro y moto,F-05-01,,12000,6500,40,15
+ELE-0010,Relé 12V 40A,Hella,Eléctrico,Carro y moto,F-05-02,,9000,4800,25,10
+ELE-0011,Sensor de oxígeno delantero,Bosch,Eléctrico,Carro,F-06-01,89467-5E070,210000,145000,3,2
+MOT-0001,Kit de distribución con tensor,Gates,Motor,Carro,G-01-01,13568-5G010,420000,300000,3,2
+MOT-0002,Correa de accesorios poli-V,Gates,Motor,Carro,G-01-02,90916-5G020,48000,31000,10,4
+MOT-0003,Empaque de tapa de válvulas,Victor Reinz,Motor,Carro,G-02-01,11213-5G030,36000,22000,8,3
+MOT-0004,Juego de empaques superior de motor,Victor Reinz,Motor,Carro,G-02-02,04111-5G040,290000,205000,2,1
+MOT-0005,Anillos de pistón estándar moto 150cc,NPR,Motor,Moto,G-03-01,13011-K2B-006,52000,33000,5,2
+MOT-0006,Guaya de acelerador moto,Genérico,Motor,Moto,G-03-02,17910-K2B-009,11000,6000,14,6
+REF-0001,Refrigerante largo vida 1 galón,Prestone,Refrigeración,Carro,H-01-01,,52000,35000,18,8
+REF-0002,Radiador de aluminio,Valeo,Refrigeración,Carro,H-02-01,16400-5H010,480000,340000,2,1
+REF-0003,Bomba de agua,Gates,Refrigeración,Carro,H-02-02,16100-5H020,185000,128000,4,2
+REF-0004,Termostato con empaque,Wahler,Refrigeración,Carro,H-02-03,90916-5G050,45000,28000,9,4
+REF-0005,Tapa de radiador 1.1 bar,Stant,Refrigeración,Carro,H-02-04,,18000,10000,15,6
+REF-0006,Manguera superior de radiador,Gates,Refrigeración,Carro,H-02-05,16571-5H030,62000,40000,5,2
+REF-0007,Refrigerante para moto 1 litro,Motul,Refrigeración,Moto,H-03-01,,36000,24000,10,4
+CAJ-0001,Kit de embrague con disco prensa y balinera,Sachs,Caja y transmisión,Carro,I-01-01,31250-5J010,580000,415000,2,1
+CAJ-0002,Aceite de caja SAE 75W-90 1 litro,Mobil,Caja y transmisión,Carro,I-01-02,,48000,32000,12,6
+CAJ-0003,Aceite ATF Dexron VI 1 litro,Castrol,Caja y transmisión,Carro,I-01-03,,46000,31000,14,6
+CAJ-0004,Líquido para transmisión CVT 1 litro,Idemitsu,Caja y transmisión,Carro,I-01-04,,78000,54000,8,6
+CAJ-0005,Kit de arrastre moto 428H 14-42-116,DID,Caja y transmisión,Moto,I-02-01,,68000,44000,14,6
+CAJ-0006,Kit de arrastre moto 520 15-42-118,DID,Caja y transmisión,Moto,I-02-02,,175000,120000,6,3
+CAJ-0007,Cable de clutch para moto,Genérico,Caja y transmisión,Moto,I-02-03,,13000,7500,16,6
+CAJ-0008,Junta homocinética lado rueda,GKN,Caja y transmisión,Carro,I-03-01,43410-5J020,230000,160000,3,2
+CAJ-0009,Fuelle de junta homocinética,GKN,Caja y transmisión,Carro,I-03-02,,38000,22000,10,4
+LLA-0001,Llanta 185/65 R15,Michelin,Llantas,Carro,J-01-01,,410000,310000,8,4
+LLA-0002,Llanta 205/55 R16,Pirelli,Llantas,Carro,J-01-02,,520000,395000,6,4
+LLA-0003,Llanta 215/60 R17,Bridgestone,Llantas,Carro,J-01-03,,610000,465000,4,4
+LLA-0004,Llanta trasera moto 90/90-17,Michelin,Llantas,Moto,J-02-01,,175000,125000,6,3
+LLA-0005,Llanta delantera moto 2.75-18,Pirelli,Llantas,Moto,J-02-02,,130000,92000,5,3
+LLA-0006,Cámara para moto 2.75-18,Genérico,Llantas,Moto,J-02-03,,22000,13000,15,6
+LLA-0007,Válvula de llanta (juego x4),Genérico,Llantas,Carro y moto,J-03-01,,8000,3500,60,20
+LLA-0008,Pesa de balanceo adhesiva 5 g,Genérico,Llantas,Carro,J-03-02,,1500,700,400,150
+CAR-0001,Espejo retrovisor exterior izquierdo,Genérico,Carrocería,Carro,K-01-01,87940-5K010,120000,78000,2,1
+CAR-0002,Plumillas limpiaparabrisas par 22/18 pulgadas,Bosch,Carrocería,Carro,K-01-02,,52000,33000,14,6
+CAR-0003,Plumilla trasera 12 pulgadas,Bosch,Carrocería,Carro,K-01-03,,22000,13000,8,4
+CAR-0004,Farola delantera derecha,Depo,Carrocería,Carro,K-02-01,81110-5K020,260000,180000,1,1
+CAR-0005,Stop trasero izquierdo,Depo,Carrocería,Carro,K-02-02,81560-5K030,95000,63000,2,1
+CAR-0006,Guardabarros delantero para moto,Genérico,Carrocería,Moto,K-03-01,61100-K2B-007,45000,27000,3,2
+CAR-0007,Espejos retrovisores para moto (par),Genérico,Carrocería,Moto,K-03-02,88110-K2B-008,32000,19000,10,4
+CAR-0008,Spray de retoque negro mate 400 ml,Pintuco,Carrocería,Carro y moto,K-04-01,,18000,10500,24,10
+OTR-0001,Kit de herramientas básico para moto,Genérico,Otro,Moto,L-01-01,,95000,62000,4,2
+OTR-0002,Desengrasante para motor 1 galón,Genérico,Otro,Carro y moto,L-02-01,,36000,22000,10,4
+OTR-0003,Silicona sellante alta temperatura 85 g,Permatex,Otro,Carro y moto,L-02-02,,32000,20000,12,5
+OTR-0004,Cinta aislante 19 mm,3M,Otro,Carro y moto,L-02-03,,6500,3500,50,20
+OTR-0005,Abrazaderas metálicas surtidas (bolsa),Genérico,Otro,Carro,L-02-04,,15000,8500,20,8
+SIN-0001,Tornillería surtida (caja),Genérico,Sin categoría,Carro y moto,,,28000,17000,6,2
+SIN-0002,Repuesto sin clasificar de prueba,Genérico,Sin categoría,Carro,,,10000,6000,1,0

@@ -1495,8 +1495,9 @@ components:
         application/json:
           schema:
             type: object
-            required: [filas, conError, importadas]
+            required: [filas, conError, importadas, avisos]
             properties:
+              avisos: { type: array, items: { type: string }, description: 'Lo que no impide importar, p. ej. columnas que no se reconocen' }
               conError: { type: integer }
               importadas: { type: integer }
               filas:

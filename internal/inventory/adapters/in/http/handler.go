@@ -240,7 +240,11 @@ func (h *Handler) importCSV(r *http.Request, p reqctx.Principal) (int, any, erro
 		}
 		rows = append(rows, d)
 	}
-	body := map[string]any{"filas": rows, "conError": bad, "importadas": res.Imported}
+	avisos := res.Warnings
+	if avisos == nil {
+		avisos = []string{}
+	}
+	body := map[string]any{"filas": rows, "conError": bad, "importadas": res.Imported, "avisos": avisos}
 	if err != nil {
 		return http.StatusUnprocessableEntity, body, nil
 	}

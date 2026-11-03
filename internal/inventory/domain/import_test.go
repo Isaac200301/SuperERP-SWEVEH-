@@ -14,10 +14,11 @@ func TestParseImport_ValidatesEachRow(t *testing.T) {
 		"BH-1;Bombillo;carro;;luces;;;;;;\n" +
 		";;;;;;;;;;\n" +
 		"PF-20;Repetido;carro;;;;;;5000;;\n"
-	rows, err := ParseImport([]byte(csv))
+	file, err := ParseImport([]byte(csv))
 	if err != nil {
 		t.Fatal(err)
 	}
+	rows := file.Rows
 	if len(rows) != 5 {
 		t.Fatalf("la fila vacía se ignora: %d filas", len(rows))
 	}
@@ -76,5 +77,48 @@ func TestPart_SheetFields(t *testing.T) {
 		if err := bad.Normalize(); err == nil {
 			t.Errorf("%+v debía rechazarse", bad)
 		}
+	}
+}
+
+// El archivo de prueba de Pablo (3-nov-2026): encabezados de la pantalla, "Para" y categorías en texto legible.
+func TestParseImport_HumanHeadersAndValues(t *testing.T) {
+	csv := "Referencia,Nombre,Marca,Categoría,Para,Ubicación,Referencia original (OEM),Precio de venta (COP),Costo (COP),Existencia,Mínimo,Notas\n" +
+		"FIL-0006,Filtro de aceite moto 150-200cc,Hiflofiltro,Filtros,Moto,A-02-01,15412-KY4-001,18000,11000,30,10,x\n" +
+		"LUB-0006,Líquido de frenos DOT 4 500 ml,Bosch,Lubricantes,Carro y moto,B-03-01,,24000,15500,22,8,\n" +
+		"SUS-0001,Amortiguador delantero a gas,Monroe,Suspensión,Carro,D-01-01,54302-3X100,\"230,000\",158000,6,2,\n" +
+		"CAJ-0001,Kit de embrague,Sachs,Caja y transmisión,Carro,I-01-01,31250-5J010,580000,415000,2,1,\n" +
+		"SIN-0001,Tornillería surtida (caja),Genérico,Sin categoría,Carro y moto,,,28000,17000,6,2,\n" +
+		"BAD-0001,Precio con decimales,,Otro,Bicicleta,,,1000.50,,,,\n"
+	file, err := ParseImport([]byte(csv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(file.Warnings) != 1 || !strings.Contains(file.Warnings[0], "Notas") {
+		t.Errorf("la columna desconocida se avisa: %v", file.Warnings)
+	}
+	want := []struct{ kind, cat string }{{"moto", "filtros"}, {"ambos", "lubricantes"}, {"carro", "suspension"}, {"carro", "transmision"}, {"ambos", ""}}
+	for i, w := range want {
+		r := file.Rows[i]
+		if len(r.Errors) != 0 || r.Part.Kind != w.kind || r.Part.Category != w.cat {
+			t.Errorf("fila %d: %+v %v, se esperaba %s/%s", r.Line, r.Part, r.Errors, w.kind, w.cat)
+		}
+	}
+	if file.Rows[2].Part.Price != 230000 || file.Rows[0].Part.Stock != 30 || file.Rows[0].Part.OEM != "15412-KY4-001" {
+		t.Errorf("valores: %+v", file.Rows[2].Part)
+	}
+	if bad := strings.Join(file.Rows[5].Errors, " | "); !strings.Contains(bad, "para:") || !strings.Contains(bad, "precio:") {
+		t.Errorf("tipo y precio con decimales son error: %v", bad)
+	}
+}
+
+func TestParseImport_Windows1252FromExcel(t *testing.T) {
+	// "Bujía" y "Eléctrico" como los guarda Excel en Windows: í = 0xED, é = 0xE9.
+	data := []byte("Referencia;Nombre;Categor\xeda;Precio\nELE-0003;Buj\xeda de iridio;El\xe9ctrico;38000\n")
+	file, err := ParseImport(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := file.Rows[0].Part; p.Name != "Bujía de iridio" || p.Category != "electrico" || len(file.Rows[0].Errors) != 0 {
+		t.Errorf("Windows-1252: %+v %v", p, file.Rows[0].Errors)
 	}
 }

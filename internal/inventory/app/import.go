@@ -14,17 +14,19 @@ var ErrImportHasErrors = shared.Rule("importacion_con_errores", "Hay filas con e
 // ImportResult es la vista previa (o el resultado) fila por fila.
 type ImportResult struct {
 	Rows     []domain.ImportRow
+	Warnings []string
 	Imported int
 }
 
 // Import valida el archivo y, si confirm y no hay errores, crea todos los repuestos en una transacción, cada uno
 // con su movimiento "importacion" (HU-37). Una referencia que ya existe es error: no se pisan existencias.
 func (s *Service) Import(ctx context.Context, actor shared.Actor, tallerID shared.ID, data []byte, confirm bool) (ImportResult, error) {
-	rows, err := domain.ParseImport(data)
+	file, err := domain.ParseImport(data)
 	if err != nil {
 		return ImportResult{}, err
 	}
-	res := ImportResult{Rows: rows}
+	rows := file.Rows
+	res := ImportResult{Rows: rows, Warnings: file.Warnings}
 	err = s.uow.Do(ctx, func(ctx context.Context) error {
 		refs := make([]string, 0, len(rows))
 		for _, r := range rows {
@@ -59,7 +61,7 @@ func (s *Service) Import(ctx context.Context, actor shared.Actor, tallerID share
 			EntityID: tallerID, After: map[string]any{"filas": res.Imported}, OccurredAt: s.clock.Now()})
 	})
 	if err != nil {
-		return ImportResult{Rows: res.Rows}, err
+		return ImportResult{Rows: res.Rows, Warnings: res.Warnings}, err
 	}
 	return res, nil
 }
