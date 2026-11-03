@@ -100,8 +100,8 @@ describe('WorkshopPage (HU-03, HU-08, HU-89)', () => {
     expect(screen.getByText('Para continuar acepta el contrato.')).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('¿Cuántos trabajan?'), '2a5');
     await userEvent.click(screen.getByLabelText('Frenos y suspensión'));
-    await userEvent.click(screen.getByLabelText('Eléctrico'));
-    await userEvent.click(screen.getByLabelText('Eléctrico'));
+    await userEvent.click(screen.getByLabelText(/^Sistema eléctrico/));
+    await userEvent.click(screen.getByLabelText(/^Sistema eléctrico/));
     await userEvent.click(screen.getByLabelText(/Acepto el contrato/));
     await userEvent.click(screen.getByRole('button', { name: 'Armar mi taller' }));
 

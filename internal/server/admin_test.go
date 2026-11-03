@@ -47,24 +47,41 @@ func TestWorkshop_OnboardingAndSchedule(t *testing.T) {
 func TestOnboarding_PreloadAndExampleOrder(t *testing.T) {
 	e := newEnv(t)
 	c := e.register("3105550141", "Marta Ríos")
-	in := map[string]any{"nombre": "Motos La 80", "atiende": "moto", "especialidades": []string{}, "ciudad": "Medellín", "tamano": "solo", "contratoAceptado": true}
-	c.must(http.StatusOK, c.do("POST", "/api/v1/workshop/onboarding", in))
-
-	r := c.must(http.StatusOK, c.do("GET", "/api/v1/services", nil))
-	servicios := r.body["servicios"].([]any)
-	if len(servicios) == 0 {
-		t.Fatal("el arranque debía dejar servicios precargados")
+	in := map[string]any{"nombre": "Motos La 80", "atiende": "moto", "especialidades": []string{"latoneria_pintura", "aire_acondicionado"},
+		"ciudad": "medellin", "tamano": "solo", "contratoAceptado": true}
+	r := c.must(http.StatusOK, c.do("POST", "/api/v1/workshop/onboarding", in))
+	if r.str("ciudad") != "Medellin" {
+		t.Errorf("ciudad normalizada: %v", r.body["ciudad"])
 	}
-	for _, s := range servicios {
-		if tipo := s.(map[string]any)["tipoVehiculo"]; tipo == "carro" {
-			t.Fatalf("un taller de motos no debía recibir servicios de carro: %v", s)
+
+	nombres := func() map[string]string {
+		r := c.must(http.StatusOK, c.do("GET", "/api/v1/services", nil))
+		m := map[string]string{}
+		for _, s := range r.body["servicios"].([]any) {
+			sv := s.(map[string]any)
+			m[sv["nombre"].(string)] = sv["tipoVehiculo"].(string)
+		}
+		return m
+	}
+	antes := nombres()
+	if antes["Latonería"] != "moto" || antes["Cambio de kit de arrastre"] != "moto" {
+		t.Fatalf("la precarga debía traer latonería y mantenimiento de moto: %v", antes)
+	}
+	for n, tipo := range antes {
+		if tipo == "carro" {
+			t.Fatalf("un taller de motos no debía recibir servicios de carro: %s", n)
 		}
 	}
-	// Repetir el arranque (Cambiar tipo de taller) no duplica la precarga.
+	// Repetir el arranque con una especialidad más suma solo lo nuevo, sin duplicar.
+	in["especialidades"] = []string{"latoneria_pintura", "aire_acondicionado", "electrico"}
 	c.must(http.StatusOK, c.do("POST", "/api/v1/workshop/onboarding", in))
-	r = c.must(http.StatusOK, c.do("GET", "/api/v1/services", nil))
-	if n := len(r.body["servicios"].([]any)); n != len(servicios) {
-		t.Fatalf("precarga duplicada: %d servicios, antes %d", n, len(servicios))
+	despues := nombres()
+	if _, ok := despues["Revisión eléctrica"]; !ok || len(despues) != len(antes)+3 {
+		t.Fatalf("debía sumar los 3 servicios de sistema eléctrico: antes %d, después %d", len(antes), len(despues))
+	}
+	w := c.must(http.StatusOK, c.do("GET", "/api/v1/workshop", nil))
+	if esp := w.body["especialidades"].([]any); len(esp) != 3 || esp[2] != "sistema_electrico" {
+		t.Errorf("la clave vieja \"electrico\" debía guardarse como sistema_electrico: %v", esp)
 	}
 
 	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3000000000", "nombre": "Cliente de ejemplo"}))

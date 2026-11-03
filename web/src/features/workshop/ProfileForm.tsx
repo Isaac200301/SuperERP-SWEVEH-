@@ -10,11 +10,16 @@ import { Segmented } from '../../shared/ui/Segmented';
 export type Taller = Schemas['Taller'];
 export const card = 'flex flex-col gap-3 rounded-card bg-white p-5';
 const select = 'min-h-[52px] rounded-btn border-[1.5px] border-line bg-white px-4 text-base';
+// Claves de tenancy/domain.Specialties. Sistema eléctrico y alto voltaje van separados a propósito.
 const especialidades = {
   mecanica_general: 'Mecánica general',
+  diagnostico_electronico: 'Diagnóstico electrónico (escáner)',
+  inyeccion_combustible: 'Inyección y combustible',
   frenos_suspension: 'Frenos y suspensión',
-  electrico: 'Eléctrico',
-  diagnostico_escaner: 'Diagnóstico con escáner',
+  caja_transmision: 'Caja y transmisión',
+  aire_acondicionado: 'Aire acondicionado',
+  sistema_electrico: 'Sistema eléctrico (luces, arranque, carga)',
+  alto_voltaje: 'Híbridos y eléctricos (alto voltaje)',
   llantas_alineacion: 'Llantas y alineación',
   latoneria_pintura: 'Latonería y pintura',
 } as const;
@@ -37,7 +42,9 @@ export function ProfileForm({ t, onSaved }: { t: Taller; onSaved?: () => void })
     contrato: t.contratoAceptadoEn != null,
   });
   // HU-03 criterio 2: el tipo de vehículo es obligatorio antes de seguir.
-  const missing = f.atiende === '' ? 'Escoge qué vehículos atiendes.' : !f.contrato ? 'Para continuar acepta el contrato.' : undefined;
+  let missing: string | undefined;
+  if (f.atiende === '') missing = 'Escoge qué vehículos atiendes.';
+  else if (!f.contrato) missing = 'Para continuar acepta el contrato.';
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (missing) return;

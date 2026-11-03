@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"sweveh/internal/audit"
@@ -142,15 +143,21 @@ func (s *Service) Remove(ctx context.Context, actor shared.Actor, tallerID, id s
 }
 
 // Preload inserta la precarga en una transacción ya abierta (la llama tenancy al terminar el paso 2).
-func (s *Service) Preload(ctx context.Context, tallerID shared.ID, attends string) error {
+// Idempotente: solo agrega los nombres que el taller no tiene, así repetir el paso 2 con una especialidad
+// nueva suma sus servicios sin duplicar los que ya estaban (ni los renombrados por el taller).
+func (s *Service) Preload(ctx context.Context, tallerID shared.ID, attends string, specialties []string) error {
 	existing, err := s.repo.List(ctx, tallerID, true)
 	if err != nil {
 		return err
 	}
-	if len(existing) > 0 {
-		return nil // idempotente: no se duplica si el paso 2 se repite
+	have := map[string]bool{}
+	for _, e := range existing {
+		have[strings.ToLower(e.Name)] = true
 	}
-	for _, sv := range domain.Preload(attends) {
+	for _, sv := range domain.Preload(attends, specialties) {
+		if have[strings.ToLower(sv.Name)] {
+			continue
+		}
 		sv.ID, sv.TallerID = shared.NewID(), tallerID
 		if err := s.repo.Insert(ctx, sv); err != nil {
 			return err

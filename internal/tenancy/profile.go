@@ -13,7 +13,7 @@ import (
 
 // Preloader carga los servicios iniciales (fachada de catalog).
 type Preloader interface {
-	Preload(ctx context.Context, tallerID shared.ID, attends string) error
+	Preload(ctx context.Context, tallerID shared.ID, attends string, specialties []string) error
 }
 
 type UnitOfWork interface {
@@ -130,7 +130,7 @@ func (a *Admin) Onboard(ctx context.Context, id shared.ID, actor shared.Actor, i
 			id, name, in.Profile.Attends, in.Profile.Specialties, nilIfEmpty(in.Profile.City), in.Profile.Size, ver, now); err != nil {
 			return err
 		}
-		if err := a.catalog.Preload(ctx, id, in.Profile.Attends); err != nil {
+		if err := a.catalog.Preload(ctx, id, in.Profile.Attends, in.Profile.Specialties); err != nil {
 			return err
 		}
 		if err := a.audit.Record(ctx, audit.Entry{TallerID: id, Actor: actor, Action: "taller.configurar", Entity: "taller", EntityID: id,
