@@ -205,7 +205,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Cambiar cilindraje y/o turbo; queda en la bitácora (HU-11). Permiso vehicle:update */
+        /** Completar o cambiar la ficha del vehículo (motor, caja, tracción, color, carrocería, llanta); queda en la bitácora (HU-11). Permiso vehicle:update */
         patch: operations["updateVehicleEngine"];
         trace?: never;
     };
@@ -1331,6 +1331,45 @@ export interface components {
             kilometraje: number | null;
             cilindrajeCc: number | null;
             turbo: boolean | null;
+            /**
+             * @description Moto: gasolina o electrico
+             * @enum {string|null}
+             */
+            energia?: "gasolina" | "diesel" | "gas" | "hibrido" | "hibrido_enchufable" | "electrico" | null;
+            /**
+             * @description Si llega, manda sobre turbo; moto: atmosferico o turbo
+             * @enum {string|null}
+             */
+            aspiracion?: "atmosferico" | "turbo" | "supercargado" | null;
+            /**
+             * @description Carro: manual, automatica, cvt, doble_embrague, amt; moto: manual, automatica, semiautomatica
+             * @enum {string|null}
+             */
+            transmision?: "manual" | "automatica" | "cvt" | "doble_embrague" | "amt" | "semiautomatica" | null;
+            /**
+             * @description Solo carro
+             * @enum {string|null}
+             */
+            traccion?: "delantera" | "trasera" | "awd" | "4x4" | null;
+            /**
+             * @description Solo moto
+             * @enum {string|null}
+             */
+            ciclo?: "2t" | "4t" | null;
+            /**
+             * @description Solo moto
+             * @enum {string|null}
+             */
+            refrigeracion?: "aire" | "liquido" | null;
+            color?: string | null;
+            /**
+             * @description Solo carro
+             * @enum {string|null}
+             */
+            carroceria?: "sedan" | "hatchback" | "suv" | "pickup" | "van" | "otra" | null;
+            /** @description 205/55 R16 o 90/90-17 */
+            llanta?: string | null;
+            /** @description Falta energía, caja, o en combustión cilindraje y aspiración (y ciclo en moto) */
             motorPendiente: boolean;
             version: number;
             /** Format: date-time */
@@ -1755,6 +1794,44 @@ export interface operations {
                     /** @description "1200", "1200 cc" o "1.2 L"; se guarda en cc */
                     cilindraje?: string | null;
                     turbo?: boolean | null;
+                    /**
+                     * @description Moto: gasolina o electrico
+                     * @enum {string|null}
+                     */
+                    energia?: "gasolina" | "diesel" | "gas" | "hibrido" | "hibrido_enchufable" | "electrico" | null;
+                    /**
+                     * @description Si llega, manda sobre turbo; moto: atmosferico o turbo
+                     * @enum {string|null}
+                     */
+                    aspiracion?: "atmosferico" | "turbo" | "supercargado" | null;
+                    /**
+                     * @description Carro: manual, automatica, cvt, doble_embrague, amt; moto: manual, automatica, semiautomatica
+                     * @enum {string|null}
+                     */
+                    transmision?: "manual" | "automatica" | "cvt" | "doble_embrague" | "amt" | "semiautomatica" | null;
+                    /**
+                     * @description Solo carro
+                     * @enum {string|null}
+                     */
+                    traccion?: "delantera" | "trasera" | "awd" | "4x4" | null;
+                    /**
+                     * @description Solo moto
+                     * @enum {string|null}
+                     */
+                    ciclo?: "2t" | "4t" | null;
+                    /**
+                     * @description Solo moto
+                     * @enum {string|null}
+                     */
+                    refrigeracion?: "aire" | "liquido" | null;
+                    color?: string | null;
+                    /**
+                     * @description Solo carro
+                     * @enum {string|null}
+                     */
+                    carroceria?: "sedan" | "hatchback" | "suv" | "pickup" | "van" | "otra" | null;
+                    /** @description 205/55 R16 o 90/90-17 */
+                    llanta?: string | null;
                 };
             };
         };
@@ -1845,6 +1922,44 @@ export interface operations {
                 "application/json": {
                     cilindraje?: string | null;
                     turbo?: boolean | null;
+                    /**
+                     * @description Moto: gasolina o electrico
+                     * @enum {string|null}
+                     */
+                    energia?: "gasolina" | "diesel" | "gas" | "hibrido" | "hibrido_enchufable" | "electrico" | null;
+                    /**
+                     * @description Si llega, manda sobre turbo; moto: atmosferico o turbo
+                     * @enum {string|null}
+                     */
+                    aspiracion?: "atmosferico" | "turbo" | "supercargado" | null;
+                    /**
+                     * @description Carro: manual, automatica, cvt, doble_embrague, amt; moto: manual, automatica, semiautomatica
+                     * @enum {string|null}
+                     */
+                    transmision?: "manual" | "automatica" | "cvt" | "doble_embrague" | "amt" | "semiautomatica" | null;
+                    /**
+                     * @description Solo carro
+                     * @enum {string|null}
+                     */
+                    traccion?: "delantera" | "trasera" | "awd" | "4x4" | null;
+                    /**
+                     * @description Solo moto
+                     * @enum {string|null}
+                     */
+                    ciclo?: "2t" | "4t" | null;
+                    /**
+                     * @description Solo moto
+                     * @enum {string|null}
+                     */
+                    refrigeracion?: "aire" | "liquido" | null;
+                    color?: string | null;
+                    /**
+                     * @description Solo carro
+                     * @enum {string|null}
+                     */
+                    carroceria?: "sedan" | "hatchback" | "suv" | "pickup" | "van" | "otra" | null;
+                    /** @description 205/55 R16 o 90/90-17 */
+                    llanta?: string | null;
                 };
             };
         };

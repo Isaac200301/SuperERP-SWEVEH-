@@ -135,7 +135,7 @@ describe('OrderDetailPage', () => {
       </Routes>
     );
     const { unmount } = renderPage(ui, '/panel/ordenes/o1');
-    expect(await screen.findByText(/Motor pendiente/)).toBeInTheDocument();
+    expect(await screen.findByText(/Ficha pendiente/)).toBeInTheDocument();
     expect(screen.queryByText(/Cotización/)).not.toBeInTheDocument();
     unmount();
     mockApi({ 'GET /orders/{id}': { status: 404, body: { detail: 'No encontramos esa orden.' } } });

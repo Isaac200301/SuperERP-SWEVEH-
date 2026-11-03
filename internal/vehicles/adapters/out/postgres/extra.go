@@ -26,17 +26,29 @@ type vRow struct {
 	Kilometraje  *int      `db:"kilometraje"`
 	CilindrajeCc *int      `db:"cilindraje_cc"`
 	Turbo        *bool     `db:"turbo"`
+	Energia      *string   `db:"energia"`
+	Aspiracion   *string   `db:"aspiracion"`
+	Transmision  *string   `db:"transmision"`
+	Traccion     *string   `db:"traccion"`
+	Ciclo        *string   `db:"ciclo"`
+	Refrig       *string   `db:"refrigeracion"`
+	Color        *string   `db:"color"`
+	Carroceria   *string   `db:"carroceria"`
+	Llanta       *string   `db:"llanta"`
 	Version      int       `db:"version"`
 	CreatedAt    time.Time `db:"created_at"`
 }
 
-const vCols = `id, taller_id, cliente_id, tipo, placa, formato_placa, marca, linea, modelo_anio, kilometraje, cilindraje_cc, turbo, version, created_at`
+const vCols = `id, taller_id, cliente_id, tipo, placa, formato_placa, marca, linea, modelo_anio, kilometraje, cilindraje_cc, turbo,
+	energia, aspiracion, transmision, traccion, ciclo, refrigeracion, color, carroceria, llanta, version, created_at`
 
 func (r vRow) domain() domain.Vehicle {
 	return domain.Vehicle{ID: r.ID, TallerID: r.TallerID, CustomerID: r.ClienteID, Kind: domain.Kind(r.Tipo),
 		Plate:   domain.RestorePlate(r.Placa, domain.PlateFormat(r.FormatoPlaca)),
-		Details: domain.Details{Brand: r.Marca, Line: r.Linea, Year: r.ModeloAnio, Mileage: r.Kilometraje},
-		Engine:  domain.Engine{DisplacementCC: r.CilindrajeCc, Turbo: r.Turbo}, Version: r.Version, CreatedAt: r.CreatedAt}
+		Details: domain.Details{Brand: r.Marca, Line: r.Linea, Year: r.ModeloAnio, Mileage: r.Kilometraje, Color: r.Color, Body: r.Carroceria, Tire: r.Llanta},
+		Engine: domain.Engine{DisplacementCC: r.CilindrajeCc, Turbo: r.Turbo, Energy: r.Energia, Aspiration: r.Aspiracion,
+			Transmission: r.Transmision, Drive: r.Traccion, Cycle: r.Ciclo, Cooling: r.Refrig},
+		Version: r.Version, CreatedAt: r.CreatedAt}
 }
 
 func vList(rows []vRow, err error) ([]domain.Vehicle, error) {

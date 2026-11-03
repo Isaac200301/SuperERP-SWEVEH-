@@ -81,6 +81,6 @@ func snapshot(v domain.Vehicle) Snapshot {
 	return Snapshot{
 		ID: v.ID, CustomerID: v.CustomerID, Plate: v.Plate.String(), Kind: string(v.Kind),
 		Brand: v.Details.Brand, Line: v.Details.Line, Year: v.Details.Year,
-		EnginePending: v.Engine.Pending(),
+		EnginePending: v.Engine.Pending(v.Kind),
 	}
 }

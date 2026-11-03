@@ -110,12 +110,13 @@ func (s *Service) Register(ctx context.Context, cmd RegisterVehicle) (RegisterRe
 	return res, err
 }
 
-// UpdateEngine es el comando de HU-11: cambiar cilindraje y/o turbo, con bitácora del valor anterior.
+// UpdateEngine es el comando de HU-11: completar o cambiar la ficha, con bitácora del valor anterior.
 type UpdateEngine struct {
 	TallerID        shared.ID
 	Actor           shared.Actor
 	VehicleID       shared.ID
 	Engine          domain.Engine
+	Details         domain.Details // solo color, carrocería y llanta
 	ExpectedVersion int
 }
 
@@ -127,7 +128,7 @@ func (s *Service) UpdateEngine(ctx context.Context, cmd UpdateEngine) (domain.Ve
 			return err
 		}
 		prevVersion := v.Version
-		prev, err := v.UpdateEngine(cmd.Engine, cmd.ExpectedVersion)
+		prev, err := v.UpdateEngine(cmd.Engine, cmd.Details, cmd.ExpectedVersion)
 		if err != nil {
 			return err
 		}
@@ -137,7 +138,7 @@ func (s *Service) UpdateEngine(ctx context.Context, cmd UpdateEngine) (domain.Ve
 		}
 		if err := s.audit.Record(ctx, audit.Entry{
 			TallerID: cmd.TallerID, Actor: cmd.Actor, Action: "vehiculo.motor.cambiar", Entity: "vehiculo",
-			EntityID: v.ID, Before: engineView(prev), After: engineView(v.Engine), OccurredAt: now,
+			EntityID: v.ID, Before: engineView(prev), After: sheetView(v), OccurredAt: now,
 		}); err != nil {
 			return err
 		}
@@ -195,5 +196,12 @@ func auditView(v domain.Vehicle) map[string]any {
 }
 
 func engineView(e domain.Engine) map[string]any {
-	return map[string]any{"cilindraje_cc": e.DisplacementCC, "turbo": e.Turbo}
+	return map[string]any{"cilindraje_cc": e.DisplacementCC, "turbo": e.Turbo, "energia": e.Energy, "aspiracion": e.Aspiration,
+		"transmision": e.Transmission, "traccion": e.Drive, "ciclo": e.Cycle, "refrigeracion": e.Cooling}
+}
+
+func sheetView(v domain.Vehicle) map[string]any {
+	m := engineView(v.Engine)
+	m["color"], m["carroceria"], m["llanta"] = v.Details.Color, v.Details.Body, v.Details.Tire
+	return m
 }

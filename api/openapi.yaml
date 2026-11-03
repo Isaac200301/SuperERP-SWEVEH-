@@ -200,6 +200,15 @@ paths:
                 kilometraje: { type: integer, nullable: true, minimum: 0 }
                 cilindraje: { type: string, nullable: true, description: '"1200", "1200 cc" o "1.2 L"; se guarda en cc' }
                 turbo: { type: boolean, nullable: true }
+                energia: { type: string, nullable: true, enum: [gasolina, diesel, gas, hibrido, hibrido_enchufable, electrico, null], description: 'Moto: gasolina o electrico' }
+                aspiracion: { type: string, nullable: true, enum: [atmosferico, turbo, supercargado, null], description: 'Si llega, manda sobre turbo; moto: atmosferico o turbo' }
+                transmision: { type: string, nullable: true, enum: [manual, automatica, cvt, doble_embrague, amt, semiautomatica, null], description: 'Carro: manual, automatica, cvt, doble_embrague, amt; moto: manual, automatica, semiautomatica' }
+                traccion: { type: string, nullable: true, enum: [delantera, trasera, awd, 4x4, null], description: 'Solo carro' }
+                ciclo: { type: string, nullable: true, enum: [2t, 4t, null], description: 'Solo moto' }
+                refrigeracion: { type: string, nullable: true, enum: [aire, liquido, null], description: 'Solo moto' }
+                color: { type: string, nullable: true, maxLength: 60 }
+                carroceria: { type: string, nullable: true, enum: [sedan, hatchback, suv, pickup, van, otra, null], description: 'Solo carro' }
+                llanta: { type: string, nullable: true, maxLength: 20, description: '205/55 R16 o 90/90-17' }
       responses:
         '200':
           description: La placa ya existía en el taller.
@@ -246,7 +255,7 @@ paths:
   /vehicles/{id}/engine:
     patch:
       operationId: updateVehicleEngine
-      summary: Cambiar cilindraje y/o turbo; queda en la bitácora (HU-11). Permiso vehicle:update
+      summary: Completar o cambiar la ficha del vehículo (motor, caja, tracción, color, carrocería, llanta); queda en la bitácora (HU-11). Permiso vehicle:update
       parameters:
         - { $ref: '#/components/parameters/Id' }
         - { name: If-Match, in: header, required: true, schema: { type: string, example: '"v1"' } }
@@ -260,6 +269,15 @@ paths:
               properties:
                 cilindraje: { type: string, nullable: true }
                 turbo: { type: boolean, nullable: true }
+                energia: { type: string, nullable: true, enum: [gasolina, diesel, gas, hibrido, hibrido_enchufable, electrico, null], description: 'Moto: gasolina o electrico' }
+                aspiracion: { type: string, nullable: true, enum: [atmosferico, turbo, supercargado, null], description: 'Si llega, manda sobre turbo; moto: atmosferico o turbo' }
+                transmision: { type: string, nullable: true, enum: [manual, automatica, cvt, doble_embrague, amt, semiautomatica, null], description: 'Carro: manual, automatica, cvt, doble_embrague, amt; moto: manual, automatica, semiautomatica' }
+                traccion: { type: string, nullable: true, enum: [delantera, trasera, awd, 4x4, null], description: 'Solo carro' }
+                ciclo: { type: string, nullable: true, enum: [2t, 4t, null], description: 'Solo moto' }
+                refrigeracion: { type: string, nullable: true, enum: [aire, liquido, null], description: 'Solo moto' }
+                color: { type: string, nullable: true, maxLength: 60 }
+                carroceria: { type: string, nullable: true, enum: [sedan, hatchback, suv, pickup, van, otra, null], description: 'Solo carro' }
+                llanta: { type: string, nullable: true, maxLength: 20, description: '205/55 R16 o 90/90-17' }
       responses:
         '200':
           description: OK
@@ -1717,7 +1735,16 @@ components:
         kilometraje: { type: integer, nullable: true }
         cilindrajeCc: { type: integer, nullable: true }
         turbo: { type: boolean, nullable: true }
-        motorPendiente: { type: boolean }
+        energia: { type: string, nullable: true, enum: [gasolina, diesel, gas, hibrido, hibrido_enchufable, electrico, null], description: 'Moto: gasolina o electrico' }
+        aspiracion: { type: string, nullable: true, enum: [atmosferico, turbo, supercargado, null], description: 'Si llega, manda sobre turbo; moto: atmosferico o turbo' }
+        transmision: { type: string, nullable: true, enum: [manual, automatica, cvt, doble_embrague, amt, semiautomatica, null], description: 'Carro: manual, automatica, cvt, doble_embrague, amt; moto: manual, automatica, semiautomatica' }
+        traccion: { type: string, nullable: true, enum: [delantera, trasera, awd, 4x4, null], description: 'Solo carro' }
+        ciclo: { type: string, nullable: true, enum: [2t, 4t, null], description: 'Solo moto' }
+        refrigeracion: { type: string, nullable: true, enum: [aire, liquido, null], description: 'Solo moto' }
+        color: { type: string, nullable: true, maxLength: 60 }
+        carroceria: { type: string, nullable: true, enum: [sedan, hatchback, suv, pickup, van, otra, null], description: 'Solo carro' }
+        llanta: { type: string, nullable: true, maxLength: 20, description: '205/55 R16 o 90/90-17' }
+        motorPendiente: { type: boolean, description: 'Falta energía, caja, o en combustión cilindraje y aspiración (y ciclo en moto)' }
         version: { type: integer }
         creadoEn: { type: string, format: date-time }
 

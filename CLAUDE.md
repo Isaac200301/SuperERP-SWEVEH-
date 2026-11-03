@@ -89,7 +89,7 @@ Claude Code las carga solas según su descripción; también puedes invocarlas p
 
 ## 5. Decisiones del equipo que debes tener presentes (resumen de `docs/01`, sección 5)
 
-- Talleres de **carros y motos**. **Sin VIN.** Todo vehículo tiene **motor con `cilindraje_cc` y `turbo`** ("motor pendiente" hasta pasar a Recibido).
+- Talleres de **carros y motos**. **Sin VIN.** Todo vehículo tiene **ficha** (DE-17, 3-nov): combustible, caja, cilindraje y aspiración (o 2T/4T en moto), más tracción, carrocería, refrigeración, color y llanta opcionales; "ficha pendiente" hasta pasar a Recibido.
 - **Todas las HU son Must** (101 vigentes; **HU-50 cancelada**). **HU-74** (medidor de mensajes y costo de IA) es del **Administrador del ERP**, no del taller.
 - **Solo WhatsApp** (demo con número de prueba de Meta). Facturación: **integrar Siigo/Alegra, no construir**.
 - **Multi-tenant**, identidad por **celular** + OTP, **Ley 1581** (autorización previa), IA con límites y borradores, capa **multi-proveedor** con costo por conversación.

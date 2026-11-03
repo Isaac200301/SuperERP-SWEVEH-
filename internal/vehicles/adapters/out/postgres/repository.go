@@ -81,6 +81,9 @@ func (Repository) Insert(ctx context.Context, v domain.Vehicle, createdBy shared
 		Marca: v.Details.Brand, Linea: v.Details.Line,
 		ModeloAnio: toInt32(v.Details.Year), Kilometraje: toInt32(v.Details.Mileage),
 		CilindrajeCc: toInt32(v.Engine.DisplacementCC), Turbo: v.Engine.Turbo,
+		Energia: v.Engine.Energy, Aspiracion: v.Engine.Aspiration, Transmision: v.Engine.Transmission,
+		Traccion: v.Engine.Drive, Ciclo: v.Engine.Cycle, Refrigeracion: v.Engine.Cooling,
+		Color: v.Details.Color, Carroceria: v.Details.Body, Llanta: v.Details.Tire,
 		CreatedAt: v.CreatedAt, CreatedBy: by,
 	})
 	return n == 1, err
@@ -92,8 +95,11 @@ func (Repository) UpdateEngine(ctx context.Context, v domain.Vehicle, prevVersio
 		return err
 	}
 	n, err := q.UpdateVehicleEngine(ctx, sqlcgen.UpdateVehicleEngineParams{
-		TallerID: v.TallerID, ID: v.ID, CilindrajeCc: toInt32(v.Engine.DisplacementCC),
-		Turbo: v.Engine.Turbo, UpdatedAt: at, Version: int32(prevVersion),
+		TallerID: v.TallerID, ID: v.ID, CilindrajeCc: toInt32(v.Engine.DisplacementCC), Turbo: v.Engine.Turbo,
+		Energia: v.Engine.Energy, Aspiracion: v.Engine.Aspiration, Transmision: v.Engine.Transmission,
+		Traccion: v.Engine.Drive, Ciclo: v.Engine.Cycle, Refrigeracion: v.Engine.Cooling,
+		Color: v.Details.Color, Carroceria: v.Details.Body, Llanta: v.Details.Tire,
+		UpdatedAt: at, Version: int32(prevVersion),
 	})
 	if err != nil {
 		return err
@@ -110,8 +116,10 @@ func toDomain(r sqlcgen.GetVehicleByIDRow) domain.Vehicle {
 		Plate: domain.RestorePlate(r.Placa, domain.PlateFormat(r.FormatoPlaca)),
 		Details: domain.Details{
 			Brand: r.Marca, Line: r.Linea, Year: toInt(r.ModeloAnio), Mileage: toInt(r.Kilometraje),
+			Color: r.Color, Body: r.Carroceria, Tire: r.Llanta,
 		},
-		Engine:    domain.Engine{DisplacementCC: toInt(r.CilindrajeCc), Turbo: r.Turbo},
+		Engine: domain.Engine{DisplacementCC: toInt(r.CilindrajeCc), Turbo: r.Turbo, Energy: r.Energia, Aspiration: r.Aspiracion,
+			Transmission: r.Transmision, Drive: r.Traccion, Cycle: r.Ciclo, Cooling: r.Refrigeracion},
 		Version:   int(r.Version),
 		CreatedAt: r.CreatedAt,
 	}

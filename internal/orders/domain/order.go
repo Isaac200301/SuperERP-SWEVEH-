@@ -33,7 +33,7 @@ var (
 	ErrInitialState    = shared.Validation("estado_inicial_invalido", "Una orden nueva empieza en Por recibir o en Recibido.").WithField("estadoInicial")
 	// HU-11: "motor pendiente" no bloquea la orden hasta que se intenta pasar a Recibido (HU-20).
 	ErrEngineRequired = shared.Rule("motor_pendiente",
-		"Falta el cilindraje o el turbo del vehículo. Complétalos para pasar la orden a Recibido.")
+		"Falta completar la ficha del vehículo (combustible, caja, cilindraje y turbo o ciclo). Complétala para pasar la orden a Recibido.")
 	// HU-16, criterio 2: avisar y dejar abrir otra solo si confirma.
 	ErrOpenOrderExists = shared.Conflict("orden_abierta_existente",
 		"Este vehículo ya tiene una orden abierta. Confirma si quieres abrir otra.")

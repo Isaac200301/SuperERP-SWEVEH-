@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,7 +15,15 @@ var (
 	ErrMileageInvalid  = shared.Validation("kilometraje_invalido", "El kilometraje no puede ser negativo.").WithField("kilometraje")
 	ErrTextTooLong     = shared.Validation("texto_largo", "Ese dato puede tener hasta 60 letras.")
 	ErrKindMismatch    = shared.Validation("tipo_no_coincide", "La placa no corresponde a ese tipo de vehículo.").WithField("tipo")
+	ErrBody            = shared.Validation("carroceria_invalida", "La carrocería es sedán, hatchback, SUV, pick-up, van u otra, y solo aplica a carros.").WithField("carroceria")
+	ErrTire            = shared.Validation("llanta_invalida", "Escribe la medida de la llanta como 205/55 R16 o 90/90-17.").WithField("llanta")
 )
+
+// Carrocerías del catálogo propio (los nombres comerciales cambian por país).
+var bodies = []string{"sedan", "hatchback", "suv", "pickup", "van", "otra"}
+
+// reTire acepta medidas de carro (205/55 R16, 205/55R16) y de moto (90/90-17, 2.75-18).
+var reTire = regexp.MustCompile(`^(\d{2,3}/\d{2}\s?Z?R\s?\d{2}|\d{2,3}/\d{2,3}-\d{2}|\d\.\d{2}-\d{2})$`)
 
 // Details son los datos descriptivos del vehículo (HU-11). Todos opcionales al crear.
 type Details struct {
@@ -21,6 +31,9 @@ type Details struct {
 	Line    *string
 	Year    *int
 	Mileage *int
+	Color   *string
+	Body    *string // solo carro
+	Tire    *string // medida de llanta
 }
 
 // Vehicle es el agregado vehículo. Sin VIN (decisión del equipo).
@@ -60,14 +73,12 @@ func NewVehicle(id, tallerID shared.ID, in NewVehicleInput, now time.Time) (Vehi
 	} else if in.Kind != "" && Kind(in.Kind) != kind {
 		return Vehicle{}, ErrKindMismatch
 	}
-	details, err := cleanDetails(in.Details, now)
+	details, err := cleanDetails(in.Details, kind, now)
 	if err != nil {
 		return Vehicle{}, err
 	}
-	if in.Engine.DisplacementCC != nil {
-		if err := ValidateDisplacement(*in.Engine.DisplacementCC); err != nil {
-			return Vehicle{}, err
-		}
+	if err := in.Engine.Validate(kind); err != nil {
+		return Vehicle{}, err
 	}
 	return Vehicle{
 		ID:         id,
@@ -82,38 +93,56 @@ func NewVehicle(id, tallerID shared.ID, in NewVehicleInput, now time.Time) (Vehi
 	}, nil
 }
 
-// UpdateEngine cambia cilindraje y/o turbo; devuelve el motor anterior para la bitácora (HU-11).
-func (v *Vehicle) UpdateEngine(e Engine, expectedVersion int) (Engine, error) {
+// UpdateEngine completa o cambia la ficha (motor, caja, tracción y color, carrocería o llanta); devuelve
+// la ficha anterior para la bitácora (HU-11). Los campos en nil no cambian.
+func (v *Vehicle) UpdateEngine(e Engine, d Details, expectedVersion int) (Engine, error) {
 	if expectedVersion != v.Version {
 		return Engine{}, shared.ErrVersionConflict
 	}
-	if e.DisplacementCC != nil {
-		if err := ValidateDisplacement(*e.DisplacementCC); err != nil {
-			return Engine{}, err
+	next := DefaultEngine(v.Kind, v.Engine.merge(e))
+	if err := next.Validate(v.Kind); err != nil {
+		return Engine{}, err
+	}
+	sheet := Details{Color: d.Color, Body: d.Body, Tire: d.Tire}
+	clean, err := cleanDetails(sheet, v.Kind, time.Time{})
+	if err != nil {
+		return Engine{}, err
+	}
+	for _, f := range []struct{ cur, next **string }{{&v.Details.Color, &clean.Color}, {&v.Details.Body, &clean.Body}, {&v.Details.Tire, &clean.Tire}} {
+		if *f.next != nil {
+			*f.cur = *f.next
 		}
 	}
 	prev := v.Engine
-	next := prev
-	if e.DisplacementCC != nil {
-		next.DisplacementCC = e.DisplacementCC
-	}
-	if e.Turbo != nil {
-		next.Turbo = e.Turbo
-	}
 	v.Engine = next
 	v.Version++
 	return prev, nil
 }
 
-func cleanDetails(d Details, now time.Time) (Details, error) {
+func cleanDetails(d Details, kind Kind, now time.Time) (Details, error) {
 	var err error
-	if d.Brand, err = cleanText(d.Brand, "marca"); err != nil {
+	for _, f := range []struct {
+		p     **string
+		field string
+	}{{&d.Brand, "marca"}, {&d.Line, "linea"}, {&d.Color, "color"}} {
+		if *f.p, err = cleanText(*f.p, f.field); err != nil {
+			return Details{}, err
+		}
+	}
+	if d.Body != nil && (kind != KindCar || !slices.Contains(bodies, *d.Body)) {
+		return Details{}, ErrBody
+	}
+	if d.Tire, err = cleanText(d.Tire, "llanta"); err != nil {
 		return Details{}, err
 	}
-	if d.Line, err = cleanText(d.Line, "linea"); err != nil {
-		return Details{}, err
+	if d.Tire != nil {
+		t := strings.ToUpper(*d.Tire)
+		if !reTire.MatchString(t) {
+			return Details{}, ErrTire
+		}
+		d.Tire = &t
 	}
-	if d.Year != nil && (*d.Year < 1950 || *d.Year > now.Year()+1) {
+	if d.Year != nil && !now.IsZero() && (*d.Year < 1950 || *d.Year > now.Year()+1) {
 		return Details{}, ErrYearInvalid
 	}
 	if d.Mileage != nil && *d.Mileage < 0 {

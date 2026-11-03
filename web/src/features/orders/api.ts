@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, ApiError, unwrap, unwrapWithETag, type Cliente, type Vehiculo } from '../../shared/api/client';
 import { normalizarPlaca } from '../../shared/lib/plate';
+import type { FichaPayload } from './sheet';
 
 export const ordersKey = ['ordenes'] as const;
 
@@ -68,10 +69,8 @@ export type NewOrderInput = {
     linea?: string;
     modeloAnio?: number;
     kilometraje?: number;
-    cilindraje?: string;
-    turbo?: boolean;
-  };
-  motorParaExistente?: { cilindraje?: string; turbo?: boolean };
+  } & FichaPayload;
+  motorParaExistente?: FichaPayload;
   sintoma: string;
   estadoInicial: 'por_recibir' | 'recibido';
   confirmarDuplicada: boolean;

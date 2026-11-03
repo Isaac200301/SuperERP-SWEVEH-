@@ -98,7 +98,7 @@ func TestQuote_BuildSendApproveDiscountAndReturn(t *testing.T) {
 
 	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550191", "nombre": "Ana Ríos"}))
 	cid := nested(r.body, "cliente", "id").(string)
-	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": "WSX741", "clienteId": cid, "cilindraje": "1400", "turbo": false}))
+	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": "WSX741", "clienteId": cid, "cilindraje": "1400", "turbo": false, "energia": "gasolina", "transmision": "manual"}))
 	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": "WSX741", "sintoma": "Frena mal", "estadoInicial": "recibido"}))
 	id := r.str("id")
 	q := "/api/v1/orders/" + id + "/quote"

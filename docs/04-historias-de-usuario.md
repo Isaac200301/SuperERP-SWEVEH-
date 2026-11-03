@@ -214,20 +214,21 @@ _Módulo del MVP: M2. Un solo registro por celular y por placa, sea carro o moto
 
 **Épica:** E02 · **Roles:** Recepción, Mecánico · **Superficies:** Piso, Panel · **Prioridad:** Must · **Origen:** Equipo · **Aplica a motos:** sí
 
-**Como** mecánico, **quiero** guardar marca, línea, modelo (año), kilometraje y las características del motor: cilindraje y si tiene turbo **para** cotizar el repuesto correcto y saber exactamente qué vehículo es.
+**Como** mecánico, **quiero** guardar marca, línea, modelo (año), color, kilometraje y la ficha del vehículo (combustible, caja, cilindraje, turbo o atmosférico y, según el tipo, tracción o 2/4 tiempos) **para** cotizar el repuesto correcto y saber qué aceite, repuestos y procedimiento lleva.
 
 **Criterios de aceptación**
 
-- **Dado** un vehículo nuevo, sea carro o moto, **cuando** lo guardo, **entonces** el sistema pide cilindraje (en cc) y turbo (sí o no) además de marca, línea, año y kilometraje; no hay campo VIN.
+- **Dado** un vehículo nuevo, sea carro o moto, **cuando** lo guardo, **entonces** puedo indicar combustible, caja, cilindraje (en cc) y aspiración (atmosférico, turbo o supercargado), además de marca, línea, año, color, kilometraje y medida de llanta; no hay campo VIN.
 - **Dado** un carro de 1.2 L, **cuando** escribo el cilindraje, **entonces** acepto 1.2 L o 1200 cc y el sistema lo guarda siempre en cc, para poder comparar y filtrar.
-- **Dado** una moto, **cuando** abro su ficha, **entonces** veo los mismos campos de motor; turbo viene en No por defecto.
-- **Dado** un vehículo creado por el agente solo con la placa, **cuando** abro su ficha, **entonces** queda marcado "motor pendiente" y no bloquea la orden hasta que intento pasarla a Recibido (ver HU-20).
-- **Dado** un cilindraje o turbo ya guardado, **cuando** lo cambio, **entonces** queda en la bitácora quién, cuándo y el valor anterior.
+- **Dado** una moto, **cuando** abro su ficha, **entonces** veo 2 o 4 tiempos y refrigeración por aire o líquido en vez de tracción y carrocería; viene atmosférica por defecto y el combustible es gasolina o eléctrica.
+- **Dado** un vehículo eléctrico, **cuando** lo guardo, **entonces** no se piden cilindraje ni aspiración.
+- **Dado** un vehículo con la ficha incompleta (falta combustible o caja; en combustión, cilindraje o aspiración; en moto, los tiempos), **cuando** abro su ficha, **entonces** queda marcado "ficha pendiente" y no bloquea la orden hasta que intento pasarla a Recibido (ver HU-20).
+- **Dado** un dato de la ficha ya guardado, **cuando** lo cambio, **entonces** queda en la bitácora quién, cuándo y el valor anterior.
 - **Dado** un kilometraje menor al de la última orden, **cuando** lo escribo, **entonces** el sistema me advierte y me pide confirmar (puede ser cambio de tablero).
 
-**Carro / moto:** El motor aplica a carro y a moto. Cilindraje y turbo los pidió el equipo (1-nov-2026). Otras características (combustible, número de cilindros, 2 o 4 tiempos en motos) no están decididas: ver Q-23. El VIN se quitó del MVP por decisión del equipo.
+**Carro / moto:** La ficha la decidió Pablo el 3-nov-2026 (DE-17) y reemplaza "cilindraje y turbo" (1-nov). Tracción y carrocería solo aplican a carros; tiempos y refrigeración, solo a motos. Las listas de valores son propuesta. El VIN sigue fuera del MVP por decisión del equipo.
 
-**Notas:** Cambio del 1-nov: antes decía "VIN opcional" y cilindraje solo en motos.
+**Notas:** Cambio del 1-nov: antes decía "VIN opcional" y cilindraje solo en motos. Cambio del 3-nov: Q-23 queda resuelta con la ficha.
 
 **Trazabilidad:** RF: RF-05 · Depende de: HU-10
 

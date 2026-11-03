@@ -13,7 +13,7 @@ func TestFlow_TransitionsHistoryAndVersion(t *testing.T) {
 	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550120", "nombre": "Jorge Peña"}))
 	clienteID := nested(r.body, "cliente", "id").(string)
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{
-		"placa": "QWE321", "clienteId": clienteID, "cilindraje": "1600", "turbo": false,
+		"placa": "QWE321", "clienteId": clienteID, "cilindraje": "1600", "turbo": false, "energia": "gasolina", "transmision": "manual",
 	}))
 	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": "QWE321", "sintoma": "Vibra", "estadoInicial": "recibido"}))
 	id, version := r.str("id"), r.body["version"]

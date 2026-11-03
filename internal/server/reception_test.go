@@ -61,7 +61,7 @@ func seedOrder(t *testing.T, c *client, phone, plate string) (clienteID, vehicul
 	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": phone, "nombre": "Cliente " + plate}))
 	clienteID = nested(r.body, "cliente", "id").(string)
 	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{
-		"placa": plate, "clienteId": clienteID, "marca": "Renault", "linea": "Logan", "cilindraje": "1600", "turbo": false,
+		"placa": plate, "clienteId": clienteID, "marca": "Renault", "linea": "Logan", "cilindraje": "1600", "turbo": false, "energia": "gasolina", "transmision": "manual",
 	}))
 	vehiculoID = nested(r.body, "vehiculo", "id").(string)
 	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": plate, "sintoma": "Ruido en la suspensión"}))

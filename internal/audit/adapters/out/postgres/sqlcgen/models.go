@@ -391,20 +391,29 @@ type VehiclesPropietarioHistorial struct {
 }
 
 type VehiclesVehiculo struct {
-	ID           uuid.UUID
-	TallerID     uuid.UUID
-	ClienteID    uuid.UUID
-	Tipo         string
-	Placa        string
-	FormatoPlaca string
-	Marca        *string
-	Linea        *string
-	ModeloAnio   *int32
-	Kilometraje  *int32
-	CilindrajeCc *int32
-	Turbo        *bool
-	Version      int32
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	CreatedBy    *uuid.UUID
+	ID            uuid.UUID
+	TallerID      uuid.UUID
+	ClienteID     uuid.UUID
+	Tipo          string
+	Placa         string
+	FormatoPlaca  string
+	Marca         *string
+	Linea         *string
+	ModeloAnio    *int32
+	Kilometraje   *int32
+	CilindrajeCc  *int32
+	Turbo         *bool
+	Version       int32
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	CreatedBy     *uuid.UUID
+	Energia       *string
+	Aspiracion    *string
+	Transmision   *string
+	Traccion      *string
+	Ciclo         *string
+	Refrigeracion *string
+	Color         *string
+	Carroceria    *string
+	Llanta        *string
 }

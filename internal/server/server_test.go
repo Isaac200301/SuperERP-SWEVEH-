@@ -327,7 +327,7 @@ func TestSlice_CustomerVehicleOrder(t *testing.T) {
 	if r.status != http.StatusBadRequest || r.str("code") != "if_match_requerido" {
 		t.Fatalf("sin If-Match: %d %v", r.status, r.body)
 	}
-	r = c.must(http.StatusOK, c.do("PATCH", "/api/v1/vehicles/"+vehiculoID+"/engine", map[string]any{"cilindraje": "1.2 L", "turbo": false}, "If-Match", etag))
+	r = c.must(http.StatusOK, c.do("PATCH", "/api/v1/vehicles/"+vehiculoID+"/engine", map[string]any{"cilindraje": "1.2 L", "turbo": false, "energia": "gasolina", "transmision": "manual"}, "If-Match", etag))
 	if r.body["cilindrajeCc"] != float64(1200) || r.body["motorPendiente"] != false {
 		t.Fatalf("motor actualizado: %v", r.body)
 	}

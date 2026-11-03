@@ -110,7 +110,7 @@ export function OrderDetailPage() {
           {o.vehiculo?.motorPendiente ? (
             <p className="flex items-center gap-2 rounded-xl bg-warn-tint p-3 text-sm font-bold text-warn-ink">
               <IconWarn size={16} />
-              Motor pendiente: falta cilindraje o turbo
+              Ficha pendiente: falta combustible, caja o datos del motor
             </p>
           ) : null}
         </section>
