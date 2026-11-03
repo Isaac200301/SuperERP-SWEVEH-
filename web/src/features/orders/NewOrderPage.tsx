@@ -1,7 +1,8 @@
+import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 
-import { ApiError } from '../../shared/api/client';
+import { api, ApiError, unwrap } from '../../shared/api/client';
 import { celularValido, formatoCelular, soloCelular } from '../../shared/lib/format';
 import { ayudaPlaca, normalizarPlaca, reconocerPlaca, tipoPorPlaca } from '../../shared/lib/plate';
 import { Alert } from '../../shared/ui/Alert';
@@ -44,6 +45,18 @@ export function NewOrderPage() {
   const [sintoma, setSintoma] = useState('');
   const [estado, setEstado] = useState<'por_recibir' | 'recibido'>('por_recibir');
   const [intentado, setIntentado] = useState(false);
+  const [ejemplo, setEjemplo] = useState(false);
+  const taller = useQuery({ queryKey: ['taller'], queryFn: async () => unwrap(await api.GET('/workshop')), enabled: primera });
+
+  // HU-05 criterio 2: sin vehículo a mano, una orden de ejemplo con placa de carro o de moto según lo que atiende.
+  function usarEjemplo() {
+    const moto = taller.data?.atiende === 'moto';
+    setPlaca(moto ? 'EJM12A' : 'EJM123');
+    setCelular('3000000000');
+    setNombre('Cliente de ejemplo');
+    setSintoma(moto ? 'Revisión general de la moto (ejemplo)' : 'Revisión general del carro (ejemplo)');
+    setEjemplo(true);
+  }
 
   const formato = reconocerPlaca(placa);
   const placaLista = formato !== 'vacia' && formato !== 'invalida';
@@ -100,8 +113,9 @@ export function NewOrderPage() {
       sintoma: sintoma.trim(),
       estadoInicial: estado === 'recibido' && motorPendiente ? 'por_recibir' : estado,
       confirmarDuplicada,
+      ejemplo,
     };
-    open.mutate(input, { onSuccess: (o) => navigate(`/panel/ordenes/${o.id}`, { replace: true }) });
+    open.mutate(input, { onSuccess: (o) => navigate(`/panel/ordenes/${o.id}${primera ? '?primera=1' : ''}`, { replace: true }) });
   }
 
   function submit(e: FormEvent) {
@@ -121,6 +135,14 @@ export function NewOrderPage() {
         </Link>
         <h1 className="text-[28px] font-extrabold tracking-[-.02em]">{primera ? 'Tu primera orden' : 'Nueva orden'}</h1>
         <p className="text-ink-2">Escribe la placa y lo que dice el cliente. La orden queda con número y hora desde ya.</p>
+        {primera ? (
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <Button variant="secondary" onClick={usarEjemplo}>
+              Usar ejemplo
+            </Button>
+            <span className="text-sm text-ink-2">{ejemplo ? 'Orden de ejemplo: no cuenta en tus números.' : '¿No tienes un vehículo a mano?'}</span>
+          </div>
+        ) : null}
       </header>
 
       <div className="grid gap-5 lg:grid-cols-2">

@@ -94,15 +94,16 @@ describe('WorkshopPage (HU-03, HU-08, HU-89)', () => {
       'PUT /workshop/schedule': {},
     });
     renderPage(<WorkshopPage />);
-    expect(await screen.findByText('Para continuar acepta el contrato.')).toBeInTheDocument();
+    expect(await screen.findByText('Escoge qué vehículos atiendes.')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Ciudad'), 'Medellín');
-    await userEvent.selectOptions(screen.getByLabelText('Atiendes'), 'moto');
+    await userEvent.click(screen.getByRole('radio', { name: 'Motos' }));
+    expect(screen.getByText('Para continuar acepta el contrato.')).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('¿Cuántos trabajan?'), '2a5');
     await userEvent.click(screen.getByLabelText('Frenos y suspensión'));
     await userEvent.click(screen.getByLabelText('Eléctrico'));
     await userEvent.click(screen.getByLabelText('Eléctrico'));
     await userEvent.click(screen.getByLabelText(/Acepto el contrato/));
-    await userEvent.click(screen.getByRole('button', { name: 'Terminar el arranque' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Armar mi taller' }));
 
     await userEvent.click(screen.getByLabelText('Lunes'));
     await userEvent.click(screen.getByLabelText('Sábado'));
@@ -151,6 +152,12 @@ describe('PanelLayout (HU-81)', () => {
     unmount();
     renderPage(<PanelLayout session={owner as unknown as Sesion} />);
     expect(screen.getByRole('link', { name: 'Equipo' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Mi taller' })).toBeInTheDocument();
+  });
+
+  it('si el taller es de una sola persona no muestra Equipo (HU-83)', () => {
+    renderPage(<PanelLayout session={owner as unknown as Sesion} soloYo />);
+    expect(screen.queryByRole('link', { name: 'Equipo' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Mi taller' })).toBeInTheDocument();
   });
 });

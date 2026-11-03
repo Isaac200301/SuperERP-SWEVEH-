@@ -21,7 +21,8 @@ const nav = [
   { to: '/panel/taller', label: 'Mi taller', icon: IconCar, perm: 'workshop:manage' },
 ];
 
-export function PanelLayout({ session }: { session: Sesion }) {
+/** soloYo: el taller dijo "solo yo" en el registro y no ve la gestión de usuarios (HU-83). */
+export function PanelLayout({ session, soloYo = false }: { session: Sesion; soloYo?: boolean }) {
   const navigate = useNavigate();
   const logout = useLogout();
   return (
@@ -31,7 +32,7 @@ export function PanelLayout({ session }: { session: Sesion }) {
           <Brand subtitle={session.taller.nombre} />
         </div>
         <nav aria-label="Secciones del panel" className="flex flex-row gap-2 md:flex-col">
-          {nav.filter((n) => can(session, n.perm)).map((n) => (
+          {nav.filter((n) => can(session, n.perm) && !(soloYo && n.to === '/panel/equipo')).map((n) => (
             <NavLink
               key={n.to}
               to={n.to}

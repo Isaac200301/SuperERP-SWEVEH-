@@ -28,11 +28,12 @@
 
 | HU | Título | Tramo | Demo | Estado | PR | Notas |
 |---|---|---|---|---|---|---|
+| 2026-11-03 | Claude (rama `dev/pablo`) | **Bloque 1: registro y alta del taller.** Nuevo `/panel/arranque` (pasos 2 y 3): tipo de taller con vehículo obligatorio, revisión de la precarga (renombrar, quitar, agregar) y horario; el registro y el panel desvían ahí a un taller sin arranque. Primera orden con "Usar ejemplo" (`ejemplo` en el contrato de `POST /orders`) y vista previa del aviso. HU-83 ("solo yo" oculta Equipo) y versión y fecha en la política. **Verde:** `go test ./...` con Postgres (sin `-race`: falta gcc en esta máquina), `go vet`, Vitest 34, `tsc`, ESLint y build. No se recorrió en un navegador real | Recorrido manual de Isaac/Pablo; Bloque 2 (inventario) |
 | HU-01 | Crear la cuenta con mi celular | T0 | sí | 🟦 En curso | | Criterios 1–3 con prueba (`internal/server/server_test.go`, `errors_test.go`). Falta: canal real del código (Q-13), medir el criterio 4 (< 5 min) en la demo |
 | HU-02 | Autorizar el tratamiento de mis propios datos | T0 | sí | 🟦 En curso | | Casilla sin marcar, bloqueo sin ella y prueba guardada. Política en borrador: depende de HU-90 y AQ-10 |
-| HU-03 | Contar qué tipo de taller tengo | T1 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
-| HU-04 | Recibir el taller ya armado | T1 | sí | ⬜ Pendiente | | |
-| HU-05 | Hacer mi primera orden antes de terminar | T1 | sí | ⬜ Pendiente | | |
+| HU-03 | Contar qué tipo de taller tengo | T1 | sí | 🟦 En curso | | Paso 2 del alta en `/panel/arranque` (`ProfileForm`): tipo de vehículo obligatorio, servicios, ciudad y tamaño. Prueba HTTP (`admin_test.go`) y Vitest (`onboarding.test.tsx`). Falta: staging |
+| HU-04 | Recibir el taller ya armado | T1 | sí | 🟦 En curso | | Paso 3 del alta: precarga según carro/moto/ambos, renombrar, quitar y agregar sin salir (Vitest) y precarga sin duplicar al repetir el arranque (`TestOnboarding_PreloadAndExampleOrder`). Lista concreta de servicios sigue sin dato (Q-02). Falta: staging |
+| HU-05 | Hacer mi primera orden antes de terminar | T1 | sí | 🟦 En curso | | "Usar ejemplo" con placa de carro o moto según lo que atiende; orden marcada `ejemplo` (no cuenta en KPIs) y vista previa del aviso sin enviar (Vitest + prueba HTTP). Falta: staging y medir < 5 min (HU-01 criterio 4) |
 | HU-06 | Que me pidan los datos solo cuando hagan falta | T6 | no | ⬜ Pendiente | | |
 | HU-07 | Poner el precio y la duración de mis servicios | T1 | sí | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
 | HU-08 | Cargar el horario del taller | T1 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
@@ -110,14 +111,14 @@
 | HU-80 | Agregar a mi mecánico | T0 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-81 | Ver solo lo que me toca como mecánico | T0 | sí | 🟦 En curso | | Criterios 1 y 2 con prueba HTTP (`mechanic_test.go`): sin costo ni permisos de dinero, 403 en configuración. Menú y botones según permisos |
 | HU-82 | Trabajar como recepción | T6 | no | ⬜ Pendiente | | |
-| HU-83 | Ocultar la gestión de usuarios si trabajo solo | T6 | no | ⬜ Pendiente | | |
+| HU-83 | Ocultar la gestión de usuarios si trabajo solo | T6 | no | 🟦 En curso | | Con tamaño "solo yo" el menú no muestra Equipo (`PanelLayout`, Vitest). Falta: staging |
 | HU-84 | Desactivar a un usuario que se va | T6 | no | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-85 | Dar mi autorización antes de que procesen mi mensaje | T2 | sí | ⬜ Pendiente | | |
 | HU-86 | Pedir la autorización en el mostrador | T2 | no | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-87 | Pedir mis datos o que los borren | T6 | no | ⬜ Pendiente | | |
 | HU-88 | Ver quién cambió qué | T0 | no | 🟦 En curso | | Bitácora solo-inserción escrita en la misma transacción (taller, usuario, cliente, vehículo, motor, orden). Falta la pantalla con filtros (criterio 2) y la cadena de hashes (ADR-17) |
 | HU-89 | Aceptar el contrato de transmisión con SWEVEH | T0 | no | ⬜ Pendiente | | |
-| HU-90 | Publicar la política de tratamiento de datos | T0 | sí | ⬜ Pendiente | | |
+| HU-90 | Publicar la política de tratamiento de datos | T0 | sí | 🟦 En curso | | `/politica-de-datos` muestra versión (`borrador-sin-validar-2026-11-01`, igual a `PolicyVersionDraft`) y fecha. El texto legal sigue en borrador: depende de AQ-10 |
 | HU-91 | Llenar el sistema mientras trabajo | T1 | no | ⬜ Pendiente | | |
 | HU-92 | Subir mis clientes y vehículos con una plantilla | T6 | no | ⬜ Pendiente | | |
 | HU-93 | Pasar mi lista de precios con una foto | T6 | sí | ⬜ Pendiente | | |

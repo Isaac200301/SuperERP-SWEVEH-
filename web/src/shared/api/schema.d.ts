@@ -1907,6 +1907,8 @@ export interface operations {
                     /** @enum {string} */
                     estadoInicial?: "por_recibir" | "recibido";
                     confirmarDuplicada?: boolean;
+                    /** @description Orden de ejemplo del arranque (HU-05); no cuenta en los KPIs */
+                    ejemplo?: boolean;
                 };
             };
         };

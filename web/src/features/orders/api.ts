@@ -75,6 +75,7 @@ export type NewOrderInput = {
   sintoma: string;
   estadoInicial: 'por_recibir' | 'recibido';
   confirmarDuplicada: boolean;
+  ejemplo?: boolean;
 };
 
 /**
@@ -107,6 +108,7 @@ export function useOpenOrder() {
             sintoma: v.sintoma,
             estadoInicial: v.estadoInicial,
             confirmarDuplicada: v.confirmarDuplicada,
+            ...(v.ejemplo ? { ejemplo: true } : {}),
           },
         }),
       );

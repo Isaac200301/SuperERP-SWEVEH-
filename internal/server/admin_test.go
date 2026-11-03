@@ -43,6 +43,39 @@ func TestWorkshop_OnboardingAndSchedule(t *testing.T) {
 	}
 }
 
+// HU-04 y HU-05: el arranque precarga servicios según lo que atiende y la primera orden puede ser de ejemplo.
+func TestOnboarding_PreloadAndExampleOrder(t *testing.T) {
+	e := newEnv(t)
+	c := e.register("3105550141", "Marta Ríos")
+	in := map[string]any{"nombre": "Motos La 80", "atiende": "moto", "especialidades": []string{}, "ciudad": "Medellín", "tamano": "solo", "contratoAceptado": true}
+	c.must(http.StatusOK, c.do("POST", "/api/v1/workshop/onboarding", in))
+
+	r := c.must(http.StatusOK, c.do("GET", "/api/v1/services", nil))
+	servicios := r.body["servicios"].([]any)
+	if len(servicios) == 0 {
+		t.Fatal("el arranque debía dejar servicios precargados")
+	}
+	for _, s := range servicios {
+		if tipo := s.(map[string]any)["tipoVehiculo"]; tipo == "carro" {
+			t.Fatalf("un taller de motos no debía recibir servicios de carro: %v", s)
+		}
+	}
+	// Repetir el arranque (Cambiar tipo de taller) no duplica la precarga.
+	c.must(http.StatusOK, c.do("POST", "/api/v1/workshop/onboarding", in))
+	r = c.must(http.StatusOK, c.do("GET", "/api/v1/services", nil))
+	if n := len(r.body["servicios"].([]any)); n != len(servicios) {
+		t.Fatalf("precarga duplicada: %d servicios, antes %d", n, len(servicios))
+	}
+
+	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3000000000", "nombre": "Cliente de ejemplo"}))
+	clienteID := nested(r.body, "cliente", "id").(string)
+	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": "EJM12A", "clienteId": clienteID}))
+	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": "EJM12A", "sintoma": "Revisión general (ejemplo)", "ejemplo": true}))
+	if r.body["ejemplo"] != true {
+		t.Fatalf("la orden debía quedar marcada como ejemplo: %v", r.body)
+	}
+}
+
 func TestUsers_AddDeactivateAndSwitchWorkshop(t *testing.T) {
 	e := newEnv(t)
 	owner := e.register("3105550150", "Gloria Paz")

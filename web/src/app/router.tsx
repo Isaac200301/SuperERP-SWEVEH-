@@ -20,6 +20,7 @@ const DashboardPage = page(() => import('../features/dashboard/DashboardPage'), 
 const CatalogPage = page(() => import('../features/catalog/CatalogPage'), 'CatalogPage');
 const TeamPage = page(() => import('../features/team/TeamPage'), 'TeamPage');
 const WorkshopPage = page(() => import('../features/workshop/WorkshopPage'), 'WorkshopPage');
+const OnboardingPage = page(() => import('../features/workshop/OnboardingPage'), 'OnboardingPage');
 
 function Lazy({ Page }: { Page: LazyExoticComponent<ComponentType> }) {
   return (
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
       { path: 'catalogo', element: <Lazy Page={CatalogPage} /> },
       { path: 'equipo', element: <Lazy Page={TeamPage} /> },
       { path: 'taller', element: <Lazy Page={WorkshopPage} /> },
+      { path: 'arranque', element: <Lazy Page={OnboardingPage} /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
