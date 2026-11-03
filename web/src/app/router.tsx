@@ -14,7 +14,10 @@ const OrdersPage = page(() => import('../features/orders/OrdersPage'), 'OrdersPa
 const NewOrderPage = page(() => import('../features/orders/NewOrderPage'), 'NewOrderPage');
 const OrderDetailPage = page(() => import('../features/orders/OrderDetailPage'), 'OrderDetailPage');
 const FloorPage = page(() => import('../features/orders/FloorPage'), 'FloorPage');
-const CatalogPage =page(() => import('../features/catalog/CatalogPage'), 'CatalogPage');
+const InboxPage = page(() => import('../features/inbox/InboxPage'), 'InboxPage');
+const AutomationsPage = page(() => import('../features/automations/AutomationsPage'), 'AutomationsPage');
+const DashboardPage = page(() => import('../features/dashboard/DashboardPage'), 'DashboardPage');
+const CatalogPage = page(() => import('../features/catalog/CatalogPage'), 'CatalogPage');
 const TeamPage = page(() => import('../features/team/TeamPage'), 'TeamPage');
 const WorkshopPage = page(() => import('../features/workshop/WorkshopPage'), 'WorkshopPage');
 
@@ -46,6 +49,9 @@ export const router = createBrowserRouter([
       { path: 'ordenes/nueva', element: <Lazy Page={NewOrderPage} /> },
       { path: 'ordenes/:id', element: <Lazy Page={OrderDetailPage} /> },
       { path: 'piso', element: <Lazy Page={FloorPage} /> },
+      { path: 'por-revisar', element: <Lazy Page={InboxPage} /> },
+      { path: 'automatizaciones', element: <Lazy Page={AutomationsPage} /> },
+      { path: 'tablero', element: <Lazy Page={DashboardPage} /> },
       { path: 'catalogo', element: <Lazy Page={CatalogPage} /> },
       { path: 'equipo', element: <Lazy Page={TeamPage} /> },
       { path: 'taller', element: <Lazy Page={WorkshopPage} /> },

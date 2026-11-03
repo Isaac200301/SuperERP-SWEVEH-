@@ -37,9 +37,13 @@ Lo que ya se puede hacer desde el panel:
 | Servicios y repuestos | Precios y duración de servicios; repuestos con existencia, mínimo y entradas | HU-07, HU-32, HU-35 |
 | Órdenes | Abrir desde la placa (carro o moto, con motor), mover por los 7 estados, entregar | HU-09…11, HU-16, HU-20, HU-25 |
 | Recepción | Checklist con kilometraje, combustible, accesorios y fotos por lado; notas | HU-17, HU-21 |
-| Cotización | Armar con servicios y repuestos de la lista del taller, enviar y registrar la respuesta | HU-27, HU-29 |
+| Cotización | Armar con servicios y repuestos de la lista del taller, enviar y registrar la respuesta; al aprobar se descuenta el inventario | HU-27, HU-29, HU-33 |
+| Piso | Las órdenes del mecánico en el celular; el mecánico no ve dinero ni configuración | HU-23, HU-81 |
+| Por revisar | Borradores del agente de WhatsApp: enviar, editar, "Lo contesto yo" o descartar; simulador del número de prueba | HU-62…65 |
+| Automatizaciones | Catálogo con interruptor y texto editable de los avisos | HU-40…42, HU-46 |
+| Tablero | Los KPIs con "qué significa", órdenes por estado y pendientes de hoy | HU-68…73, HU-76 |
 
-Ya existen en el backend, sin pantalla todavía: WhatsApp y agente, automatizaciones, bandeja "Por revisar" y KPIs. El estado por historia está en [`docs/09-estado-de-construccion.md`](docs/09-estado-de-construccion.md).
+Todavía falta conectar el número de prueba real de Meta (hoy se usa el simulador), la conversación dentro de la orden y la bitácora en pantalla. El estado por historia está en [`docs/09-estado-de-construccion.md`](docs/09-estado-de-construccion.md).
 
 **Calidad:** cada PR pasa por GitHub Actions con pruebas de Go con `-race` contra Postgres real, cobertura mínima del 80 % en dominio y aplicación, `golangci-lint`, Vitest, gitleaks, govulncheck, **Snyk** y **SonarQube Cloud**. Se trabaja en la rama `developer` y se integra a `main` por pull request revisado.
 

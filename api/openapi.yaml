@@ -1029,6 +1029,313 @@ paths:
         '200': { $ref: '#/components/responses/Taller' }
         '400': { $ref: '#/components/responses/Problem' }
 
+  /dashboard:
+    get:
+      operationId: getDashboard
+      summary: Los 6 KPIs del taller y las órdenes abiertas por estado (HU-68…73). Permiso kpi:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kpis, porEstado]
+                properties:
+                  kpis: { type: array, items: { $ref: '#/components/schemas/Kpi' } }
+                  porEstado: { type: object, additionalProperties: { type: integer } }
+
+  /today:
+    get:
+      operationId: getToday
+      summary: Lo que el dueño tiene pendiente hoy (HU-76). Permiso order:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pendientes]
+                properties:
+                  pendientes: { type: array, items: { $ref: '#/components/schemas/Pendiente' } }
+
+  /automations:
+    get:
+      operationId: listAutomations
+      summary: Catálogo de automatizaciones con interruptor (HU-40). Permiso order:read
+      responses:
+        '200': { $ref: '#/components/responses/Automatizaciones' }
+
+  /automations/{code}:
+    patch:
+      operationId: updateAutomation
+      summary: Encender, apagar o editar el texto de un aviso (HU-41, HU-42). Permiso automation:manage
+      parameters: [{ name: code, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                activa: { type: boolean }
+                texto: { type: string, nullable: true }
+      responses:
+        '200': { $ref: '#/components/responses/Automatizaciones' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /automations/runs:
+    get:
+      operationId: listAutomationRuns
+      summary: Registro de cada ejecución de una automatización (HU-46). Permiso automation:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ejecuciones]
+                properties:
+                  ejecuciones:
+                    type: array
+                    items:
+                      type: object
+                      required: [codigo, resultado, detalle, creadoEn]
+                      properties:
+                        codigo: { type: string }
+                        resultado: { type: string }
+                        detalle: { type: string }
+                        ordenId: { type: string, format: uuid, nullable: true }
+                        creadoEn: { type: string, format: date-time }
+
+  /inbox:
+    get:
+      operationId: listDrafts
+      summary: Bandeja "Por revisar" con los borradores del agente (HU-62). Permiso inbox:manage
+      parameters:
+        - { name: todos, in: query, description: '1 = incluir los ya resueltos', schema: { type: string, enum: ['1'] } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [borradores]
+                properties:
+                  borradores: { type: array, items: { $ref: '#/components/schemas/Borrador' } }
+
+  /inbox/{id}:
+    post:
+      operationId: resolveDraft
+      summary: 'Enviar, editar y enviar, o "Lo contesto yo" (HU-62, HU-63). Nada sale sin que el dueño pulse Enviar (RF-18). Permiso inbox:manage'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [enviar, lo_contesto_yo, descartar] }
+                texto: { type: string, nullable: true, description: 'Texto editado por el dueño' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Borrador' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /inbox/stats:
+    get:
+      operationId: getDraftStats
+      summary: Qué tan seguido el dueño edita los borradores (HU-65). Permiso inbox:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enviados, editados, porcentajeEditados]
+                properties:
+                  enviados: { type: integer }
+                  editados: { type: integer }
+                  porcentajeEditados: { type: number }
+
+  /conversations:
+    get:
+      operationId: listConversations
+      summary: Conversaciones de WhatsApp del taller. Permiso conversation:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [conversaciones]
+                properties:
+                  conversaciones: { type: array, items: { $ref: '#/components/schemas/Conversacion' } }
+
+  /conversations/{id}:
+    get:
+      operationId: getConversation
+      summary: Una conversación con sus mensajes (HU-24). Permiso conversation:read
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [conversacion, mensajes]
+                properties:
+                  conversacion: { $ref: '#/components/schemas/Conversacion' }
+                  mensajes: { type: array, items: { $ref: '#/components/schemas/Mensaje' } }
+        '404': { $ref: '#/components/responses/Problem' }
+    patch:
+      operationId: setConversationMode
+      summary: Pasar la conversación al agente o a una persona (HU-59). Permiso inbox:manage
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [modo]
+              properties:
+                modo: { type: string, enum: [agente, humano] }
+      responses:
+        '204': { description: Actualizada }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /conversations/{id}/messages:
+    post:
+      operationId: replyConversation
+      summary: Una persona del taller contesta directamente; respeta la ventana de 24 h (HU-47, HU-59). Permiso inbox:manage
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [texto]
+              properties:
+                texto: { type: string }
+                ordenId: { type: string, format: uuid, nullable: true }
+      responses:
+        '201':
+          description: Encolado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Mensaje' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /orders/{id}/messages:
+    get:
+      operationId: listOrderMessages
+      summary: La conversación de WhatsApp dentro de la orden (HU-24). Permiso order:read
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mensajes]
+                properties:
+                  mensajes: { type: array, items: { $ref: '#/components/schemas/Mensaje' } }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /whatsapp/channel:
+    get:
+      operationId: getWhatsAppChannel
+      summary: Canal de WhatsApp del taller (número de prueba o real, HU-101). Permiso workshop:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [canal]
+                properties:
+                  canal:
+                    type: object
+                    nullable: true
+                    properties:
+                      proveedor: { type: string }
+                      numero: { type: string }
+
+  /simulator/inbound:
+    post:
+      operationId: simulateInbound
+      summary: 'Solo fuera de producción: simula un mensaje de cliente por el canal local, con el formato del webhook de Meta (D-01). Permiso workshop:manage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [celular, texto]
+              properties:
+                celular: { type: string }
+                nombre: { type: string }
+                texto: { type: string }
+                boton: { type: string, description: 'id del botón de respuesta, si el cliente pulsó uno' }
+      responses:
+        '202': { description: Recibido }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /audit:
+    get:
+      operationId: listAudit
+      summary: Bitácora de quién cambió qué, con filtros (HU-88). Permiso audit:read
+      parameters:
+        - { name: entidad, in: query, schema: { type: string } }
+        - { name: usuario, in: query, schema: { type: string, format: uuid } }
+        - { name: desde, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [eventos]
+                properties:
+                  eventos:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, accion, entidad, actorTipo, ocurridoEn]
+                      properties:
+                        id: { type: string }
+                        accion: { type: string }
+                        entidad: { type: string }
+                        entidadId: { type: string, nullable: true }
+                        actorTipo: { type: string }
+                        actorId: { type: string, nullable: true }
+                        antes: { type: object, nullable: true }
+                        despues: { type: object, nullable: true }
+                        ocurridoEn: { type: string, format: date-time }
+
 components:
   securitySchemes:
     cookieAuth:
@@ -1089,6 +1396,16 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Taller' }
 
+    Automatizaciones:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [automatizaciones]
+            properties:
+              automatizaciones: { type: array, items: { $ref: '#/components/schemas/Automatizacion' } }
+
   requestBodies:
     Cantidad:
       required: true
@@ -1102,6 +1419,90 @@ components:
               ordenId: { type: string, format: uuid, description: 'Obligatorio en devoluciones' }
 
   schemas:
+    Kpi:
+      type: object
+      required: [codigo, titulo, valor, texto, detalle, queSignifica]
+      properties:
+        codigo: { type: string }
+        titulo: { type: string }
+        valor: { type: number, nullable: true }
+        texto: { type: string, description: 'Valor ya formateado en español de Colombia' }
+        detalle: { type: string }
+        queSignifica: { type: string, description: 'Explicación en palabras del taller (HU-75)' }
+
+    Pendiente:
+      type: object
+      required: [tipo, titulo, detalle, tono]
+      properties:
+        tipo: { type: string }
+        titulo: { type: string }
+        detalle: { type: string }
+        ordenId: { type: string, format: uuid }
+        tono: { type: string, enum: [err, warn, info] }
+
+    Automatizacion:
+      type: object
+      required: [codigo, nombre, disparador, activa, proximamente, enviaMensaje, editable, texto, datos, ejecucionesSemana, costo]
+      properties:
+        codigo: { type: string }
+        nombre: { type: string }
+        disparador: { type: string }
+        activa: { type: boolean }
+        proximamente: { type: boolean }
+        enviaMensaje: { type: boolean }
+        editable: { type: boolean }
+        texto: { type: string }
+        datos: { type: array, items: { type: string }, nullable: true }
+        ejecucionesSemana: { type: integer }
+        costo: { type: string }
+
+    Borrador:
+      type: object
+      required: [id, conversacionId, celular, mensajeCliente, intencion, propuesto, estado, origen, creadoEn]
+      properties:
+        id: { type: string, format: uuid }
+        conversacionId: { type: string, format: uuid }
+        celular: { type: string }
+        mensajeCliente: { type: string }
+        intencion: { type: string }
+        propuesto: { type: string, description: 'Texto que propone la IA o la plantilla; no sale sin aprobación (RF-18)' }
+        final: { type: string, nullable: true }
+        fuentes: { type: array, items: { type: string }, nullable: true, description: 'De dónde salió cada dato (HU-64)' }
+        accion: { type: object, nullable: true, description: 'Acción propuesta (p. ej. crear la orden con la placa, HU-55)' }
+        estado: { type: string }
+        origen: { type: string }
+        creadoEn: { type: string, format: date-time }
+        resueltoEn: { type: string, format: date-time, nullable: true }
+
+    Conversacion:
+      type: object
+      required: [id, celular, clienteId, modo, pideHumano, ventanaAbiertaHasta]
+      properties:
+        id: { type: string, format: uuid }
+        celular: { type: string }
+        clienteId: { type: string, format: uuid, nullable: true }
+        modo: { type: string, enum: [agente, humano] }
+        pideHumano: { type: boolean }
+        ventanaAbiertaHasta: { type: string, format: date-time, nullable: true }
+        ultimoMensaje: { type: string }
+        ultimoEn: { type: string, format: date-time }
+
+    Mensaje:
+      type: object
+      required: [id, direccion, tipo, cuerpo, estado, origen, creadoEn]
+      properties:
+        id: { type: string, format: uuid }
+        direccion: { type: string }
+        tipo: { type: string }
+        cuerpo: { type: string }
+        payload: { type: object, nullable: true }
+        estado: { type: string }
+        origen: { type: string }
+        ordenId: { type: string, format: uuid, nullable: true }
+        automatizacion: { type: string, nullable: true }
+        error: { type: string, nullable: true }
+        creadoEn: { type: string, format: date-time }
+
     Salvedad:
       type: object
       required: [nota]
