@@ -32,17 +32,20 @@ func (h *Handler) Routes(r chi.Router) {
 }
 
 type dto struct {
-	ID          string `json:"id"`
-	Nombre      string `json:"nombre"`
-	Tipo        string `json:"tipoVehiculo"`
-	Precio      *int64 `json:"precio"`
-	DuracionMin *int   `json:"duracionMin"`
-	Activo      bool   `json:"activo"`
-	Version     int    `json:"version"`
+	ID          string  `json:"id"`
+	Nombre      string  `json:"nombre"`
+	Tipo        string  `json:"tipoVehiculo"`
+	Precio      *int64  `json:"precio"`
+	DuracionMin *int    `json:"duracionMin"`
+	Activo      bool    `json:"activo"`
+	Version     int     `json:"version"`
+	Categoria   *string `json:"categoria"`
+	Garantia    *int    `json:"garantiaDias"`
 }
 
 func toDTO(s domain.Service) dto {
-	return dto{ID: s.ID.String(), Nombre: s.Name, Tipo: s.Kind, Precio: s.Price, DuracionMin: s.DurationMin, Activo: s.Active, Version: s.Version}
+	return dto{ID: s.ID.String(), Nombre: s.Name, Tipo: s.Kind, Precio: s.Price, DuracionMin: s.DurationMin, Activo: s.Active, Version: s.Version,
+		Categoria: s.Category, Garantia: s.WarrantyDay}
 }
 
 func (h *Handler) list(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -55,10 +58,12 @@ func (h *Handler) list(r *http.Request, p reqctx.Principal) (int, any, error) {
 }
 
 type createReq struct {
-	Nombre      string `json:"nombre"`
-	Tipo        string `json:"tipoVehiculo"`
-	Precio      *int64 `json:"precio"`
-	DuracionMin *int   `json:"duracionMin"`
+	Nombre      string  `json:"nombre"`
+	Tipo        string  `json:"tipoVehiculo"`
+	Precio      *int64  `json:"precio"`
+	DuracionMin *int    `json:"duracionMin"`
+	Categoria   *string `json:"categoria"`
+	Garantia    *int    `json:"garantiaDias"`
 }
 
 func (h *Handler) create(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -67,7 +72,7 @@ func (h *Handler) create(r *http.Request, p reqctx.Principal) (int, any, error) 
 		return 0, nil, err
 	}
 	s, err := h.svc.Create(r.Context(), p.Actor(), domain.Service{TallerID: p.TallerID, Name: req.Nombre, Kind: req.Tipo,
-		Price: req.Precio, DurationMin: req.DuracionMin})
+		Price: req.Precio, DurationMin: req.DuracionMin, Category: req.Categoria, WarrantyDay: req.Garantia})
 	if err != nil {
 		return 0, nil, err
 	}
@@ -76,12 +81,14 @@ func (h *Handler) create(r *http.Request, p reqctx.Principal) (int, any, error) 
 
 // patchReq usa punteros dobles para distinguir "no vino" de "vino en null" (quitar el precio).
 type patchReq struct {
-	Nombre      *string               `json:"nombre"`
-	Tipo        *string               `json:"tipoVehiculo"`
-	Precio      httpx.Optional[int64] `json:"precio"`
-	DuracionMin httpx.Optional[int]   `json:"duracionMin"`
-	Activo      *bool                 `json:"activo"`
-	Version     int                   `json:"version"`
+	Nombre      *string                `json:"nombre"`
+	Tipo        *string                `json:"tipoVehiculo"`
+	Precio      httpx.Optional[int64]  `json:"precio"`
+	DuracionMin httpx.Optional[int]    `json:"duracionMin"`
+	Activo      *bool                  `json:"activo"`
+	Version     int                    `json:"version"`
+	Categoria   httpx.Optional[string] `json:"categoria"`
+	Garantia    httpx.Optional[int]    `json:"garantiaDias"`
 }
 
 func (h *Handler) update(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -95,6 +102,7 @@ func (h *Handler) update(r *http.Request, p reqctx.Principal) (int, any, error) 
 	}
 	s, err := h.svc.Update(r.Context(), p.Actor(), p.TallerID, id, req.Version, app.Patch{
 		Name: req.Nombre, Kind: req.Tipo, Price: req.Precio.Ptr(), DurationMin: req.DuracionMin.Ptr(), Active: req.Activo,
+		Category: req.Categoria.Ptr(), WarrantyDay: req.Garantia.Ptr(),
 	})
 	return http.StatusOK, toDTO(s), err
 }

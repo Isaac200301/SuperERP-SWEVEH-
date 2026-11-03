@@ -807,6 +807,8 @@ paths:
                 tipoVehiculo: { type: string }
                 precio: { type: integer, format: int64, nullable: true }
                 duracionMin: { type: integer, nullable: true }
+                categoria: { allOf: [{ $ref: '#/components/schemas/Categoria' }], nullable: true }
+                garantiaDias: { type: integer, nullable: true, minimum: 0, maximum: 3650 }
       responses:
         '201':
           description: Creado
@@ -834,6 +836,8 @@ paths:
                 duracionMin: { type: integer, nullable: true }
                 activo: { type: boolean }
                 version: { type: integer }
+                categoria: { allOf: [{ $ref: '#/components/schemas/Categoria' }], nullable: true }
+                garantiaDias: { type: integer, nullable: true, minimum: 0, maximum: 3650 }
       responses:
         '200':
           description: OK
@@ -858,6 +862,7 @@ paths:
       parameters:
         - { name: q, in: query, schema: { type: string } }
         - { name: todos, in: query, description: '1 = incluir inactivos (requiere part:manage)', schema: { type: string, enum: ['1'] } }
+        - { name: categoria, in: query, schema: { $ref: '#/components/schemas/Categoria' } }
       responses:
         '200': { $ref: '#/components/responses/Repuestos' }
     post:
@@ -878,6 +883,10 @@ paths:
                 precioVenta: { type: integer, format: int64 }
                 existencia: { type: integer }
                 minimo: { type: integer }
+                marca: { type: string, maxLength: 60 }
+                categoria: { type: string, description: 'Una de Categoria o vacío' }
+                ubicacion: { type: string, maxLength: 40 }
+                referenciaOem: { type: string, maxLength: 40 }
       responses:
         '201':
           description: Creado
@@ -914,6 +923,10 @@ paths:
                 minimo: { type: integer }
                 activo: { type: boolean }
                 version: { type: integer }
+                marca: { type: string, maxLength: 60 }
+                categoria: { type: string, description: 'Una de Categoria o vacío' }
+                ubicacion: { type: string, maxLength: 40 }
+                referenciaOem: { type: string, maxLength: 40 }
       responses:
         '200':
           description: OK
@@ -950,6 +963,53 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
+
+  /parts/{id}/movements:
+    get:
+      operationId: listPartMovements
+      summary: Movimientos del repuesto, lo más reciente primero (HU-35, HU-38). Permiso part:read
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [movimientos]
+                properties:
+                  movimientos:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, cantidad, motivo, ordenId, creadoEn]
+                      properties:
+                        id: { type: string, format: uuid }
+                        cantidad: { type: integer, description: 'Positivo entra, negativo sale' }
+                        motivo: { type: string, enum: [entrada, salida_orden, pendiente_orden, devolucion, ajuste, importacion] }
+                        ordenId: { type: string, format: uuid, nullable: true }
+                        creadoEn: { type: string, format: date-time }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /parts/import:
+    post:
+      operationId: importParts
+      summary: Importar repuestos desde CSV (HU-37). Sin confirmar=1 es solo la vista previa; con errores no se importa nada. Permiso import:run
+      parameters:
+        - { name: confirmar, in: query, schema: { type: string, enum: ['0', '1'] } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [archivo]
+              properties:
+                archivo: { type: string, format: binary, description: 'CSV de la plantilla, separado por , o ;' }
+      responses:
+        '200': { $ref: '#/components/responses/Importacion' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Importacion' }
 
   /users:
     get:
@@ -1429,6 +1489,27 @@ components:
       schema: { type: string, enum: [sweveh] }
 
   responses:
+    Importacion:
+      description: Resultado fila por fila de la importación
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [filas, conError, importadas]
+            properties:
+              conError: { type: integer }
+              importadas: { type: integer }
+              filas:
+                type: array
+                items:
+                  type: object
+                  required: [fila, referencia, nombre, estado, errores]
+                  properties:
+                    fila: { type: integer }
+                    referencia: { type: string }
+                    nombre: { type: string }
+                    estado: { type: string, enum: [ok, error] }
+                    errores: { type: array, items: { type: string } }
     Problem:
       description: Error (RFC 9457)
       content:
@@ -1678,6 +1759,12 @@ components:
         duracionMin: { type: integer, nullable: true }
         activo: { type: boolean }
         version: { type: integer }
+        categoria: { allOf: [{ $ref: '#/components/schemas/Categoria' }], nullable: true }
+        garantiaDias: { type: integer, nullable: true }
+
+    Categoria:
+      type: string
+      enum: [motor, frenos, suspension, direccion, electrico, transmision, refrigeracion, llantas, carroceria, filtros, lubricantes, otro]
 
     Repuesto:
       type: object
@@ -1694,6 +1781,10 @@ components:
         bajoMinimo: { type: boolean }
         activo: { type: boolean }
         version: { type: integer }
+        marca: { type: string, description: 'Vacío = sin dato' }
+        categoria: { type: string, description: 'Una de Categoria o vacío' }
+        ubicacion: { type: string }
+        referenciaOem: { type: string, description: 'Referencia original o equivalente' }
 
     Miembro:
       type: object

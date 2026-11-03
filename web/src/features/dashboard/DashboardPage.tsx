@@ -30,6 +30,11 @@ export function DashboardPage() {
                     Ver orden
                   </Link>
                 ) : null}
+                {p.tipo === 'inventario' ? (
+                  <Link className="font-bold underline" to="/panel/repuestos?bajo=1">
+                    Ver repuestos
+                  </Link>
+                ) : null}
               </li>
             ))}
           </ul>

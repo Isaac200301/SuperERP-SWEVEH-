@@ -145,6 +145,18 @@ describe('QuotePanel (HU-27, HU-29)', () => {
       { decision: 'rechazar', canal: 'telefono' },
     ]);
   });
+
+  it('con la cotización aprobada devuelve al inventario un repuesto que no se usó (HU-38)', async () => {
+    const calls = mockApi({
+      'GET /me': owner,
+      'GET /orders/{id}/quote': cotizacion({ estado: 'aprobada', lineas: [{ ...cotizacion().cotizacion.lineas[0], aprobada: true, sinStock: false }] }),
+      'POST /parts/{id}/returns': { status: 422, body: { detail: 'No puedes devolver más unidades de las que esa orden descontó.' } },
+    });
+    renderPage(<QuotePanel orden={o({ estado: 'en_reparacion' })} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Devolver 1 al inventario' }));
+    expect(await screen.findByText(/No puedes devolver más/)).toBeInTheDocument();
+    expect(calls.find((c) => c.path === '/parts/p1/returns')?.body).toEqual({ cantidad: 1, ordenId: 'o1' });
+  });
 });
 
 describe('FloorPage (HU-23)', () => {

@@ -186,7 +186,7 @@ func (t *taller) Catalog(ctx context.Context, tallerID shared.ID) ([]domain.Pric
 	for _, i := range items {
 		sv = append(sv, domain.Priced{Name: i.Name, Price: i.Price, Kind: "servicio"})
 	}
-	parts, err := t.s.M.Inventory.Search(ctx, tallerID, "", false)
+	parts, err := t.s.M.Inventory.Search(ctx, tallerID, "", false, "")
 	for _, p := range parts {
 		price := p.Price
 		pt = append(pt, domain.Priced{Name: p.Name, Price: &price, Kind: "repuesto"})

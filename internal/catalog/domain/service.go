@@ -2,6 +2,7 @@
 package domain
 
 import (
+	"slices"
 	"strings"
 
 	"sweveh/internal/shared"
@@ -13,7 +14,13 @@ var (
 	ErrKind     = shared.Validation("servicio_tipo", "Indica si el servicio es de carro, de moto o de ambos.").WithField("tipoVehiculo")
 	ErrPrice    = shared.Validation("servicio_precio", "El precio va en pesos, sin decimales y no negativo.").WithField("precio")
 	ErrDuration = shared.Validation("servicio_duracion", "La duración va en minutos, mayor que cero.").WithField("duracionMin")
+	ErrCategory = shared.Validation("servicio_categoria", "Escoge una categoría de la lista.").WithField("categoria")
+	ErrWarranty = shared.Validation("servicio_garantia", "La garantía va en días, entre 0 y 3.650.").WithField("garantiaDias")
 )
+
+// Categories es la misma lista de inventory/domain.Categories (sistemas del vehículo + filtros y lubricantes).
+var Categories = []string{"motor", "frenos", "suspension", "direccion", "electrico", "transmision", "refrigeracion", "llantas",
+	"carroceria", "filtros", "lubricantes", "otro"}
 
 // Service es un servicio que el taller ofrece. Precio nil = "el taller te confirma el valor" (HU-07).
 type Service struct {
@@ -25,6 +32,8 @@ type Service struct {
 	DurationMin *int
 	Active      bool
 	Version     int
+	Category    *string
+	WarrantyDay *int // días de garantía del trabajo; nil = sin dato
 }
 
 func ValidKind(k string) bool { return k == kindCar || k == kindMoto || k == kindBoth }
@@ -43,6 +52,15 @@ func (s *Service) Validate() error {
 	}
 	if s.DurationMin != nil && *s.DurationMin <= 0 {
 		return ErrDuration
+	}
+	if s.Category != nil && *s.Category == "" {
+		s.Category = nil
+	}
+	if s.Category != nil && !slices.Contains(Categories, *s.Category) {
+		return ErrCategory
+	}
+	if s.WarrantyDay != nil && (*s.WarrantyDay < 0 || *s.WarrantyDay > 3650) {
+		return ErrWarranty
 	}
 	return nil
 }

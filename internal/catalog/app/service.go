@@ -83,6 +83,8 @@ type Patch struct {
 	Price       **int64
 	DurationMin **int
 	Active      *bool
+	Category    **string
+	WarrantyDay **int
 }
 
 // Update cambia nombre, tipo, precio, duración o estado (HU-07). Los precios ya cotizados no cambian:
@@ -112,6 +114,12 @@ func (s *Service) Update(ctx context.Context, actor shared.Actor, tallerID, id s
 		}
 		if p.Active != nil {
 			next.Active = *p.Active
+		}
+		if p.Category != nil {
+			next.Category = *p.Category
+		}
+		if p.WarrantyDay != nil {
+			next.WarrantyDay = *p.WarrantyDay
 		}
 		if err := next.Validate(); err != nil {
 			return err
@@ -167,5 +175,6 @@ func (s *Service) Preload(ctx context.Context, tallerID shared.ID, attends strin
 }
 
 func view(s domain.Service) map[string]any {
-	return map[string]any{"nombre": s.Name, "tipo": s.Kind, "precio": s.Price, "duracion_min": s.DurationMin, "activo": s.Active}
+	return map[string]any{"nombre": s.Name, "tipo": s.Kind, "precio": s.Price, "duracion_min": s.DurationMin, "activo": s.Active,
+		"categoria": s.Category, "garantia_dias": s.WarrantyDay}
 }

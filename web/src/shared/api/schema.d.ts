@@ -692,6 +692,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/parts/{id}/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Movimientos del repuesto, lo más reciente primero (HU-35, HU-38). Permiso part:read */
+        get: operations["listPartMovements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/parts/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Importar repuestos desde CSV (HU-37). Sin confirmar=1 es solo la vista previa; con errores no se importa nada. Permiso import:run */
+        post: operations["importParts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users": {
         parameters: {
             query?: never;
@@ -1264,7 +1298,11 @@ export interface components {
             duracionMin: number | null;
             activo: boolean;
             version: number;
+            categoria?: components["schemas"]["Categoria"] | null;
+            garantiaDias?: number | null;
         };
+        /** @enum {string} */
+        Categoria: "motor" | "frenos" | "suspension" | "direccion" | "electrico" | "transmision" | "refrigeracion" | "llantas" | "carroceria" | "filtros" | "lubricantes" | "otro";
         Repuesto: {
             /** Format: uuid */
             id: string;
@@ -1283,6 +1321,13 @@ export interface components {
             bajoMinimo: boolean;
             activo: boolean;
             version: number;
+            /** @description Vacío = sin dato */
+            marca?: string;
+            /** @description Una de Categoria o vacío */
+            categoria?: string;
+            ubicacion?: string;
+            /** @description Referencia original o equivalente */
+            referenciaOem?: string;
         };
         Miembro: {
             /** Format: uuid */
@@ -1479,6 +1524,26 @@ export interface components {
         };
     };
     responses: {
+        /** @description Resultado fila por fila de la importación */
+        Importacion: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    conError: number;
+                    importadas: number;
+                    filas: {
+                        fila: number;
+                        referencia: string;
+                        nombre: string;
+                        /** @enum {string} */
+                        estado: "ok" | "error";
+                        errores: string[];
+                    }[];
+                };
+            };
+        };
         /** @description Error (RFC 9457) */
         Problem: {
             headers: {
@@ -2731,6 +2796,8 @@ export interface operations {
                     /** Format: int64 */
                     precio?: number | null;
                     duracionMin?: number | null;
+                    categoria?: components["schemas"]["Categoria"] | null;
+                    garantiaDias?: number | null;
                 };
             };
         };
@@ -2787,6 +2854,8 @@ export interface operations {
                     duracionMin?: number | null;
                     activo?: boolean;
                     version: number;
+                    categoria?: components["schemas"]["Categoria"] | null;
+                    garantiaDias?: number | null;
                 };
             };
         };
@@ -2811,6 +2880,7 @@ export interface operations {
                 q?: string;
                 /** @description 1 = incluir inactivos (requiere part:manage) */
                 todos?: "1";
+                categoria?: components["schemas"]["Categoria"];
             };
             header?: never;
             path?: never;
@@ -2840,6 +2910,11 @@ export interface operations {
                     precioVenta: number;
                     existencia?: number;
                     minimo?: number;
+                    marca?: string;
+                    /** @description Una de Categoria o vacío */
+                    categoria?: string;
+                    ubicacion?: string;
+                    referenciaOem?: string;
                 };
             };
         };
@@ -2890,6 +2965,11 @@ export interface operations {
                     minimo?: number;
                     activo?: boolean;
                     version: number;
+                    marca?: string;
+                    /** @description Una de Categoria o vacío */
+                    categoria?: string;
+                    ubicacion?: string;
+                    referenciaOem?: string;
                 };
             };
         };
@@ -2953,6 +3033,68 @@ export interface operations {
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    listPartMovements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        movimientos: {
+                            /** Format: uuid */
+                            id: string;
+                            /** @description Positivo entra, negativo sale */
+                            cantidad: number;
+                            /** @enum {string} */
+                            motivo: "entrada" | "salida_orden" | "pendiente_orden" | "devolucion" | "ajuste" | "importacion";
+                            /** Format: uuid */
+                            ordenId: string | null;
+                            /** Format: date-time */
+                            creadoEn: string;
+                        }[];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    importParts: {
+        parameters: {
+            query?: {
+                confirmar?: "0" | "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description CSV de la plantilla, separado por , o ;
+                     */
+                    archivo: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Importacion"];
+            400: components["responses"]["Problem"];
+            422: components["responses"]["Importacion"];
         };
     };
     listUsers: {

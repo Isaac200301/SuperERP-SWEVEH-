@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api, unwrap, type EstadoOrden, type Schemas } from '../../shared/api/client';
+import { api, ApiError, unwrap, type EstadoOrden, type Schemas } from '../../shared/api/client';
 import { ordersKey } from './api';
 
 export type Checklist = Schemas['Checklist'];
@@ -132,7 +132,15 @@ export function useQuoteActions(id: string) {
       unwrap(await api.POST('/orders/{id}/quote/response', { params: { path: { id } }, body })),
     onSettled: invalidate,
   });
-  return { add, remove, send, respond };
+  // HU-38: devolver una unidad de un repuesto ya descontado; el servidor no deja devolver más de lo que salió.
+  const giveBack = useMutation({
+    mutationFn: async (partId: string) => {
+      const r = await api.POST('/parts/{id}/returns', { params: { path: { id: partId } }, body: { cantidad: 1, ordenId: id } });
+      if (!r.response.ok) throw new ApiError(r.response.status, r.error as never);
+    },
+    onSettled: invalidate,
+  });
+  return { add, remove, send, respond, giveBack };
 }
 
 /** Servicios y repuestos del taller para cotizar (HU-07, HU-34). */

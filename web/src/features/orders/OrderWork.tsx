@@ -243,6 +243,7 @@ export function QuotePanel({ orden }: { orden: Orden }) {
   const q = useQuote(orden.id);
   const act = useQuoteActions(orden.id);
   const puedeRegistrar = usePermission('quote:register_response');
+  const permisoDevolver = usePermission('part:return');
   const [buscar, setBuscar] = useState('');
   const cat = useCatalog(buscar);
   // "Cotizar esto" desde un hallazgo del diagnóstico: busca en el catálogo con su texto (DiagnosisPanel).
@@ -256,7 +257,8 @@ export function QuotePanel({ orden }: { orden: Orden }) {
   // Sin cotización todavía: se arma una vacía; el primer ítem crea el borrador en el servidor.
   const cot = q.data ?? { numero: 1, estado: 'borrador' as const, total: 0, lineas: [] };
   const editable = cot.estado === 'borrador';
-  const err = act.add.error ?? act.remove.error ?? act.send.error ?? act.respond.error;
+  const err = act.add.error ?? act.remove.error ?? act.send.error ?? act.respond.error ?? act.giveBack.error;
+  const puedeDevolver = permisoDevolver && cot.estado === 'aprobada';
 
   return (
     <section className={card} aria-labelledby="cotizacion">
@@ -285,6 +287,11 @@ export function QuotePanel({ orden }: { orden: Orden }) {
                 {editable ? (
                   <button type="button" className="min-h-[44px] px-2 font-bold text-err-ink" onClick={() => act.remove.mutate(l.id)}>
                     Quitar
+                  </button>
+                ) : null}
+                {puedeDevolver && l.tipo === 'repuesto' && l.refId && l.aprobada !== false ? (
+                  <button type="button" className="min-h-[44px] px-2 font-bold text-primary" onClick={() => act.giveBack.mutate(l.refId ?? '')}>
+                    Devolver 1 al inventario
                   </button>
                 ) : null}
               </td>
