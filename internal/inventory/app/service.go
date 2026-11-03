@@ -23,6 +23,14 @@ type Repository interface {
 	Returnable(ctx context.Context, tallerID, partID, orderID shared.ID) (int, error)
 	Movements(ctx context.Context, tallerID, partID shared.ID, limit int) ([]domain.Movement, error)
 	ExistingRefs(ctx context.Context, tallerID shared.ID, refs []string) (map[string]bool, error)
+	OrderParts(ctx context.Context, tallerID, orderID shared.ID) ([]domain.OrderPart, error)
+}
+
+// ReturnResult dice qué pasó con la devolución, para mostrarlo en la orden (HU-38).
+type ReturnResult struct {
+	Returned int
+	Left     int // lo que aún se puede devolver de esa orden
+	Stock    int // existencia del repuesto después de devolver
 }
 
 // ErrReturnTooMany evita que una devolución infle la existencia por encima de lo que la orden usó (HU-38).
@@ -228,11 +236,12 @@ func (s *Service) Discount(ctx context.Context, tallerID, orderID shared.ID, lin
 }
 
 // Return devuelve al inventario lo que no se usó (HU-38).
-func (s *Service) Return(ctx context.Context, actor shared.Actor, tallerID, partID, orderID shared.ID, qty int) error {
+func (s *Service) Return(ctx context.Context, actor shared.Actor, tallerID, partID, orderID shared.ID, qty int) (ReturnResult, error) {
 	if qty <= 0 {
-		return domain.ErrQty
+		return ReturnResult{}, domain.ErrQty
 	}
-	return s.uow.Do(ctx, func(ctx context.Context) error {
+	var res ReturnResult
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
 		if _, err := s.repo.Get(ctx, tallerID, partID); err != nil {
 			return err
 		}
@@ -246,9 +255,26 @@ func (s *Service) Return(ctx context.Context, actor shared.Actor, tallerID, part
 		if _, err := s.repo.Move(ctx, Movement{TallerID: tallerID, PartID: partID, Qty: qty, Reason: "devolucion", OrderID: &orderID, UserID: &actor.ID}); err != nil {
 			return err
 		}
+		p, err := s.repo.Get(ctx, tallerID, partID)
+		if err != nil {
+			return err
+		}
+		res = ReturnResult{Returned: qty, Left: left - qty, Stock: p.Stock}
 		return s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "repuesto.devolucion", Entity: "repuesto",
-			EntityID: partID, After: map[string]any{"cantidad": qty, "orden_id": orderID.String()}, OccurredAt: s.clock.Now()})
+			EntityID: partID, After: map[string]any{"cantidad": qty, "orden_id": orderID.String(), "existencia": p.Stock}, OccurredAt: s.clock.Now()})
 	})
+	return res, err
+}
+
+// OrderParts resume por repuesto lo descontado, devuelto y pendiente de una orden (HU-33, HU-38).
+func (s *Service) OrderParts(ctx context.Context, tallerID, orderID shared.ID) ([]domain.OrderPart, error) {
+	var out []domain.OrderPart
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.OrderParts(ctx, tallerID, orderID)
+		return err
+	})
+	return out, err
 }
 
 // GetMany devuelve varios repuestos (lo usa la cotización dentro de su transacción).

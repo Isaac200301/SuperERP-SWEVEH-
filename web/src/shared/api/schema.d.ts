@@ -448,7 +448,8 @@ export interface paths {
         delete: operations["removeQuoteLine"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Cambiar la cantidad o, solo en precio libre, el precio de un ítem del borrador (HU-27). Permiso quote:edit */
+        patch: operations["updateQuoteLine"];
         trace?: never;
     };
     "/orders/{id}/quote/send": {
@@ -686,6 +687,23 @@ export interface paths {
         put?: never;
         /** Devolver al inventario lo que no se usó en una orden (HU-38). Permiso part:return */
         post: operations["returnPart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{id}/part-movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Por repuesto, lo que la orden descontó, devolvió y dejó pendiente (HU-33, HU-38). Permiso part:read */
+        get: operations["listOrderPartMovements"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1119,6 +1137,11 @@ export interface components {
             codigosFalla: string[];
             /** Format: date-time */
             creadoEn: string;
+            /**
+             * Format: int64
+             * @description Mano de obra estimada en COP
+             */
+            manoObra?: number | null;
         };
         Kpi: {
             codigo: string;
@@ -1237,6 +1260,16 @@ export interface components {
             autorId: string | null;
             /** Format: date-time */
             creadoEn: string;
+            /**
+             * Format: uuid
+             * @description Fotos subidas juntas con una nota
+             */
+            grupoId?: string | null;
+            /**
+             * Format: uuid
+             * @description Foto de un hallazgo del diagnóstico
+             */
+            hallazgoId?: string | null;
         };
         Cotizacion: {
             /** Format: uuid */
@@ -1262,6 +1295,8 @@ export interface components {
                 /** Format: int64 */
                 subtotal: number;
                 sinStock: boolean;
+                /** @description El precio lo puso una persona y se puede corregir */
+                precioLibre?: boolean;
                 aprobada: boolean | null;
             }[];
             /** Format: date-time */
@@ -2367,6 +2402,8 @@ export interface operations {
                     descripcion: string;
                     gravedad: components["schemas"]["Gravedad"];
                     codigosFalla?: string[];
+                    /** Format: int64 */
+                    manoObra?: number | null;
                 };
             };
         };
@@ -2448,8 +2485,13 @@ export interface operations {
                     lado?: string;
                     nota?: string;
                     mostrarCliente?: boolean;
-                    /** Format: binary */
-                    foto?: string;
+                    /**
+                     * Format: uuid
+                     * @description Foto de un hallazgo de esta orden
+                     */
+                    hallazgoId?: string;
+                    /** @description Una o varias fotos (máx. 8); van al final del formulario */
+                    foto?: string[];
                 };
             };
         };
@@ -2553,6 +2595,35 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["Cotizacion"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    updateQuoteLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    cantidad?: number;
+                    /**
+                     * Format: int64
+                     * @description Solo si la línea tiene precioLibre
+                     */
+                    precioUnitario?: number;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Cotizacion"];
+            400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
@@ -3026,15 +3097,55 @@ export interface operations {
         requestBody: components["requestBodies"]["Cantidad"];
         responses: {
             /** @description Devuelto */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        devueltas: number;
+                        quedanPorDevolver: number;
+                        existencia: number;
+                    };
+                };
             };
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    listOrderPartMovements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        repuestos: {
+                            /** Format: uuid */
+                            repuestoId: string;
+                            referencia: string;
+                            nombre: string;
+                            descontado: number;
+                            devuelto: number;
+                            /** @description Aprobado sin existencia: no se descontó */
+                            pendiente: number;
+                            porDevolver: number;
+                        }[];
+                    };
+                };
+            };
         };
     };
     listPartMovements: {

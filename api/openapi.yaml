@@ -493,6 +493,7 @@ paths:
                 descripcion: { type: string, maxLength: 1000 }
                 gravedad: { $ref: '#/components/schemas/Gravedad' }
                 codigosFalla: { type: array, maxItems: 10, items: { type: string, example: 'P0301' } }
+                manoObra: { type: integer, format: int64, minimum: 0, nullable: true }
       responses:
         '201':
           description: Hallazgo registrado
@@ -543,7 +544,8 @@ paths:
                 lado: { type: string }
                 nota: { type: string }
                 mostrarCliente: { type: boolean }
-                foto: { type: string, format: binary }
+                hallazgoId: { type: string, format: uuid, description: 'Foto de un hallazgo de esta orden' }
+                foto: { type: array, maxItems: 8, items: { type: string, format: binary }, description: 'Una o varias fotos (máx. 8); van al final del formulario' }
       responses:
         '201':
           description: Creada
@@ -603,6 +605,27 @@ paths:
         '422': { $ref: '#/components/responses/Problem' }
 
   /orders/{id}/quote/lines/{lineId}:
+    patch:
+      operationId: updateQuoteLine
+      summary: Cambiar la cantidad o, solo en precio libre, el precio de un ítem del borrador (HU-27). Permiso quote:edit
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: lineId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                cantidad: { type: integer, minimum: 1 }
+                precioUnitario: { type: integer, format: int64, minimum: 0, description: 'Solo si la línea tiene precioLibre' }
+      responses:
+        '200': { $ref: '#/components/responses/Cotizacion' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
     delete:
       operationId: removeQuoteLine
       summary: Quitar una línea de la cotización (HU-27). Permiso quote:edit
@@ -959,10 +982,48 @@ paths:
       parameters: [{ $ref: '#/components/parameters/Id' }]
       requestBody: { $ref: '#/components/requestBodies/Cantidad' }
       responses:
-        '204': { description: Devuelto }
+        '200':
+          description: Devuelto
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [devueltas, quedanPorDevolver, existencia]
+                properties:
+                  devueltas: { type: integer }
+                  quedanPorDevolver: { type: integer }
+                  existencia: { type: integer }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
+
+  /orders/{id}/part-movements:
+    get:
+      operationId: listOrderPartMovements
+      summary: Por repuesto, lo que la orden descontó, devolvió y dejó pendiente (HU-33, HU-38). Permiso part:read
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [repuestos]
+                properties:
+                  repuestos:
+                    type: array
+                    items:
+                      type: object
+                      required: [repuestoId, referencia, nombre, descontado, devuelto, pendiente, porDevolver]
+                      properties:
+                        repuestoId: { type: string, format: uuid }
+                        referencia: { type: string }
+                        nombre: { type: string }
+                        descontado: { type: integer }
+                        devuelto: { type: integer }
+                        pendiente: { type: integer, description: 'Aprobado sin existencia: no se descontó' }
+                        porDevolver: { type: integer }
 
   /parts/{id}/movements:
     get:
@@ -1589,6 +1650,7 @@ components:
         gravedad: { $ref: '#/components/schemas/Gravedad' }
         codigosFalla: { type: array, items: { type: string } }
         creadoEn: { type: string, format: date-time }
+        manoObra: { type: integer, format: int64, nullable: true, description: 'Mano de obra estimada en COP' }
     Kpi:
       type: object
       required: [codigo, titulo, valor, texto, detalle, queSignifica]
@@ -1707,6 +1769,8 @@ components:
         etapa: { type: string }
         autorId: { type: string, format: uuid, nullable: true }
         creadoEn: { type: string, format: date-time }
+        grupoId: { type: string, format: uuid, nullable: true, description: 'Fotos subidas juntas con una nota' }
+        hallazgoId: { type: string, format: uuid, nullable: true, description: 'Foto de un hallazgo del diagnóstico' }
 
     Cotizacion:
       type: object
@@ -1730,6 +1794,7 @@ components:
               precioUnitario: { type: integer, format: int64 }
               subtotal: { type: integer, format: int64 }
               sinStock: { type: boolean }
+              precioLibre: { type: boolean, description: 'El precio lo puso una persona y se puede corregir' }
               aprobada: { type: boolean, nullable: true }
         enviadaEn: { type: string, format: date-time, nullable: true }
         respondidaEn: { type: string, format: date-time, nullable: true }

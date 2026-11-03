@@ -22,18 +22,19 @@ type findingRow struct {
 	Codigos     []string   `db:"codigos_falla"`
 	AutorID     *shared.ID `db:"autor_id"`
 	CreatedAt   time.Time  `db:"created_at"`
+	ManoObra    *int64     `db:"mano_obra"`
 }
 
-const findingCols = `id, taller_id, orden_id, sistema, descripcion, gravedad, codigos_falla, autor_id, created_at`
+const findingCols = `id, taller_id, orden_id, sistema, descripcion, gravedad, codigos_falla, autor_id, created_at, mano_obra`
 
 func (r findingRow) domain() domain.Finding {
 	return domain.Finding{ID: r.ID, TallerID: r.TallerID, OrderID: r.OrdenID, System: r.Sistema, Description: r.Descripcion,
-		Severity: r.Gravedad, FaultCodes: r.Codigos, AuthorID: r.AutorID, CreatedAt: r.CreatedAt}
+		Severity: r.Gravedad, FaultCodes: r.Codigos, AuthorID: r.AutorID, CreatedAt: r.CreatedAt, Labor: r.ManoObra}
 }
 
 func (Findings) InsertFinding(ctx context.Context, f domain.Finding) error {
-	_, err := db.Exec(ctx, `INSERT INTO orders.hallazgo (`+findingCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		f.ID, f.TallerID, f.OrderID, f.System, f.Description, f.Severity, f.FaultCodes, f.AuthorID, f.CreatedAt)
+	_, err := db.Exec(ctx, `INSERT INTO orders.hallazgo (`+findingCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		f.ID, f.TallerID, f.OrderID, f.System, f.Description, f.Severity, f.FaultCodes, f.AuthorID, f.CreatedAt, f.Labor)
 	return err
 }
 

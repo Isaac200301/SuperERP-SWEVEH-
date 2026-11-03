@@ -176,7 +176,7 @@ func TestQuote_BuildSendApproveDiscountAndReturn(t *testing.T) {
 
 	// HU-38: devolver lo que no se usó, ligado a la orden.
 	is4xx(t, "devolución sin orden", c.do("POST", "/api/v1/parts/"+pid+"/returns", map[string]any{"cantidad": 1}))
-	c.must(http.StatusNoContent, c.do("POST", "/api/v1/parts/"+pid+"/returns", map[string]any{"cantidad": 1, "ordenId": id}))
+	c.must(http.StatusOK, c.do("POST", "/api/v1/parts/"+pid+"/returns", map[string]any{"cantidad": 1, "ordenId": id}))
 	if s := partStock(t, c, "PF-20"); s != 4 {
 		t.Fatalf("existencia tras devolver: %v", s)
 	}
@@ -188,7 +188,7 @@ func TestQuote_BuildSendApproveDiscountAndReturn(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if c.do("POST", "/api/v1/parts/"+pid+"/returns", map[string]any{"cantidad": 1, "ordenId": id}).status == http.StatusNoContent {
+			if c.do("POST", "/api/v1/parts/"+pid+"/returns", map[string]any{"cantidad": 1, "ordenId": id}).status == http.StatusOK {
 				okCount.Add(1)
 			}
 		}()

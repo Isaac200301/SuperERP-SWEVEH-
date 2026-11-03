@@ -103,6 +103,18 @@ func (p *Part) normalizeSheet() error {
 	return nil
 }
 
+// OrderPart resume lo que una orden movió de un repuesto (HU-33, HU-38).
+type OrderPart struct {
+	PartID     shared.ID
+	Ref, Name  string
+	Discounted int // salió de bodega al aprobar
+	Returned   int // volvió a bodega
+	Pending    int // aprobado sin existencia: no se descontó (Q-11)
+}
+
+// ToReturn es lo que todavía se puede devolver.
+func (o OrderPart) ToReturn() int { return o.Discounted - o.Returned }
+
 // Movement es una línea del libro de inventario de un repuesto (HU-35, HU-38).
 type Movement struct {
 	ID        shared.ID

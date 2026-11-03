@@ -6,8 +6,10 @@ import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { Field } from '../../shared/ui/Field';
 import { Segmented } from '../../shared/ui/Segmented';
+import { formatoCOP } from '../../shared/lib/format';
 import { usePermission } from '../auth/api';
 import { cotizarEvento } from './OrderWork';
+import { maxFotosPorNota, photoUrl, useAddEvidence, useEvidence, useQuoteActions } from './work';
 
 type Sistema = Schemas['SistemaVehiculo'];
 type Gravedad = Schemas['Gravedad'];
@@ -34,13 +36,18 @@ export function DiagnosisPanel({ orden }: { orden: Orden }) {
   const qc = useQueryClient();
   const key = ['hallazgos', orden.id];
   const puede = usePermission('order:diagnose');
+  const cotiza = usePermission('quote:edit');
+  const verDinero = usePermission('money:read') || cotiza;
+  const quote = useQuoteActions(orden.id);
+  const ev = useEvidence(orden.id);
+  const subir = useAddEvidence(orden.id);
   const list = useQuery({
     queryKey: key,
     queryFn: async () => unwrap(await api.GET('/orders/{id}/findings', { params: { path: { id: orden.id } } })).hallazgos,
   });
   const done = () => qc.invalidateQueries({ queryKey: key });
   const add = useMutation({
-    mutationFn: async (b: { sistema: Sistema; descripcion: string; gravedad: Gravedad; codigosFalla: string[] }) =>
+    mutationFn: async (b: { sistema: Sistema; descripcion: string; gravedad: Gravedad; codigosFalla: string[]; manoObra?: number }) =>
       unwrap(await api.POST('/orders/{id}/findings', { params: { path: { id: orden.id } }, body: b })),
     onSuccess: done,
   });
@@ -55,6 +62,7 @@ export function DiagnosisPanel({ orden }: { orden: Orden }) {
   const [descripcion, setDescripcion] = useState('');
   const [gravedad, setGravedad] = useState<Gravedad | ''>('');
   const [codigos, setCodigos] = useState('');
+  const [manoObra, setManoObra] = useState('');
 
   let missing: string | undefined;
   if (sistema === '') missing = 'Escoge el sistema.';
@@ -65,12 +73,20 @@ export function DiagnosisPanel({ orden }: { orden: Orden }) {
     e.preventDefault();
     if (missing || sistema === '' || gravedad === '') return;
     const codigosFalla = codigos.split(/[\s,;]+/).filter(Boolean);
+    const mo = manoObra.trim() === '' ? undefined : Number(manoObra.replace(/\D/g, ''));
     add.mutate(
-      { sistema, descripcion: descripcion.trim(), gravedad, codigosFalla },
-      { onSuccess: () => { setDescripcion(''); setCodigos(''); setGravedad(''); } },
+      { sistema, descripcion: descripcion.trim(), gravedad, codigosFalla, ...(mo !== undefined ? { manoObra: mo } : {}) },
+      { onSuccess: () => { setDescripcion(''); setCodigos(''); setGravedad(''); setManoObra(''); } },
     );
   };
-  const error = add.error ?? remove.error;
+  const error = add.error ?? remove.error ?? quote.add.error ?? subir.error;
+  // "Cotizar esto": agrega la mano de obra estimada como ítem de precio libre y busca los repuestos de ese sistema.
+  const cotizar = (h: (typeof hallazgos)[number]) => {
+    if (cotiza && h.manoObra != null) {
+      quote.add.mutate({ tipo: 'servicio', descripcion: `Mano de obra · ${sistemas[h.sistema]}: ${h.descripcion}`.slice(0, 200), cantidad: 1, precioUnitario: h.manoObra });
+    }
+    window.dispatchEvent(new CustomEvent(cotizarEvento, { detail: sistemas[h.sistema] }));
+  };
   const hallazgos = list.data ?? [];
 
   return (
@@ -87,11 +103,31 @@ export function DiagnosisPanel({ orden }: { orden: Orden }) {
             <span className="font-bold">{sistemas[h.sistema]}</span>
             <span className="min-w-[200px] flex-1">{h.descripcion}</span>
             {h.codigosFalla.length ? <span className="font-mono text-sm">{h.codigosFalla.join(' · ')}</span> : null}
-            <button
-              type="button"
-              className="min-h-[44px] px-2 font-bold text-primary"
-              onClick={() => window.dispatchEvent(new CustomEvent(cotizarEvento, { detail: sistemas[h.sistema] }))}
-            >
+            {verDinero && h.manoObra != null ? <span className="font-mono text-sm">Mano de obra {formatoCOP(h.manoObra)}</span> : null}
+            {(ev.data ?? []).filter((x) => x.hallazgoId === h.id && x.tieneFoto).map((x) => (
+              <a key={x.id} href={photoUrl(orden.id, x.id)} target="_blank" rel="noopener noreferrer">
+                <img src={photoUrl(orden.id, x.id)} alt={`Foto de ${h.descripcion}`} className="h-12 w-12 rounded-lg object-cover" loading="lazy" />
+              </a>
+            ))}
+            {puede && agregaEn.includes(orden.estado) ? (
+              <label className="min-h-[44px] cursor-pointer content-center px-2 font-bold text-primary">
+                Agregar fotos
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  multiple
+                  aria-label={`Fotos de ${h.descripcion}`}
+                  className="sr-only"
+                  onChange={(e) => {
+                    const fotos = [...(e.target.files ?? [])].slice(0, maxFotosPorNota);
+                    if (fotos.length) subir.mutate({ fotos, hallazgoId: h.id });
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            ) : null}
+            <button type="button" className="min-h-[44px] px-2 font-bold text-primary" onClick={() => cotizar(h)}>
               Cotizar esto
             </button>
             {puede && borraEn.includes(orden.estado) ? (
@@ -118,6 +154,9 @@ export function DiagnosisPanel({ orden }: { orden: Orden }) {
             </select>
           </div>
           <Field label="Códigos de falla (opcional)" value={codigos} onChange={(e) => setCodigos(e.target.value)} placeholder="P0301 P0420" mono />
+          {verDinero ? (
+            <Field label="Mano de obra estimada (COP)" inputMode="numeric" value={manoObra} onChange={(e) => setManoObra(e.target.value)} hint="Opcional; con Cotizar esto pasa a la cotización." />
+          ) : null}
           <div className="sm:col-span-2">
             <Field label="Qué encontraste" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Pastillas delanteras al 10 %" />
           </div>

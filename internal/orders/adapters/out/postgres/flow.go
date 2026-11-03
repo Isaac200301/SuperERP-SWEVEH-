@@ -187,19 +187,27 @@ type evidenceRow struct {
 	Etapa       string     `db:"etapa"`
 	AutorID     *shared.ID `db:"autor_id"`
 	CreatedAt   time.Time  `db:"created_at"`
+	GrupoID     *shared.ID `db:"grupo_id"`
+	HallazgoID  *shared.ID `db:"hallazgo_id"`
 }
 
 func (r evidenceRow) port() ports.Evidence {
 	return ports.Evidence{ID: r.ID, TallerID: r.TallerID, OrderID: r.OrdenID, Side: r.Lado, Note: r.Nota, StorageKey: r.StorageKey,
-		ContentType: r.ContentType, ShowClient: r.Mostrar, Stage: r.Etapa, AuthorID: r.AutorID, CreatedAt: r.CreatedAt}
+		ContentType: r.ContentType, ShowClient: r.Mostrar, Stage: r.Etapa, AuthorID: r.AutorID, CreatedAt: r.CreatedAt,
+		GroupID: r.GrupoID, FindingID: r.HallazgoID}
 }
 
-const evCols = `id, taller_id, orden_id, lado, nota, storage_key, content_type, mostrar_cliente, etapa, autor_id, created_at`
+const evCols = `id, taller_id, orden_id, lado, nota, storage_key, content_type, mostrar_cliente, etapa, autor_id, created_at, grupo_id, hallazgo_id`
 
 func (Flow) InsertEvidence(ctx context.Context, e ports.Evidence) error {
-	_, err := db.Exec(ctx, `INSERT INTO orders.evidencia (`+evCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-		e.ID, e.TallerID, e.OrderID, e.Side, e.Note, e.StorageKey, e.ContentType, e.ShowClient, e.Stage, e.AuthorID, e.CreatedAt)
+	_, err := db.Exec(ctx, `INSERT INTO orders.evidencia (`+evCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+		e.ID, e.TallerID, e.OrderID, e.Side, e.Note, e.StorageKey, e.ContentType, e.ShowClient, e.Stage, e.AuthorID, e.CreatedAt, e.GroupID, e.FindingID)
 	return err
+}
+
+func (Flow) FindingInOrder(ctx context.Context, tallerID, orderID, findingID shared.ID) (bool, error) {
+	return db.Scalar[bool](ctx, `SELECT EXISTS (SELECT 1 FROM orders.hallazgo WHERE taller_id = $1 AND orden_id = $2 AND id = $3)`,
+		tallerID, orderID, findingID)
 }
 
 func (Flow) ListEvidence(ctx context.Context, tallerID, orderID shared.ID) ([]ports.Evidence, error) {

@@ -87,9 +87,16 @@ describe('ReceptionPanel (HU-17, HU-21)', () => {
     const foto = new File([new Uint8Array([0xff, 0xd8, 0xff])], 'f.jpg', { type: 'image/jpeg' });
     const inputs = document.querySelectorAll<HTMLInputElement>('input[type=file]');
     await userEvent.upload(inputs[1] as HTMLInputElement, foto);
-    await userEvent.type(screen.getByLabelText(/Nota/), 'Cambié el buje');
-    await userEvent.click(screen.getByRole('button', { name: 'Agregar nota' }));
+    await userEvent.type(screen.getByLabelText(/Nota/), 'Rayón en la puerta');
+    // Una nota con varias fotos va en un solo envío con todas las fotos (rayones, piezas encontradas).
+    const tres = [1, 2, 3].map((i) => new File([new Uint8Array([0xff, 0xd8, 0xff, i])], `r${i}.jpg`, { type: 'image/jpeg' }));
+    await userEvent.upload(screen.getByLabelText('Fotos de la nota'), tres);
+    expect(screen.getByText('3 fotos')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar nota' }));
     await waitFor(() => expect(calls.filter((c) => c.method === 'POST' && c.path.endsWith('/evidence'))).toHaveLength(2));
+    const nota = String(calls.filter((c) => c.method === 'POST')[1]?.body);
+    expect(nota.match(/name="foto"/g)).toHaveLength(3);
+    expect(nota).toContain('Rayón en la puerta');
   });
 
   it('una orden cerrada no se edita', async () => {
@@ -101,28 +108,43 @@ describe('ReceptionPanel (HU-17, HU-21)', () => {
 });
 
 describe('QuotePanel (HU-27, HU-29)', () => {
-  it('agrega de la lista del taller, quita y envía', async () => {
+  it('agrega servicios con y sin precio, repuestos con cantidad, mano de obra libre, cambia cantidades y envía', async () => {
     const calls = mockApi({
       'GET /me': owner,
       'GET /orders/{id}/quote': cotizacion(),
       'GET /services': { servicios: [{ id: 's1', nombre: 'Alineación', tipoVehiculo: 'carro', precio: 60000, duracionMin: 30, activo: true, version: 1 }, { id: 's2', nombre: 'Revisión', tipoVehiculo: 'carro', precio: null, duracionMin: null, activo: true, version: 1 }] },
       'GET /parts': { repuestos: [{ id: 'p1', referencia: 'PF-20', nombre: 'Pastillas', tipoVehiculo: 'carro', precioVenta: 65000, existencia: 0, minimo: 1, bajoMinimo: true, activo: true, version: 1 }] },
       'POST /orders/{id}/quote/lines': cotizacion(),
+      'PATCH /orders/{id}/quote/lines/{lineId}': cotizacion(),
       'DELETE /orders/{id}/quote/lines/{lineId}': cotizacion(),
       'POST /orders/{id}/quote/send': cotizacion({ estado: 'enviada' }),
     });
     renderPage(<QuotePanel orden={o()} />);
     expect(await screen.findByText('sin existencia')).toBeInTheDocument();
-    expect(screen.getByText('precio por confirmar')).toBeInTheDocument();
-    await userEvent.click(await screen.findByRole('button', { name: /Servicio · Alineación/ }));
-    await userEvent.click(screen.getByRole('button', { name: /Repuesto · Pastillas/ }));
+    expect(await screen.findByText('sin precio de lista')).toBeInTheDocument();
+    const agregar = () => screen.getAllByRole('button', { name: 'Agregar' });
+    await userEvent.click(agregar()[0] as HTMLElement); // Alineación: precio de lista
+    // Revisión sin precio: no deja agregar hasta escribir el valor.
+    expect(screen.getByText('Escribe el precio.')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Precio de Servicio · Revisión'), '45.000');
+    await userEvent.click(agregar()[1] as HTMLElement);
+    await userEvent.clear(screen.getByLabelText('Cantidad de Repuesto · Pastillas'));
+    await userEvent.type(screen.getByLabelText('Cantidad de Repuesto · Pastillas'), '2');
+    await userEvent.click(agregar()[2] as HTMLElement);
+    await userEvent.type(screen.getByLabelText('Mano de obra u otro ítem'), 'Mano de obra frenos');
+    await userEvent.type(screen.getByLabelText('Valor (COP)'), '70000');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar ítem' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Más Pastillas (PF-20)' }));
     await userEvent.click(screen.getByRole('button', { name: 'Quitar' }));
     await userEvent.click(screen.getByRole('button', { name: 'Enviar cotización al cliente' }));
     await waitFor(() => expect(calls.some((c) => c.path.endsWith('/quote/send'))).toBe(true));
-    expect(calls.filter((c) => c.path.endsWith('/quote/lines')).map((c) => c.body)).toEqual([
+    expect(calls.filter((c) => c.method === 'POST' && c.path.endsWith('/quote/lines')).map((c) => c.body)).toEqual([
       { tipo: 'servicio', refId: 's1', cantidad: 1 },
-      { tipo: 'repuesto', refId: 'p1', cantidad: 1 },
+      { tipo: 'servicio', refId: 's2', cantidad: 1, precioUnitario: 45000 },
+      { tipo: 'repuesto', refId: 'p1', cantidad: 2 },
+      { tipo: 'servicio', descripcion: 'Mano de obra frenos', precioUnitario: 70000, cantidad: 1 },
     ]);
+    expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({ cantidad: 2 });
   });
 
   it('sin cotización muestra una vacía y no deja enviar', async () => {
@@ -150,12 +172,25 @@ describe('QuotePanel (HU-27, HU-29)', () => {
     const calls = mockApi({
       'GET /me': owner,
       'GET /orders/{id}/quote': cotizacion({ estado: 'aprobada', lineas: [{ ...cotizacion().cotizacion.lineas[0], aprobada: true, sinStock: false }] }),
-      'POST /parts/{id}/returns': { status: 422, body: { detail: 'No puedes devolver más unidades de las que esa orden descontó.' } },
+      'GET /orders/{id}/part-movements': { repuestos: [{ repuestoId: 'p1', referencia: 'PF-20', nombre: 'Pastillas', descontado: 2, devuelto: 0, pendiente: 0, porDevolver: 2 }] },
+      'POST /parts/{id}/returns': { devueltas: 1, quedanPorDevolver: 1, existencia: 4 },
     });
     renderPage(<QuotePanel orden={o({ estado: 'en_reparacion' })} />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Devolver 1 al inventario' }));
-    expect(await screen.findByText(/No puedes devolver más/)).toBeInTheDocument();
+    expect(await screen.findByText(/Descontado 2 · Devuelto 0/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Devolver 1 al inventario' }));
+    expect(await screen.findByText(/Se devolvió 1 de Pastillas \(PF-20\)\. Quedan 1 por devolver · 4 en bodega/)).toBeInTheDocument();
     expect(calls.find((c) => c.path === '/parts/p1/returns')?.body).toEqual({ cantidad: 1, ordenId: 'o1' });
+  });
+
+  it('un repuesto que quedó pendiente (sin existencia) no muestra el botón de devolver', async () => {
+    mockApi({
+      'GET /me': owner,
+      'GET /orders/{id}/quote': cotizacion({ estado: 'aprobada', lineas: [{ ...cotizacion().cotizacion.lineas[0], aprobada: true }] }),
+      'GET /orders/{id}/part-movements': { repuestos: [{ repuestoId: 'p1', referencia: 'PF-20', nombre: 'Pastillas', descontado: 0, devuelto: 0, pendiente: 1, porDevolver: 0 }] },
+    });
+    renderPage(<QuotePanel orden={o({ estado: 'en_reparacion' })} />);
+    expect(await screen.findByText(/Pendiente 1 \(no había existencia\)/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Devolver 1 al inventario' })).not.toBeInTheDocument();
   });
 });
 

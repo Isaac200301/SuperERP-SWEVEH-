@@ -20,6 +20,7 @@ type Finding struct {
 	FaultCodes  []string
 	AuthorID    *shared.ID
 	CreatedAt   time.Time
+	Labor       *int64 // mano de obra estimada en pesos; la pone la persona, nunca la IA (RF-17)
 }
 
 var (
@@ -36,6 +37,7 @@ var (
 	ErrFindingState    = shared.Rule("hallazgo_fuera_de_estado", "Los hallazgos se registran con el vehículo en el taller: desde Recibido hasta En reparación.")
 	ErrFindingLocked   = shared.Rule("hallazgo_cotizado", "Ya se envió la cotización: el hallazgo no se puede borrar. Agrega uno nuevo si cambió algo.")
 	ErrFindingNotFound = shared.NotFound("hallazgo_no_encontrado", "No encontramos ese hallazgo en la orden.")
+	ErrFindingLabor    = shared.Validation("hallazgo_mano_obra", "La mano de obra va en pesos, sin decimales y no negativa.").WithField("manoObra")
 )
 
 // NewFinding valida y normaliza un hallazgo (códigos en mayúscula, sin repetir, máximo 10).
@@ -66,6 +68,15 @@ func NewFinding(id shared.ID, o Order, system, description, severity string, cod
 	}
 	return Finding{ID: id, TallerID: o.TallerID, OrderID: o.ID, System: system, Description: description, Severity: severity,
 		FaultCodes: clean, AuthorID: author, CreatedAt: now}, nil
+}
+
+// WithLabor agrega la mano de obra estimada (opcional).
+func (f Finding) WithLabor(labor *int64) (Finding, error) {
+	if labor != nil && *labor < 0 {
+		return Finding{}, ErrFindingLabor
+	}
+	f.Labor = labor
+	return f, nil
 }
 
 // CanAddFindings: con el vehículo en el taller y la orden abierta. En reparación sirven para la cotización adicional (HU-31).

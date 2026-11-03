@@ -34,6 +34,7 @@ type lRow struct {
 	Precio      int64      `db:"precio_unitario"`
 	SinStock    bool       `db:"sin_stock"`
 	Aprobada    *bool      `db:"aprobada"`
+	Libre       bool       `db:"precio_libre"`
 }
 
 const qCols = `id, taller_id, orden_id, numero, estado, enviada_en, respondida_en, canal_respuesta, respuesta_ref, version`
@@ -41,11 +42,11 @@ const qCols = `id, taller_id, orden_id, numero, estado, enviada_en, respondida_e
 func (Repository) load(ctx context.Context, r qRow) (domain.Quote, error) {
 	q := domain.Quote{ID: r.ID, TallerID: r.TallerID, OrderID: r.OrdenID, Number: r.Numero, State: domain.State(r.Estado),
 		SentAt: r.EnviadaEn, RespondedAt: r.Respondida, Channel: r.Canal, ResponseRef: r.Ref, Version: r.Version}
-	lines, err := db.Many[lRow](ctx, `SELECT id, tipo, ref_id, descripcion, cantidad, precio_unitario, sin_stock, aprobada
+	lines, err := db.Many[lRow](ctx, `SELECT id, tipo, ref_id, descripcion, cantidad, precio_unitario, sin_stock, aprobada, precio_libre
 		FROM quotes.linea WHERE taller_id = $1 AND cotizacion_id = $2 ORDER BY created_at, id`, r.TallerID, r.ID)
 	for _, l := range lines {
 		q.Lines = append(q.Lines, domain.Line{ID: l.ID, Kind: l.Tipo, RefID: l.RefID, Description: l.Descripcion, Qty: l.Cantidad,
-			UnitPrice: l.Precio, NoStock: l.SinStock, Approved: l.Aprobada})
+			UnitPrice: l.Precio, NoStock: l.SinStock, Approved: l.Aprobada, FreePrice: l.Libre})
 	}
 	return q, err
 }
@@ -98,8 +99,9 @@ func (Repository) Save(ctx context.Context, q domain.Quote, prev int) error {
 	}
 	for i, l := range q.Lines {
 		if _, err := db.Exec(ctx, `INSERT INTO quotes.linea (id, taller_id, cotizacion_id, tipo, ref_id, descripcion, cantidad,
-			precio_unitario, sin_stock, aprobada, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now() + make_interval(secs => $11))`,
-			l.ID, q.TallerID, q.ID, l.Kind, l.RefID, l.Description, l.Qty, l.UnitPrice, l.NoStock, l.Approved, float64(i)/1000); err != nil {
+			precio_unitario, sin_stock, aprobada, precio_libre, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now() + make_interval(secs => $12))`,
+			l.ID, q.TallerID, q.ID, l.Kind, l.RefID, l.Description, l.Qty, l.UnitPrice, l.NoStock, l.Approved, l.FreePrice, float64(i)/1000); err != nil {
 			return err
 		}
 	}

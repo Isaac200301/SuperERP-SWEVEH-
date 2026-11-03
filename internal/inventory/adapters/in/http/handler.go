@@ -36,6 +36,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(h.guard.Require("part:manage")).Post("/parts/{id}/entries", httpx.JSON(h.log, h.entry))
 	r.With(h.guard.Require("part:return")).Post("/parts/{id}/returns", httpx.JSON(h.log, h.ret))
 	r.With(h.guard.Require("part:read")).Get("/parts/{id}/movements", httpx.JSON(h.log, h.movements))
+	r.With(h.guard.Require("part:read")).Get("/orders/{id}/part-movements", httpx.JSON(h.log, h.orderParts))
 	r.With(h.guard.Require("import:run")).Post("/parts/import", httpx.JSON(h.log, h.importCSV))
 }
 
@@ -174,7 +175,26 @@ func (h *Handler) ret(r *http.Request, p reqctx.Principal) (int, any, error) {
 	if err != nil {
 		return 0, nil, shared.Validation("orden_requerida", "Indica la orden de la que vuelve el repuesto.").WithField("ordenId")
 	}
-	return http.StatusNoContent, nil, h.svc.Return(r.Context(), p.Actor(), p.TallerID, id, oid, q.Cantidad)
+	res, err := h.svc.Return(r.Context(), p.Actor(), p.TallerID, id, oid, q.Cantidad)
+	if err != nil {
+		return 0, nil, err
+	}
+	return http.StatusOK, map[string]any{"devueltas": res.Returned, "quedanPorDevolver": res.Left, "existencia": res.Stock}, nil
+}
+
+// orderParts: por repuesto, lo que la orden descontó, devolvió y dejó pendiente (HU-38).
+func (h *Handler) orderParts(r *http.Request, p reqctx.Principal) (int, any, error) {
+	id, err := httpx.PathID(r, "id", shared.NotFound("orden_no_encontrada", "No encontramos esa orden en tu taller."))
+	if err != nil {
+		return 0, nil, err
+	}
+	list, err := h.svc.OrderParts(r.Context(), p.TallerID, id)
+	out := make([]map[string]any, 0, len(list))
+	for _, x := range list {
+		out = append(out, map[string]any{"repuestoId": x.PartID.String(), "referencia": x.Ref, "nombre": x.Name, "descontado": x.Discounted,
+			"devuelto": x.Returned, "pendiente": x.Pending, "porDevolver": x.ToReturn()})
+	}
+	return http.StatusOK, map[string]any{"repuestos": out}, err
 }
 
 type movementDTO struct {

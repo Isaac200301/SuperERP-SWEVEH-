@@ -27,6 +27,7 @@ var (
 	ErrLine         = shared.Validation("linea_invalida", "Cada ítem necesita descripción, cantidad mayor que cero y precio no negativo.")
 	ErrOrderStage   = shared.Rule("orden_no_cotizable", "Solo se cotiza con la orden en diagnóstico (o una adicional en reparación).")
 	ErrNoApproved   = shared.Validation("sin_items_aprobados", "Marca al menos un ítem aprobado o rechaza la cotización.")
+	ErrListPrice    = shared.Rule("precio_de_lista", "Ese precio sale de la lista del taller; cámbialo en Servicios o Repuestos.").WithField("precioUnitario")
 )
 
 // Line es un ítem con el precio de venta congelado al cotizar (HU-07, criterio 3).
@@ -39,6 +40,7 @@ type Line struct {
 	UnitPrice   int64
 	NoStock     bool
 	Approved    *bool
+	FreePrice   bool // la persona puso el precio (ítem libre o servicio sin precio de lista): se puede corregir
 }
 
 func (l Line) Subtotal() int64 { return int64(l.Qty) * l.UnitPrice }
@@ -78,8 +80,42 @@ func (q *Quote) AddLine(l Line) error {
 		(l.Kind != "servicio" && l.Kind != "repuesto") {
 		return ErrLine
 	}
+	// El mismo repuesto o servicio del catálogo suma cantidad en vez de repetir la línea.
+	for i, cur := range q.Lines {
+		if l.RefID != nil && cur.RefID != nil && *cur.RefID == *l.RefID && cur.Kind == l.Kind && cur.UnitPrice == l.UnitPrice {
+			q.Lines[i].Qty += l.Qty
+			return nil
+		}
+	}
 	q.Lines = append(q.Lines, l)
 	return nil
+}
+
+// UpdateLine cambia la cantidad y, solo en precio libre, el precio unitario. Devuelve la línea resultante.
+func (q *Quote) UpdateLine(id shared.ID, qty *int, price *int64) (Line, error) {
+	if q.State != Draft {
+		return Line{}, ErrNotEditable
+	}
+	for i := range q.Lines {
+		l := &q.Lines[i]
+		if l.ID != id {
+			continue
+		}
+		if price != nil && !l.FreePrice {
+			return Line{}, ErrListPrice
+		}
+		if (qty != nil && *qty <= 0) || (price != nil && *price < 0) {
+			return Line{}, ErrLine
+		}
+		if qty != nil {
+			l.Qty = *qty
+		}
+		if price != nil {
+			l.UnitPrice = *price
+		}
+		return *l, nil
+	}
+	return Line{}, ErrLineNotFound
 }
 
 func (q *Quote) RemoveLine(id shared.ID) error {

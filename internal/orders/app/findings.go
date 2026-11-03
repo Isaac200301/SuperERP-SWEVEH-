@@ -31,6 +31,7 @@ type FindingInput struct {
 	Description       string
 	Severity          string
 	FaultCodes        []string
+	Labor             *int64
 }
 
 func (s *Findings) Add(ctx context.Context, in FindingInput) (domain.Finding, error) {
@@ -43,6 +44,9 @@ func (s *Findings) Add(ctx context.Context, in FindingInput) (domain.Finding, er
 		now := s.clock.Now()
 		f, err := domain.NewFinding(shared.NewID(), o, in.System, in.Description, in.Severity, in.FaultCodes, actorID(in.Actor), now)
 		if err != nil {
+			return err
+		}
+		if f, err = f.WithLabor(in.Labor); err != nil {
 			return err
 		}
 		if err := s.repo.InsertFinding(ctx, f); err != nil {
@@ -88,5 +92,5 @@ func (s *Findings) Remove(ctx context.Context, tallerID, orderID, id shared.ID, 
 
 func findingView(f domain.Finding) map[string]any {
 	return map[string]any{"hallazgo_id": f.ID.String(), "sistema": f.System, "descripcion": f.Description, "gravedad": f.Severity,
-		"codigos_falla": f.FaultCodes}
+		"codigos_falla": f.FaultCodes, "mano_obra": f.Labor}
 }

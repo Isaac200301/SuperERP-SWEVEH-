@@ -32,6 +32,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(h.guard.Require("quote:read")).Get("/orders/{id}/quote", httpx.JSON(h.log, h.get))
 	r.With(h.guard.Require("quote:edit")).Post("/orders/{id}/quote/lines", httpx.JSON(h.log, h.add))
 	r.With(h.guard.Require("quote:edit")).Delete("/orders/{id}/quote/lines/{lineId}", httpx.JSON(h.log, h.remove))
+	r.With(h.guard.Require("quote:edit")).Patch("/orders/{id}/quote/lines/{lineId}", httpx.JSON(h.log, h.update))
 	r.With(h.guard.Require("quote:send")).Post("/orders/{id}/quote/send", httpx.JSON(h.log, h.send))
 	r.With(h.guard.Require("quote:register_response")).Post("/orders/{id}/quote/response", httpx.JSON(h.log, h.respond))
 }
@@ -45,6 +46,7 @@ type lineDTO struct {
 	Precio      int64   `json:"precioUnitario"`
 	Subtotal    int64   `json:"subtotal"`
 	SinStock    bool    `json:"sinStock"`
+	PrecioLibre bool    `json:"precioLibre"`
 	Aprobada    *bool   `json:"aprobada"`
 }
 
@@ -72,7 +74,7 @@ func toDTO(q *domain.Quote) any {
 			ref = &s
 		}
 		d.Lineas = append(d.Lineas, lineDTO{ID: l.ID.String(), Tipo: l.Kind, RefID: ref, Descripcion: l.Description,
-			Cantidad: l.Qty, Precio: l.UnitPrice, Subtotal: l.Subtotal(), SinStock: l.NoStock, Aprobada: l.Approved})
+			Cantidad: l.Qty, Precio: l.UnitPrice, Subtotal: l.Subtotal(), SinStock: l.NoStock, Aprobada: l.Approved, PrecioLibre: l.FreePrice})
 	}
 	return map[string]any{"cotizacion": d}
 }
@@ -112,6 +114,26 @@ func (h *Handler) add(r *http.Request, p reqctx.Principal) (int, any, error) {
 		in.RefID = &ref
 	}
 	out, err := h.svc.AddLine(r.Context(), p.TallerID, id, p.Actor(), in)
+	return http.StatusOK, toDTO(&out), err
+}
+
+func (h *Handler) update(r *http.Request, p reqctx.Principal) (int, any, error) {
+	id, err := httpx.PathID(r, "id", errOrder)
+	if err != nil {
+		return 0, nil, err
+	}
+	lid, err := httpx.PathID(r, "lineId", domain.ErrLineNotFound)
+	if err != nil {
+		return 0, nil, err
+	}
+	var q struct {
+		Cantidad *int   `json:"cantidad"`
+		Precio   *int64 `json:"precioUnitario"`
+	}
+	if err := httpx.Decode(r, &q); err != nil {
+		return 0, nil, err
+	}
+	out, err := h.svc.UpdateLine(r.Context(), p.TallerID, id, lid, p.Actor(), q.Cantidad, q.Precio)
 	return http.StatusOK, toDTO(&out), err
 }
 

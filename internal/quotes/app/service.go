@@ -152,6 +152,7 @@ func (s *Quotes) AddLine(ctx context.Context, tallerID, orderID shared.ID, actor
 			return err
 		}
 		l := domain.Line{ID: shared.NewID(), Kind: in.Kind, RefID: in.RefID, Description: in.Description, Qty: in.Qty}
+		var stock *int // existencia del repuesto, para marcar "sin existencia" con la cantidad total de la línea
 		switch {
 		case in.Kind == "servicio" && in.RefID != nil:
 			sv, err := s.catalog.Get(ctx, tallerID, *in.RefID)
@@ -162,7 +163,7 @@ func (s *Quotes) AddLine(ctx context.Context, tallerID, orderID shared.ID, actor
 			if sv.Price != nil {
 				l.UnitPrice = *sv.Price
 			} else if in.UnitPrice != nil {
-				l.UnitPrice = *in.UnitPrice
+				l.UnitPrice, l.FreePrice = *in.UnitPrice, true
 			} else {
 				return ErrPriceNeeded
 			}
@@ -175,16 +176,19 @@ func (s *Quotes) AddLine(ctx context.Context, tallerID, orderID shared.ID, actor
 			if !ok || !p.Active {
 				return shared.NotFound("repuesto_no_encontrado", "No encontramos ese repuesto en tu taller.")
 			}
-			l.Description, l.UnitPrice, l.NoStock = p.Name+" ("+p.Ref+")", p.Price, p.Stock < in.Qty
+			l.Description, l.UnitPrice, stock = p.Name+" ("+p.Ref+")", p.Price, &p.Stock
 		default:
 			if in.UnitPrice == nil {
 				return ErrPriceNeeded
 			}
-			l.UnitPrice = *in.UnitPrice
+			l.UnitPrice, l.FreePrice = *in.UnitPrice, true
 		}
 		pv := q.Version
 		if err := q.AddLine(l); err != nil {
 			return err
+		}
+		if stock != nil {
+			markNoStock(&q, *in.RefID, *stock)
 		}
 		q.Version++
 		if err := s.repo.Save(ctx, q, pv); err != nil {
@@ -193,6 +197,44 @@ func (s *Quotes) AddLine(ctx context.Context, tallerID, orderID shared.ID, actor
 		out = q
 		return s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "cotizacion.agregar_item", Entity: "cotizacion",
 			EntityID: q.ID, After: map[string]any{"descripcion": l.Description, "cantidad": l.Qty, "precio": l.UnitPrice}, OccurredAt: s.clock.Now()})
+	})
+	return out, err
+}
+
+// UpdateLine cambia cantidad o precio libre de un ítem del borrador; recalcula "sin existencia" del repuesto.
+func (s *Quotes) UpdateLine(ctx context.Context, tallerID, orderID, lineID shared.ID, actor shared.Actor, qty *int, price *int64) (domain.Quote, error) {
+	var out domain.Quote
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		q, ok, err := s.repo.Latest(ctx, tallerID, orderID)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return domain.ErrNotFound
+		}
+		pv := q.Version
+		l, err := q.UpdateLine(lineID, qty, price)
+		if err != nil {
+			return err
+		}
+		if l.Kind == "repuesto" && l.RefID != nil {
+			parts, err := s.inv.Parts(ctx, tallerID, []shared.ID{*l.RefID})
+			if err != nil {
+				return err
+			}
+			for i := range q.Lines {
+				if q.Lines[i].ID == lineID {
+					q.Lines[i].NoStock = parts[*l.RefID].Stock < l.Qty
+				}
+			}
+		}
+		q.Version++
+		if err := s.repo.Save(ctx, q, pv); err != nil {
+			return err
+		}
+		out = q
+		return s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "cotizacion.cambiar_item", Entity: "cotizacion",
+			EntityID: q.ID, After: map[string]any{"linea_id": lineID.String(), "cantidad": l.Qty, "precio": l.UnitPrice}, OccurredAt: s.clock.Now()})
 	})
 	return out, err
 }
@@ -330,4 +372,13 @@ func (s *Quotes) Respond(ctx context.Context, c RespondCmd) (domain.Quote, error
 			Payload: map[string]any{"orden_id": c.OrderID.String(), "decision": c.Response.Decision, "canal": c.Response.Channel}})
 	})
 	return out, err
+}
+
+// markNoStock marca "sin existencia" en la línea del repuesto según su cantidad total (también tras sumar).
+func markNoStock(q *domain.Quote, partID shared.ID, stock int) {
+	for i := range q.Lines {
+		if q.Lines[i].RefID != nil && *q.Lines[i].RefID == partID && q.Lines[i].Kind == "repuesto" {
+			q.Lines[i].NoStock = stock < q.Lines[i].Qty
+		}
+	}
 }

@@ -39,6 +39,7 @@ type findingDTO struct {
 	Gravedad     string    `json:"gravedad"`
 	CodigosFalla []string  `json:"codigosFalla"`
 	CreadoEn     time.Time `json:"creadoEn"`
+	ManoObra     *int64    `json:"manoObra"`
 }
 
 func findingOut(f domain.Finding) findingDTO {
@@ -46,7 +47,7 @@ func findingOut(f domain.Finding) findingDTO {
 	if codes == nil {
 		codes = []string{}
 	}
-	return findingDTO{ID: f.ID.String(), Sistema: f.System, Descripcion: f.Description, Gravedad: f.Severity, CodigosFalla: codes, CreadoEn: f.CreatedAt}
+	return findingDTO{ID: f.ID.String(), Sistema: f.System, Descripcion: f.Description, Gravedad: f.Severity, CodigosFalla: codes, CreadoEn: f.CreatedAt, ManoObra: f.Labor}
 }
 
 func (h *FindingsHandler) list(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -72,12 +73,13 @@ func (h *FindingsHandler) add(r *http.Request, p reqctx.Principal) (int, any, er
 		Descripcion  string   `json:"descripcion"`
 		Gravedad     string   `json:"gravedad"`
 		CodigosFalla []string `json:"codigosFalla"`
+		ManoObra     *int64   `json:"manoObra"`
 	}
 	if err := httpx.Decode(r, &q); err != nil {
 		return 0, nil, err
 	}
 	f, err := h.svc.Add(r.Context(), app.FindingInput{TallerID: p.TallerID, OrderID: id, Actor: p.Actor(), System: q.Sistema,
-		Description: q.Descripcion, Severity: q.Gravedad, FaultCodes: q.CodigosFalla})
+		Description: q.Descripcion, Severity: q.Gravedad, FaultCodes: q.CodigosFalla, Labor: q.ManoObra})
 	if err != nil {
 		return 0, nil, err
 	}

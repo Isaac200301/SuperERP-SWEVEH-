@@ -47,4 +47,36 @@ describe('DiagnosisPanel (HU-103 propuesta)', () => {
     expect(screen.queryByRole('button', { name: 'Quitar' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Agregar hallazgo' })).not.toBeInTheDocument();
   });
+
+  it('guarda la mano de obra, "Cotizar esto" la pasa a la cotización y sube fotos del hallazgo', async () => {
+    const cotizador = { ...owner, permisos: [...owner.permisos, 'quote:edit'] };
+    const calls = mockApi({
+      'GET /me': cotizador,
+      'GET /orders/{id}/findings': { hallazgos: [{ ...hallazgo, manoObra: 60000 }] },
+      'GET /orders/{id}/evidence': { evidencias: [] },
+      'POST /orders/{id}/findings': { status: 201, body: hallazgo },
+      'POST /orders/{id}/quote/lines': { cotizacion: null },
+      'POST /orders/{id}/evidence': { status: 201, body: { id: 'e1' } },
+    });
+    renderPage(<DiagnosisPanel orden={orden({ estado: 'en_diagnostico' }) as unknown as Orden} />);
+    expect(await screen.findByText(/Mano de obra \$\s?60\.000/)).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('Sistema'), 'suspension');
+    await userEvent.type(screen.getByLabelText('Qué encontraste'), 'Bujes gastados');
+    await userEvent.type(screen.getByLabelText('Mano de obra estimada (COP)'), '45.000');
+    await userEvent.click(screen.getByRole('radio', { name: 'Puede esperar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar hallazgo' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cotizar esto' }));
+    const fotos = [1, 2].map((i) => new File([new Uint8Array([0xff, 0xd8, 0xff, i])], `h${i}.jpg`, { type: 'image/jpeg' }));
+    await userEvent.upload(screen.getByLabelText('Fotos de Pastillas al 10 %'), fotos);
+
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path.endsWith('/evidence'))).toBe(true));
+    expect(calls.find((c) => c.path.endsWith('/findings') && c.method === 'POST')?.body).toMatchObject({ sistema: 'suspension', manoObra: 45000 });
+    expect(calls.find((c) => c.path.endsWith('/quote/lines'))?.body).toEqual({
+      tipo: 'servicio', descripcion: 'Mano de obra · Frenos: Pastillas al 10 %', cantidad: 1, precioUnitario: 60000,
+    });
+    const envio = String(calls.find((c) => c.path.endsWith('/evidence') && c.method === 'POST')?.body);
+    expect(envio).toContain('h1');
+    expect(envio.match(/name="foto"/g)).toHaveLength(2);
+    expect(envio).toContain('name="hallazgoId"');
+  });
 });

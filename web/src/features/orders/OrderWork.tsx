@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
-import { ApiError, type Orden } from '../../shared/api/client';
+import { ApiError, type Orden, type Schemas } from '../../shared/api/client';
 import { estados, flujo } from '../../shared/i18n/es-CO';
 import { formatoCOP, formatoHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
@@ -10,7 +10,9 @@ import {
   photoUrl,
   useAddEvidence,
   useCatalog,
+  useOrderParts,
   useChecklist,
+  maxFotosPorNota,
   useEvidence,
   useQuote,
   useQuoteActions,
@@ -20,6 +22,17 @@ import {
 import { usePermission } from '../auth/api';
 
 export const cotizarEvento = 'sweveh:cotizar';
+
+type Evidencia = Schemas['Evidencia'];
+/** Junta las fotos que se subieron con la misma nota (grupoId); la primera trae la nota. */
+export function agrupar(list: Evidencia[]): Evidencia[][] {
+  const grupos = new Map<string, Evidencia[]>();
+  for (const x of list) {
+    const k = x.grupoId ?? x.id;
+    grupos.set(k, [...(grupos.get(k) ?? []), x]);
+  }
+  return [...grupos.values()];
+}
 const ladosCarro = ['frente', 'trasera', 'izquierdo', 'derecho'];
 const ladosMoto = [...ladosCarro, 'tablero'];
 const combustibles: Record<string, string> = {
@@ -113,6 +126,7 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
   const [fuel, setFuel] = useState('');
   const [acc, setAcc] = useState('');
   const [nota, setNota] = useState('');
+  const [fotos, setFotos] = useState<File[]>([]);
 
   if (cl.isPending) return <p role="status">Cargando checklist…</p>;
   if (cl.isError) return <Alert>{cl.error.message}</Alert>;
@@ -210,26 +224,44 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
           className="flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            if (nota.trim()) subir.mutate({ nota: nota.trim() }, { onSuccess: () => setNota('') });
+            if (!nota.trim() && fotos.length === 0) return;
+            subir.mutate(
+              { ...(nota.trim() ? { nota: nota.trim() } : {}), fotos },
+              { onSuccess: () => { setNota(''); setFotos([]); } },
+            );
           }}
         >
           <div className="min-w-[240px] flex-1">
-            <Field label="Nota (lo que encontraste o cambiaste)" value={nota} onChange={(e) => setNota(e.target.value)} />
+            <Field label="Nota (lo que encontraste o cambiaste)" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Rayón en la puerta trasera" />
           </div>
-          <Button type="submit" variant="ghost">
-            Agregar nota
+          <label className="inline-flex min-h-[52px] cursor-pointer items-center rounded-btn border-[1.5px] border-line px-4 font-bold text-primary">
+            {fotos.length ? `${fotos.length} foto${fotos.length > 1 ? 's' : ''}` : 'Agregar fotos'}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              aria-label="Fotos de la nota"
+              className="sr-only"
+              onChange={(e) => setFotos([...(e.target.files ?? [])].slice(0, maxFotosPorNota))}
+            />
+          </label>
+          <Button type="submit" variant="ghost" missing={nota.trim() || fotos.length ? undefined : 'Escribe la nota o agrega fotos.'}>
+            Guardar nota
           </Button>
         </form>
       ) : null}
       <ul className="flex flex-col gap-2">
-        {(ev.data ?? []).map((x) => (
-          <li key={x.id} className="flex items-center gap-3 rounded-2xl bg-surface p-3 text-sm">
-            {x.tieneFoto ? (
-              <img src={photoUrl(orden.id, x.id)} alt={`Foto ${x.lado ?? ''}`} className="h-14 w-14 rounded-xl object-cover" loading="lazy" />
-            ) : null}
-            <span className="flex-1">{x.nota ?? (x.lado ? `Foto: ${x.lado}` : 'Foto')}</span>
+        {agrupar((ev.data ?? []).filter((x) => !x.hallazgoId)).map((g) => (
+          <li key={g[0]?.id} className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface p-3 text-sm">
+            {g.filter((x) => x.tieneFoto).map((x) => (
+              <a key={x.id} href={photoUrl(orden.id, x.id)} target="_blank" rel="noopener noreferrer">
+                <img src={photoUrl(orden.id, x.id)} alt={`Foto ${x.lado ?? x.nota ?? ''}`} className="h-14 w-14 rounded-xl object-cover" loading="lazy" />
+              </a>
+            ))}
+            <span className="min-w-[160px] flex-1">{g[0]?.nota ?? (g[0]?.lado ? `Foto: ${g[0].lado}` : 'Fotos')}</span>
             <span className="font-mono text-xs text-ink-2">
-              {estados[x.etapa as keyof typeof estados] ?? x.etapa} · {formatoHora(x.creadoEn)}
+              {estados[g[0]?.etapa as keyof typeof estados] ?? g[0]?.etapa} · {g[0] ? formatoHora(g[0].creadoEn) : ''}
             </span>
           </li>
         ))}
@@ -238,7 +270,73 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
   );
 }
 
-/** HU-27, HU-29 y HU-34: cotización con servicios y repuestos del taller; precios solo de la lista. */
+const pesos = (s: string) => (s.trim() === '' ? undefined : Number(s.replace(/\D/g, '')));
+
+/** Un ítem del catálogo: los servicios sin precio piden el valor y los repuestos la cantidad antes de agregar. */
+function CatalogItem({ label, detalle, precio, pidePrecio, pideCantidad, busy, onAdd }: {
+  label: string; detalle?: string; precio: number | null; pidePrecio: boolean; pideCantidad: boolean; busy: boolean;
+  onAdd: (v: { cantidad: number; precioUnitario?: number }) => void;
+}) {
+  const [cant, setCant] = useState('1');
+  const [valor, setValor] = useState('');
+  const n = pesos(cant) ?? 0;
+  const v = pesos(valor);
+  let falta: string | undefined;
+  if (n < 1) falta = 'Escribe la cantidad.';
+  else if (pidePrecio && v === undefined) falta = 'Escribe el precio.';
+  return (
+    <li className="flex flex-wrap items-end gap-2 rounded-xl px-3 py-2 hover:bg-primary-tint">
+      <span className="min-w-[180px] flex-1">
+        {label} {detalle ? <span className="text-ink-2">{detalle}</span> : null}
+        <span className="ml-2 font-mono">{precio == null ? 'sin precio de lista' : formatoCOP(precio)}</span>
+      </span>
+      {pidePrecio ? <Field label={`Precio de ${label}`} inputMode="numeric" value={valor} onChange={(e) => setValor(e.target.value)} className="w-32" /> : null}
+      {pideCantidad ? <Field label={`Cantidad de ${label}`} inputMode="numeric" value={cant} onChange={(e) => setCant(e.target.value)} className="w-20" /> : null}
+      <Button variant="secondary" busy={busy} missing={falta} onClick={() => onAdd({ cantidad: n, ...(pidePrecio && v !== undefined ? { precioUnitario: v } : {}) })}>
+        Agregar
+      </Button>
+    </li>
+  );
+}
+
+/** Mano de obra u otro ítem libre: el precio lo pone la persona (RF-17) y se puede corregir mientras es borrador. */
+function FreeItem({ busy, onAdd }: { busy: boolean; onAdd: (v: { descripcion: string; precioUnitario: number; cantidad: number }) => void }) {
+  const [desc, setDesc] = useState('');
+  const [valor, setValor] = useState('');
+  const [cant, setCant] = useState('1');
+  const v = pesos(valor);
+  const n = pesos(cant) ?? 0;
+  let falta: string | undefined;
+  if (!desc.trim()) falta = 'Describe el trabajo.';
+  else if (v === undefined) falta = 'Escribe el valor.';
+  else if (n < 1) falta = 'Escribe la cantidad.';
+  return (
+    <form
+      className="grid gap-3 rounded-2xl bg-surface p-3 sm:grid-cols-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (falta || v === undefined) return;
+        onAdd({ descripcion: desc.trim(), precioUnitario: v, cantidad: n });
+        setDesc('');
+        setValor('');
+        setCant('1');
+      }}
+    >
+      <div className="sm:col-span-2">
+        <Field label="Mano de obra u otro ítem" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Mano de obra cambio de pastillas" />
+      </div>
+      <Field label="Valor (COP)" inputMode="numeric" value={valor} onChange={(e) => setValor(e.target.value)} />
+      <Field label="Cantidad del ítem" inputMode="numeric" value={cant} onChange={(e) => setCant(e.target.value)} />
+      <div className="sm:col-span-4">
+        <Button type="submit" variant="secondary" busy={busy} missing={falta}>
+          Agregar ítem
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** HU-27, HU-29, HU-34 y HU-38: cotización con servicios, repuestos y mano de obra; precios de la lista o puestos por la persona. */
 export function QuotePanel({ orden }: { orden: Orden }) {
   const q = useQuote(orden.id);
   const act = useQuoteActions(orden.id);
@@ -246,6 +344,8 @@ export function QuotePanel({ orden }: { orden: Orden }) {
   const permisoDevolver = usePermission('part:return');
   const [buscar, setBuscar] = useState('');
   const cat = useCatalog(buscar);
+  const aprobada = q.data?.estado === 'aprobada';
+  const movidos = useOrderParts(orden.id, aprobada);
   // "Cotizar esto" desde un hallazgo del diagnóstico: busca en el catálogo con su texto (DiagnosisPanel).
   useEffect(() => {
     const onCotizar = (e: Event) => setBuscar((e as CustomEvent<string>).detail);
@@ -257,8 +357,9 @@ export function QuotePanel({ orden }: { orden: Orden }) {
   // Sin cotización todavía: se arma una vacía; el primer ítem crea el borrador en el servidor.
   const cot = q.data ?? { numero: 1, estado: 'borrador' as const, total: 0, lineas: [] };
   const editable = cot.estado === 'borrador';
-  const err = act.add.error ?? act.remove.error ?? act.send.error ?? act.respond.error ?? act.giveBack.error;
-  const puedeDevolver = permisoDevolver && cot.estado === 'aprobada';
+  const err = act.add.error ?? act.remove.error ?? act.send.error ?? act.respond.error ?? act.giveBack.error ?? act.update.error;
+  const devuelto = act.giveBack.data;
+  const movPorRepuesto = new Map((movidos.data ?? []).map((m) => [m.repuestoId, m]));
 
   return (
     <section className={card} aria-labelledby="cotizacion">
@@ -275,28 +376,66 @@ export function QuotePanel({ orden }: { orden: Orden }) {
           </tr>
         </thead>
         <tbody>
-          {cot.lineas.map((l) => (
-            <tr key={l.id} className="border-t border-line">
-              <td className="py-2">
-                {l.descripcion}
-                {l.sinStock ? <span className="ml-2 font-bold text-warn-ink">sin existencia</span> : null}
-              </td>
-              <td>{l.cantidad}</td>
-              <td className="text-right font-mono">{formatoCOP(l.subtotal)}</td>
-              <td className="text-right">
-                {editable ? (
-                  <button type="button" className="min-h-[44px] px-2 font-bold text-err-ink" onClick={() => act.remove.mutate(l.id)}>
-                    Quitar
-                  </button>
-                ) : null}
-                {puedeDevolver && l.tipo === 'repuesto' && l.refId && l.aprobada !== false ? (
-                  <button type="button" className="min-h-[44px] px-2 font-bold text-primary" onClick={() => act.giveBack.mutate(l.refId ?? '')}>
-                    Devolver 1 al inventario
-                  </button>
-                ) : null}
-              </td>
-            </tr>
-          ))}
+          {cot.lineas.map((l) => {
+            const mov = l.refId ? movPorRepuesto.get(l.refId) : undefined;
+            return (
+              <tr key={l.id} className="border-t border-line align-top">
+                <td className="py-2">
+                  {l.descripcion}
+                  {l.sinStock ? <span className="ml-2 font-bold text-warn-ink">sin existencia</span> : null}
+                  {mov ? (
+                    <span className="block text-xs text-ink-2">
+                      Descontado {mov.descontado} · Devuelto {mov.devuelto}
+                      {mov.pendiente ? ` · Pendiente ${mov.pendiente} (no había existencia)` : ''}
+                    </span>
+                  ) : null}
+                </td>
+                <td>
+                  {editable ? (
+                    <span className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        aria-label={`Menos ${l.descripcion}`}
+                        className="h-9 w-9 rounded-full bg-surface font-bold"
+                        disabled={l.cantidad <= 1}
+                        onClick={() => act.update.mutate({ lineId: l.id, cantidad: l.cantidad - 1 })}
+                      >
+                        −
+                      </button>
+                      <span className="w-6 text-center">{l.cantidad}</span>
+                      <button
+                        type="button"
+                        aria-label={`Más ${l.descripcion}`}
+                        className="h-9 w-9 rounded-full bg-surface font-bold"
+                        onClick={() => act.update.mutate({ lineId: l.id, cantidad: l.cantidad + 1 })}
+                      >
+                        +
+                      </button>
+                    </span>
+                  ) : (
+                    l.cantidad
+                  )}
+                </td>
+                <td className="text-right font-mono">{formatoCOP(l.subtotal)}</td>
+                <td className="text-right">
+                  {editable ? (
+                    <button type="button" className="min-h-[44px] px-2 font-bold text-err-ink" onClick={() => act.remove.mutate(l.id)}>
+                      Quitar
+                    </button>
+                  ) : null}
+                  {permisoDevolver && aprobada && l.tipo === 'repuesto' && l.refId && mov && mov.porDevolver > 0 ? (
+                    <button
+                      type="button"
+                      className="min-h-[44px] px-2 font-bold text-primary"
+                      onClick={() => act.giveBack.mutate({ partId: l.refId ?? '', nombre: l.descripcion })}
+                    >
+                      Devolver 1 al inventario
+                    </button>
+                  ) : null}
+                </td>
+              </tr>
+            );
+          })}
           {cot.lineas.length === 0 ? (
             <tr>
               <td colSpan={4} className="py-3 text-ink-2">
@@ -315,38 +454,41 @@ export function QuotePanel({ orden }: { orden: Orden }) {
           </tr>
         </tfoot>
       </table>
+      {devuelto ? (
+        <p role="status" className="font-bold text-ok">
+          Se devolvió {devuelto.devueltas} de {devuelto.nombre}. Quedan {devuelto.quedanPorDevolver} por devolver · {devuelto.existencia} en bodega.
+        </p>
+      ) : null}
 
       {editable ? (
         <>
           <Field label="Buscar servicio o repuesto" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
-          <ul className="flex max-h-64 flex-col gap-1 overflow-auto">
+          <ul className="flex max-h-80 flex-col gap-1 overflow-auto">
             {cat.data?.servicios.map((s) => (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  className="flex min-h-[44px] w-full justify-between rounded-xl px-3 text-left hover:bg-primary-tint"
-                  onClick={() => act.add.mutate({ tipo: 'servicio', refId: s.id, cantidad: 1 })}
-                >
-                  <span>Servicio · {s.nombre}</span>
-                  <span className="font-mono">{s.precio == null ? 'precio por confirmar' : formatoCOP(s.precio)}</span>
-                </button>
-              </li>
+              <CatalogItem
+                key={s.id}
+                label={`Servicio · ${s.nombre}`}
+                precio={s.precio}
+                pidePrecio={s.precio == null}
+                pideCantidad={false}
+                busy={act.add.isPending}
+                onAdd={(v) => act.add.mutate({ tipo: 'servicio', refId: s.id, ...v })}
+              />
             ))}
             {cat.data?.repuestos.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  className="flex min-h-[44px] w-full justify-between rounded-xl px-3 text-left hover:bg-primary-tint"
-                  onClick={() => act.add.mutate({ tipo: 'repuesto', refId: p.id, cantidad: 1 })}
-                >
-                  <span>
-                    Repuesto · {p.nombre} <span className="text-ink-2">({p.existencia} en bodega)</span>
-                  </span>
-                  <span className="font-mono">{formatoCOP(p.precioVenta)}</span>
-                </button>
-              </li>
+              <CatalogItem
+                key={p.id}
+                label={`Repuesto · ${p.nombre}`}
+                detalle={`(${p.existencia} en bodega)`}
+                precio={p.precioVenta}
+                pidePrecio={false}
+                pideCantidad
+                busy={act.add.isPending}
+                onAdd={(v) => act.add.mutate({ tipo: 'repuesto', refId: p.id, ...v })}
+              />
             ))}
           </ul>
+          <FreeItem busy={act.add.isPending} onAdd={(v) => act.add.mutate({ tipo: 'servicio', ...v })} />
           <Button
             missing={cot.lineas.length === 0 ? 'Agrega al menos un ítem para enviarla.' : undefined}
             busy={act.send.isPending}

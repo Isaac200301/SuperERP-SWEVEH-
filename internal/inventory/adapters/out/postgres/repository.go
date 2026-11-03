@@ -178,3 +178,28 @@ func (Repository) ExistingRefs(ctx context.Context, tallerID shared.ID, refs []s
 	}
 	return out, err
 }
+
+type orderPartRow struct {
+	ID         shared.ID `db:"id"`
+	Referencia string    `db:"referencia"`
+	Nombre     string    `db:"nombre"`
+	Descontado int       `db:"descontado"`
+	Devuelto   int       `db:"devuelto"`
+	Pendiente  int       `db:"pendiente"`
+}
+
+// OrderParts suma el libro de inventario de una orden por repuesto.
+func (Repository) OrderParts(ctx context.Context, tallerID, orderID shared.ID) ([]domain.OrderPart, error) {
+	rows, err := db.Many[orderPartRow](ctx, `SELECT a.id, a.referencia, a.nombre,
+			COALESCE(-SUM(m.cantidad) FILTER (WHERE m.motivo = 'salida_orden'), 0)::int AS descontado,
+			COALESCE(SUM(m.cantidad) FILTER (WHERE m.motivo = 'devolucion'), 0)::int AS devuelto,
+			COALESCE(-SUM(m.cantidad) FILTER (WHERE m.motivo = 'pendiente_orden'), 0)::int AS pendiente
+		FROM inventory.movimiento m JOIN inventory.articulo a ON a.id = m.articulo_id AND a.taller_id = m.taller_id
+		WHERE m.taller_id = $1 AND m.orden_id = $2
+		GROUP BY a.id, a.referencia, a.nombre ORDER BY a.nombre`, tallerID, orderID)
+	out := make([]domain.OrderPart, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, domain.OrderPart{PartID: r.ID, Ref: r.Referencia, Name: r.Nombre, Discounted: r.Descontado, Returned: r.Devuelto, Pending: r.Pendiente})
+	}
+	return out, err
+}

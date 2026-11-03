@@ -260,13 +260,21 @@ type EvidenceInput struct {
 	Note              *string
 	ShowClient        bool
 	Photo             io.Reader // nil si es solo nota
+	GroupID           *shared.ID
+	FindingID         *shared.ID
 }
+
+// MaxPhotosPerNote limita cuántas fotos se suben juntas (rayones, piezas encontradas).
+const MaxPhotosPerNote = 8
+
+var ErrTooManyPhotos = shared.Validation("demasiadas_fotos", "Sube hasta 8 fotos por nota.").WithField("foto")
+var errFindingNotInOrder = shared.NotFound("hallazgo_no_encontrado", "No encontramos ese hallazgo en la orden.")
 
 // AddEvidence guarda foto (validada por contenido) y/o nota con hora, autor y etapa (HU-21).
 // La foto se sube antes de abrir la transacción: nunca I/O lento dentro de ella.
 func (f *Flow) AddEvidence(ctx context.Context, in EvidenceInput) (ports.Evidence, error) {
 	e := ports.Evidence{ID: shared.NewID(), TallerID: in.TallerID, OrderID: in.OrderID, Side: in.Side, Note: in.Note,
-		ShowClient: in.ShowClient, AuthorID: actorID(in.Actor), CreatedAt: f.clock.Now()}
+		ShowClient: in.ShowClient, AuthorID: actorID(in.Actor), CreatedAt: f.clock.Now(), GroupID: in.GroupID, FindingID: in.FindingID}
 	if in.Side != nil && !slices.Contains(domain.MotoSides, *in.Side) && *in.Side != "otro" {
 		return e, shared.Validation("lado_invalido", "Ese lado no existe.").WithField("lado")
 	}
@@ -277,8 +285,20 @@ func (f *Flow) AddEvidence(ctx context.Context, in EvidenceInput) (ports.Evidenc
 	var stage domain.State
 	if err := f.uow.Do(ctx, func(ctx context.Context) error {
 		o, err := f.repo.Load(ctx, in.TallerID, in.OrderID)
+		if err != nil {
+			return err
+		}
 		stage = o.State
-		return err
+		if in.FindingID != nil {
+			ok, err := f.repo.FindingInOrder(ctx, in.TallerID, in.OrderID, *in.FindingID)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return errFindingNotInOrder
+			}
+		}
+		return nil
 	}); err != nil {
 		return e, err
 	}
@@ -305,7 +325,7 @@ func (f *Flow) AddEvidence(ctx context.Context, in EvidenceInput) (ports.Evidenc
 		}
 		return f.audit.Record(ctx, audit.Entry{TallerID: in.TallerID, Actor: in.Actor, Action: "orden.evidencia", Entity: "orden",
 			EntityID: in.OrderID, After: map[string]any{"evidencia_id": e.ID.String(), "lado": in.Side, "foto": in.Photo != nil,
-				"mostrar_cliente": in.ShowClient}, OccurredAt: e.CreatedAt})
+				"mostrar_cliente": in.ShowClient, "grupo_id": idString(in.GroupID), "hallazgo_id": idString(in.FindingID)}, OccurredAt: e.CreatedAt})
 	})
 	return e, err
 }
@@ -456,4 +476,12 @@ func join(s []string) string {
 		out += x
 	}
 	return out
+}
+
+func idString(id *shared.ID) *string {
+	if id == nil {
+		return nil
+	}
+	s := id.String()
+	return &s
 }

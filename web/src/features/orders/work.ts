@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api, ApiError, unwrap, type EstadoOrden, type Schemas } from '../../shared/api/client';
+import { api, unwrap, type EstadoOrden, type Schemas } from '../../shared/api/client';
 import { ordersKey } from './api';
 
 export type Checklist = Schemas['Checklist'];
@@ -71,7 +71,9 @@ export function useEvidence(id: string) {
   });
 }
 
-export type EvidenceInput = { lado?: string; nota?: string; mostrarCliente?: boolean; foto?: File };
+// Una nota puede llevar varias fotos (rayones, piezas encontradas); hallazgoId las pega a un hallazgo.
+export type EvidenceInput = { lado?: string; nota?: string; mostrarCliente?: boolean; foto?: File; fotos?: File[]; hallazgoId?: string };
+export const maxFotosPorNota = 8;
 
 /** HU-21: la foto va al final del formulario para que el servidor la procese en streaming. */
 export function useAddEvidence(id: string) {
@@ -87,7 +89,8 @@ export function useAddEvidence(id: string) {
             if (v.lado) fd.append('lado', v.lado);
             if (v.nota) fd.append('nota', v.nota);
             fd.append('mostrarCliente', String(v.mostrarCliente ?? false));
-            if (v.foto) fd.append('foto', v.foto);
+            if (v.hallazgoId) fd.append('hallazgoId', v.hallazgoId);
+            for (const f of [...(v.foto ? [v.foto] : []), ...(v.fotos ?? [])]) fd.append('foto', f);
             return fd;
           },
         }),
@@ -132,15 +135,35 @@ export function useQuoteActions(id: string) {
       unwrap(await api.POST('/orders/{id}/quote/response', { params: { path: { id } }, body })),
     onSettled: invalidate,
   });
-  // HU-38: devolver una unidad de un repuesto ya descontado; el servidor no deja devolver más de lo que salió.
-  const giveBack = useMutation({
-    mutationFn: async (partId: string) => {
-      const r = await api.POST('/parts/{id}/returns', { params: { path: { id: partId } }, body: { cantidad: 1, ordenId: id } });
-      if (!r.response.ok) throw new ApiError(r.response.status, r.error as never);
-    },
+  // Cantidad y, solo en precio libre, el precio de un ítem del borrador.
+  const update = useMutation({
+    mutationFn: async (v: { lineId: string; cantidad?: number; precioUnitario?: number }) =>
+      unwrap(
+        await api.PATCH('/orders/{id}/quote/lines/{lineId}', {
+          params: { path: { id, lineId: v.lineId } },
+          body: { ...(v.cantidad !== undefined ? { cantidad: v.cantidad } : {}), ...(v.precioUnitario !== undefined ? { precioUnitario: v.precioUnitario } : {}) },
+        }),
+      ),
     onSettled: invalidate,
   });
-  return { add, remove, send, respond, giveBack };
+  // HU-38: devolver una unidad de un repuesto ya descontado; responde cuánto queda por devolver.
+  const giveBack = useMutation({
+    mutationFn: async (v: { partId: string; nombre: string }) => ({
+      ...unwrap(await api.POST('/parts/{id}/returns', { params: { path: { id: v.partId } }, body: { cantidad: 1, ordenId: id } })),
+      nombre: v.nombre,
+    }),
+    onSettled: invalidate,
+  });
+  return { add, remove, send, respond, giveBack, update };
+}
+
+/** Por repuesto, lo que la orden descontó, devolvió y dejó pendiente (HU-33, HU-38). */
+export function useOrderParts(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...ordersKey, id, 'repuestos-movidos'],
+    enabled,
+    queryFn: async () => unwrap(await api.GET('/orders/{id}/part-movements', { params: { path: { id } } })).repuestos,
+  });
 }
 
 /** Servicios y repuestos del taller para cotizar (HU-07, HU-34). */
