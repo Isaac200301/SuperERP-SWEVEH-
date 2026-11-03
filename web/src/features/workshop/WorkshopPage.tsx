@@ -5,6 +5,7 @@ import { api, unwrap } from '../../shared/api/client';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { card, ProfileForm, type Taller } from './ProfileForm';
+import { SettingsForm } from './SettingsForm';
 
 const select = 'min-h-[52px] rounded-btn border-[1.5px] border-line bg-white px-4 text-base';
 const dias = { lun: 'Lunes', mar: 'Martes', mie: 'Miércoles', jue: 'Jueves', vie: 'Viernes', sab: 'Sábado', dom: 'Domingo' } as const;
@@ -63,6 +64,7 @@ export function WorkshopPage() {
       </header>
       <ProfileForm t={q.data} />
       <Schedule t={q.data} />
+      <SettingsForm />
     </>
   );
 }

@@ -847,6 +847,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workshop/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Parámetros del taller (órdenes, recepción, cotización). Sin configurar, los valores por defecto. Todos los roles */
+        get: operations["getWorkshopSettings"];
+        /** Guardar los parámetros con versión optimista (0 = nunca se guardaron). Permiso workshop:manage */
+        put: operations["saveWorkshopSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workshop/schedule": {
         parameters: {
             query?: never;
@@ -1124,6 +1142,29 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ItemRecepcion: {
+            /** @description Estable; vacía = se arma con el nombre */
+            clave: string;
+            nombre: string;
+        };
+        Parametros: {
+            usarEsperandoRepuesto: boolean;
+            usarControlCalidad: boolean;
+            fotosMinimas: number;
+            kmObligatorio: boolean;
+            itemsCarro: components["schemas"]["ItemRecepcion"][];
+            itemsMoto: components["schemas"]["ItemRecepcion"][];
+            /** @description Por defecto 19, a confirmar con un contador */
+            ivaPct: number;
+            /** @description Los precios de lista ya incluyen IVA */
+            preciosConIva: boolean;
+            /** Format: int64 */
+            tarifaHora: number | null;
+            descuentoMaxPct: number;
+            descuentoRecepcion: boolean;
+            vigenciaDias: number;
+            version: number;
+        };
         /** @enum {string} */
         SistemaVehiculo: "motor" | "frenos" | "suspension" | "direccion" | "electrico" | "transmision" | "refrigeracion" | "llantas" | "carroceria" | "otro";
         /** @enum {string} */
@@ -3383,6 +3424,52 @@ export interface operations {
         responses: {
             200: components["responses"]["Taller"];
             400: components["responses"]["Problem"];
+        };
+    };
+    getWorkshopSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Parametros"];
+                };
+            };
+        };
+    };
+    saveWorkshopSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Parametros"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Parametros"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
         };
     };
     setWorkshopSchedule: {

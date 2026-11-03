@@ -1205,6 +1205,33 @@ paths:
         '200': { $ref: '#/components/responses/Taller' }
         '400': { $ref: '#/components/responses/Problem' }
 
+  /workshop/settings:
+    get:
+      operationId: getWorkshopSettings
+      summary: Parámetros del taller (órdenes, recepción, cotización). Sin configurar, los valores por defecto. Todos los roles
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Parametros' }
+    put:
+      operationId: saveWorkshopSettings
+      summary: Guardar los parámetros con versión optimista (0 = nunca se guardaron). Permiso workshop:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Parametros' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Parametros' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+
   /workshop/schedule:
     put:
       operationId: setWorkshopSchedule
@@ -1634,6 +1661,31 @@ components:
               ordenId: { type: string, format: uuid, description: 'Obligatorio en devoluciones' }
 
   schemas:
+    ItemRecepcion:
+      type: object
+      required: [clave, nombre]
+      properties:
+        clave: { type: string, description: 'Estable; vacía = se arma con el nombre' }
+        nombre: { type: string, maxLength: 60 }
+    Parametros:
+      type: object
+      additionalProperties: false
+      required: [usarEsperandoRepuesto, usarControlCalidad, fotosMinimas, kmObligatorio, itemsCarro, itemsMoto, ivaPct, preciosConIva,
+        tarifaHora, descuentoMaxPct, descuentoRecepcion, vigenciaDias, version]
+      properties:
+        usarEsperandoRepuesto: { type: boolean }
+        usarControlCalidad: { type: boolean }
+        fotosMinimas: { type: integer, minimum: 0, maximum: 8 }
+        kmObligatorio: { type: boolean }
+        itemsCarro: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/ItemRecepcion' } }
+        itemsMoto: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/ItemRecepcion' } }
+        ivaPct: { type: integer, minimum: 0, maximum: 30, description: 'Por defecto 19, a confirmar con un contador' }
+        preciosConIva: { type: boolean, description: 'Los precios de lista ya incluyen IVA' }
+        tarifaHora: { type: integer, format: int64, nullable: true, minimum: 0 }
+        descuentoMaxPct: { type: integer, minimum: 0, maximum: 100 }
+        descuentoRecepcion: { type: boolean }
+        vigenciaDias: { type: integer, minimum: 1, maximum: 90 }
+        version: { type: integer }
     SistemaVehiculo:
       type: string
       enum: [motor, frenos, suspension, direccion, electrico, transmision, refrigeracion, llantas, carroceria, otro]
