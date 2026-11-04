@@ -220,6 +220,11 @@ func (Repository) Conversations(ctx context.Context, tallerID shared.ID, limit i
 }
 
 // ResponseMinutes: por cada mensaje del cliente, minutos hasta la siguiente respuesta del taller (HU-73).
+func (Repository) SentSince(ctx context.Context, tallerID shared.ID, since time.Time) (int, error) {
+	return db.Scalar[int](ctx, `SELECT count(*)::int FROM messaging.mensaje WHERE taller_id = $1 AND direccion = 'saliente'
+		AND estado IN ('enviado', 'entregado', 'leido') AND created_at >= $2`, tallerID, since)
+}
+
 // ResponseMinutes son los minutos entre cada mensaje del cliente y la primera respuesta (persona o agente). Auto marca
 // las respuestas automáticas (el estado de AU-05 y la autorización de datos), que el tablero cuenta aparte (HU-73).
 func (Repository) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]app.ResponseTime, error) {

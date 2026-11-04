@@ -76,7 +76,7 @@ func newEnvWith(t *testing.T, cfg config.API) *env {
 		Verifier:  authn.NewVerifier(map[string]*ecdsa.PublicKey{"test-1": &key.PublicKey}, clk),
 		OTPSender: mem, OTPPepper: []byte("pepper-de-pruebas-de-32-caracteres!!"),
 		AllowedOrigins: []string{origin}, LoginPerMinute: 100000, Storage: st,
-		Extra: wire.Extra(cfg), Public: wire.Public(d.API, cfg, log),
+		Extra: wire.Extra(cfg), Public: wire.Public(d.API, cfg, log), PlatformAdmins: cfg.Platform.Admins,
 	})
 	srv.Config.Handler = mux
 	srv.StartTLS()

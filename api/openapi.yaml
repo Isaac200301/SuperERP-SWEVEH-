@@ -1657,6 +1657,39 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
 
+  /platform/usage:
+    get:
+      operationId: getPlatformUsage
+      summary: 'Medidor del administrador del ERP (HU-74, ADR-0030): mensajes enviados del mes contra los incluidos y costo de IA por taller, el que más cuesta primero. Solo administradores del ERP (PLATFORM_ADMINS); a un usuario de taller le responde 403 sin_permiso'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [talleres, mes, incluidos, pesosPorDolar]
+                properties:
+                  mes: { type: string, description: 'AAAA-MM' }
+                  incluidos: { type: integer, description: 'Mensajes incluidos por taller (provisional, D-04)' }
+                  pesosPorDolar: { type: integer, description: 'Para pasar el costo de IA a pesos (provisional)' }
+                  talleres:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, nombre, mensajes, incluidos, mensajesTexto, iaMicroUsd, iaPesos, iaTexto, sePasa]
+                      properties:
+                        id: { type: string, format: uuid }
+                        nombre: { type: string }
+                        mensajes: { type: integer }
+                        incluidos: { type: integer }
+                        mensajesTexto: { type: string, description: '"34 de 1.000"' }
+                        iaMicroUsd: { type: integer, format: int64 }
+                        iaPesos: { type: integer, format: int64 }
+                        iaTexto: { type: string, description: '"IA $1.200"' }
+                        sePasa: { type: boolean, description: 'Lleva más mensajes de los incluidos' }
+        '403': { $ref: '#/components/responses/Problem' }
+
   /audit:
     get:
       operationId: listAudit
@@ -2177,6 +2210,7 @@ components:
           items: { type: string }
           description: 'Permisos recurso:acción del rol; la UI los usa solo para ocultar, el servidor siempre verifica (R-05)'
         cuentaNueva: { type: boolean }
+        adminPlataforma: { type: boolean, description: 'Es administrador del ERP: ve el medidor de todos los talleres (HU-74, ADR-0030)' }
 
     Cliente:
       type: object

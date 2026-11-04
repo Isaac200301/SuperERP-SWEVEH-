@@ -750,6 +750,17 @@ func (s *Service) createOrder(ctx context.Context, tallerID shared.ID, d DraftRe
 	return s.taller.CreateOrderFromPlate(ctx, tallerID, c.ID, d.Action.CreateOrder.Plate, d.Action.CreateOrder.Symptom, nil)
 }
 
+// MonthCost es el costo de IA del mes en micro USD (HU-99), para el medidor del administrador (HU-74).
+func (s *Service) MonthCost(ctx context.Context, tallerID shared.ID) (int64, error) {
+	var c int64
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		c, err = s.repo.MonthCost(ctx, tallerID, monthStart(s.clock.Now()))
+		return err
+	})
+	return c, err
+}
+
 // Stats es qué tan seguido el dueño edita los borradores (HU-65).
 func (s *Service) Stats(ctx context.Context, tallerID shared.ID) (sent, edited int, err error) {
 	err = s.uow.Do(ctx, func(ctx context.Context) error {

@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"sweveh/internal/shared"
 )
 
 type Env string
@@ -39,6 +41,15 @@ type API struct {
 	StorageDir       string
 	WhatsApp         WhatsApp
 	AI               AI
+	Platform         Platform
+}
+
+// Platform es lo del administrador del ERP (HU-74, ADR-0030): quiénes son y con qué números se compara el consumo.
+// IncludedMessages y COPPerUSD son provisionales hasta decidir el plan (D-04, Q-24).
+type Platform struct {
+	Admins           []string // celulares en E.164 (+57…) de los administradores del ERP; vacío = nadie
+	IncludedMessages int      // mensajes incluidos por taller al mes ("34 de 1.000")
+	COPPerUSD        int      // pesos por dólar para mostrar el costo de IA en pesos
 }
 
 // WhatsApp configura el canal (HU-101). Provider elige el adaptador: "meta" (Cloud API, oficial) o "local"
@@ -156,6 +167,18 @@ func LoadAPI() (API, error) {
 		StorageDir:       get("STORAGE_DIR", ".data/fotos"),
 	}
 	c.WhatsApp, c.AI = engine(c.Env, &errs)
+	c.Platform = Platform{IncludedMessages: getInt("PLAN_MENSAJES_INCLUIDOS", 1000, &errs), COPPerUSD: getInt("TRM_COP_POR_USD", 4000, &errs)}
+	for _, raw := range splitList(os.Getenv("PLATFORM_ADMINS")) {
+		phone, err := shared.ParseColombianMobile(raw)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("PLATFORM_ADMINS: %q no es un celular colombiano", raw))
+			continue
+		}
+		c.Platform.Admins = append(c.Platform.Admins, phone)
+	}
+	if c.Platform.IncludedMessages <= 0 || c.Platform.COPPerUSD <= 0 {
+		errs = append(errs, errors.New("PLAN_MENSAJES_INCLUIDOS y TRM_COP_POR_USD deben ser mayores que cero"))
+	}
 	if err := c.Env.validate(); err != nil {
 		errs = append(errs, err)
 	}

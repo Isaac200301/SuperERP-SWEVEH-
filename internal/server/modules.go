@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"log/slog"
 
 	"sweveh/internal/audit"
@@ -24,6 +25,7 @@ import (
 	"sweveh/internal/outbox"
 	"sweveh/internal/platform/clock"
 	"sweveh/internal/platform/db"
+	"sweveh/internal/platform/reqctx"
 	"sweveh/internal/platform/storage"
 	"sweveh/internal/quotes"
 	quotesdeps "sweveh/internal/quotes/adapters/out/deps"
@@ -60,6 +62,9 @@ type Modules struct {
 	InvF      inventory.Inventory
 	Quotes    *quotesapp.Quotes
 	QuotesF   quotes.Quotes
+
+	// PlatformAdmin dice si quien llama es administrador del ERP (HU-74, ADR-0030). Lo pone New; nil = nadie lo es.
+	PlatformAdmin func(ctx context.Context, p reqctx.Principal) (bool, error)
 }
 
 // Build arma los módulos sobre una conexión (rol sweveh_api o sweveh_worker).

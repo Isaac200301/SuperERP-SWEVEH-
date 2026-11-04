@@ -74,6 +74,7 @@ func run() error {
 		Pool: pool, Log: log, Clock: clk, Signer: signer, Verifier: verifier, OTPSender: sender,
 		OTPPepper: []byte(cfg.OTPPepper), AllowedOrigins: cfg.AllowedOrigins, TrustProxy: cfg.TrustProxy,
 		HSTS: cfg.Env != config.EnvLocal, WebDir: cfg.WebDir, LoginPerMinute: cfg.LoginPerMinute,
+		PlatformAdmins: cfg.Platform.Admins,
 	})
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,

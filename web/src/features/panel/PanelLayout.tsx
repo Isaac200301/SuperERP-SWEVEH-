@@ -3,7 +3,18 @@ import { NavLink, Outlet, useNavigate } from 'react-router';
 import type { Sesion } from '../../shared/api/client';
 import { roles } from '../../shared/i18n/es-CO';
 import { Brand } from '../../shared/ui/Logo';
-import { IconCar, IconChat, IconCheck, IconClock, IconLogout, IconOrders, IconPlus, IconTeam, IconTool, IconWarn } from '../../shared/ui/icons';
+import {
+  IconCar,
+  IconChat,
+  IconCheck,
+  IconClock,
+  IconLogout,
+  IconOrders,
+  IconPlus,
+  IconTeam,
+  IconTool,
+  IconWarn,
+} from '../../shared/ui/icons';
 import { can, useLogout } from '../auth/api';
 
 /**
@@ -21,6 +32,8 @@ const nav = [
   { to: '/panel/repuestos', label: 'Repuestos', icon: IconOrders, perm: 'part:manage' },
   { to: '/panel/equipo', label: 'Equipo', icon: IconTeam, perm: 'user:manage' },
   { to: '/panel/taller', label: 'Mi taller', icon: IconCar, perm: 'workshop:manage' },
+  // HU-74: solo el administrador del ERP; no es un permiso de taller (ADR-0030).
+  { to: '/panel/plataforma', label: 'Plataforma', icon: IconCheck, perm: '', admin: true },
 ];
 
 /** soloYo: el taller dijo "solo yo" en el registro y no ve la gestión de usuarios (HU-83). */
@@ -34,20 +47,22 @@ export function PanelLayout({ session, soloYo = false }: { session: Sesion; solo
           <Brand subtitle={session.taller.nombre} />
         </div>
         <nav aria-label="Secciones del panel" className="flex flex-row gap-2 md:flex-col">
-          {nav.filter((n) => can(session, n.perm) && !(soloYo && n.to === '/panel/equipo')).map((n) => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              className={({ isActive }) =>
-                `flex min-h-[44px] items-center gap-2.5 rounded-full px-4 text-[15px] ${
-                  isActive ? 'bg-nav font-extrabold text-ink' : 'bg-surface font-semibold text-[#33443F] hover:bg-white'
-                }`
-              }
-            >
-              <n.icon />
-              {n.label}
-            </NavLink>
-          ))}
+          {nav
+            .filter(n => ('admin' in n ? session.adminPlataforma === true : can(session, n.perm)) && !(soloYo && n.to === '/panel/equipo'))
+            .map(n => (
+              <NavLink
+                key={n.to}
+                to={n.to}
+                className={({ isActive }) =>
+                  `flex min-h-[44px] items-center gap-2.5 rounded-full px-4 text-[15px] ${
+                    isActive ? 'bg-nav font-extrabold text-ink' : 'bg-surface font-semibold text-[#33443F] hover:bg-white'
+                  }`
+                }
+              >
+                <n.icon />
+                {n.label}
+              </NavLink>
+            ))}
           <button
             type="button"
             className="ml-auto inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 font-bold text-primary md:hidden"
@@ -59,7 +74,7 @@ export function PanelLayout({ session, soloYo = false }: { session: Sesion; solo
         </nav>
         <div className="mt-auto hidden flex-col gap-1 rounded-[22px] bg-white p-4 text-sm md:flex">
           <b>{session.usuario.nombre}</b>
-          <span className="text-ink-2">{session.roles.map((r) => roles[r] ?? r).join(', ')}</span>
+          <span className="text-ink-2">{session.roles.map(r => roles[r] ?? r).join(', ')}</span>
           <button
             type="button"
             className="mt-2 inline-flex min-h-[44px] items-center gap-2 font-bold text-primary"

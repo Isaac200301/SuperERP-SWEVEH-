@@ -1209,6 +1209,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/platform/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Medidor del administrador del ERP (HU-74, ADR-0030): mensajes enviados del mes contra los incluidos y costo de IA por taller, el que más cuesta primero. Solo administradores del ERP (PLATFORM_ADMINS); a un usuario de taller le responde 403 sin_permiso */
+        get: operations["getPlatformUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/audit": {
         parameters: {
             query?: never;
@@ -1630,6 +1647,8 @@ export interface components {
             /** @description Permisos recurso:acción del rol; la UI los usa solo para ocultar, el servidor siempre verifica (R-05) */
             permisos?: string[];
             cuentaNueva: boolean;
+            /** @description Es administrador del ERP: ve el medidor de todos los talleres (HU-74, ADR-0030) */
+            adminPlataforma?: boolean;
         };
         Cliente: {
             /** Format: uuid */
@@ -4256,6 +4275,51 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    getPlatformUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description AAAA-MM */
+                        mes: string;
+                        /** @description Mensajes incluidos por taller (provisional, D-04) */
+                        incluidos: number;
+                        /** @description Para pasar el costo de IA a pesos (provisional) */
+                        pesosPorDolar: number;
+                        talleres: {
+                            /** Format: uuid */
+                            id: string;
+                            nombre: string;
+                            mensajes: number;
+                            incluidos: number;
+                            /** @description "34 de 1.000" */
+                            mensajesTexto: string;
+                            /** Format: int64 */
+                            iaMicroUsd: number;
+                            /** Format: int64 */
+                            iaPesos: number;
+                            /** @description "IA $1.200" */
+                            iaTexto: string;
+                            /** @description Lleva más mensajes de los incluidos */
+                            sePasa: boolean;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
         };
     };
     listAudit: {
