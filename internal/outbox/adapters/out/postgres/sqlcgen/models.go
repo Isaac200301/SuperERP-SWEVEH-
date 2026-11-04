@@ -42,6 +42,7 @@ type AssistantLlamadaIum struct {
 	LatenciaMs    int32
 	Resultado     string
 	CreatedAt     time.Time
+	MensajeID     *uuid.UUID
 }
 
 type AuditEvento struct {
