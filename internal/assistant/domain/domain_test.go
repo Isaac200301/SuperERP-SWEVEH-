@@ -197,3 +197,21 @@ func TestBuildDraft_GreetingAndUnknown(t *testing.T) {
 		t.Fatalf("otro: %q", d.Text)
 	}
 }
+
+// ADR-0029: el texto del asesor solo puede decir precios que trajo una tool, sin enlaces y corto.
+func TestGuard(t *testing.T) {
+	quoted := map[int64]bool{45000: true, 32000: true}
+	for text, ok := range map[string]bool{
+		"El cambio de aceite cuesta $45.000 y el aceite $32000.": true,
+		"Te sale en $39.000.":              false,
+		"Mira www.otrotaller.com":          false,
+		"Escríbenos a https://wa.me/57300": false,
+		"":                                 false,
+		strings.Repeat("a", MaxReply+1):    false,
+		"¡Hola! ¿En qué te ayudo con tu vehículo?": true,
+	} {
+		if err := Guard(text, quoted); (err == nil) != ok {
+			t.Errorf("Guard(%.40q) = %v; ok esperado %v", text, err, ok)
+		}
+	}
+}

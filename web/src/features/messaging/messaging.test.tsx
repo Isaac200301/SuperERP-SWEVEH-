@@ -27,6 +27,11 @@ describe('Thread (HU-24)', () => {
     expect(screen.getByText(/No se entregó/)).toBeInTheDocument();
     expect(screen.getByText(/código 131026/)).toBeInTheDocument();
   });
+
+  it('ADR-0029: muestra la foto de la vitrina que envió el asesor', () => {
+    renderPage(<Thread mensajes={[msg({ tipo: 'imagen', origen: 'agente', cuerpo: 'Aceite 20W50 · $32.000', payload: { imagen: 'repuesto:p1' } })]} />);
+    expect(screen.getByAltText('Aceite 20W50 · $32.000')).toHaveAttribute('src', '/api/v1/parts/p1/photo');
+  });
 });
 
 describe('OrderMessages (HU-24)', () => {

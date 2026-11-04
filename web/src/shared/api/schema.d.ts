@@ -1380,6 +1380,8 @@ export interface components {
                 }[];
                 boton?: string;
                 nombre?: string;
+                /** @description Foto enviada: "repuesto:<id>" es la foto de la vitrina (ADR-0029) */
+                imagen?: string;
             } | null;
             estado: string;
             origen: string;

@@ -42,6 +42,14 @@ type Taller interface {
 	Catalog(ctx context.Context, tallerID shared.ID) ([]domain.Priced, []domain.Priced, error) // servicios, repuestos
 	Workshop(ctx context.Context, tallerID shared.ID) (name string, open bool, nextOpening string, err error)
 	Attends(ctx context.Context, tallerID shared.ID) (string, error) // carro | moto | ambos
+
+	// Para el asesor (ADR-0029).
+	Profile(ctx context.Context, tallerID shared.ID) (WorkshopProfile, error)
+	Vehicles(ctx context.Context, tallerID, customerID shared.ID) ([]Vehicle, error)
+	History(ctx context.Context, tallerID, convID shared.ID, before time.Time, limit int) ([]Turn, error)
+	Showcase(ctx context.Context, tallerID shared.ID, q string) ([]Product, error)
+	// SendMedia envía una foto (ref "repuesto:<id>") con un pie opcional; false = ventana cerrada.
+	SendMedia(ctx context.Context, tallerID shared.ID, phone, caption, ref string) (bool, error)
 }
 
 type Inbound struct {
@@ -168,8 +176,9 @@ type Service struct {
 	audit  AuditLog
 	clock  Clock
 	ai     Interpreter
-	free   Interpreter // reglas: respaldo sin costo cuando se agota el tope mensual
-	capUSD int64
+	free    Interpreter // reglas: respaldo sin costo cuando se agota el tope mensual
+	capUSD  int64
+	advisor Advisor // asesor con tools (ADR-0029); nil = solo el flujo de reglas
 }
 
 func NewService(u UnitOfWork, r Repository, t Taller, a AuditLog, c Clock, ai, free Interpreter, monthlyCapMicroUSD int64) *Service {
@@ -363,6 +372,10 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 	if in.Kind != "texto" {
 		return nil
 	}
+	handled, tried, err := s.advise(ctx, tallerID, in, c)
+	if err != nil || handled {
+		return err
+	}
 	services, parts, err := s.taller.Catalog(ctx, tallerID)
 	if err != nil {
 		return err
@@ -372,7 +385,7 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 		return err
 	}
 	u, ok, err := s.interpret(ctx, tallerID, in, InterpretRequest{Text: in.Text, Workshop: name, Attends: attends,
-		Catalog: domain.Items(services, parts)})
+		Catalog: domain.Items(services, parts)}, tried)
 	if err != nil {
 		return err
 	}
@@ -468,7 +481,7 @@ func (s *Service) plateReview(ctx context.Context, tallerID shared.ID, in Inboun
 // interpret hace la única llamada al intérprete (RNF-05) fuera de la transacción, con límite de 30 s, y la
 // registra (HU-99). Con el tope mensual del taller agotado usa las reglas (sin costo). ok=false si la salida no
 // cumple el esquema o la IA falló: el llamador deja la tarjeta para el dueño (HU-54).
-func (s *Service) interpret(ctx context.Context, tallerID shared.ID, in Inbound, req InterpretRequest) (domain.Understanding, bool, error) {
+func (s *Service) interpret(ctx context.Context, tallerID shared.ID, in Inbound, req InterpretRequest, rulesOnly bool) (domain.Understanding, bool, error) {
 	var spent int64
 	if err := s.uow.Do(ctx, func(ctx context.Context) error {
 		var err error
@@ -478,8 +491,11 @@ func (s *Service) interpret(ctx context.Context, tallerID shared.ID, in Inbound,
 		return domain.Understanding{}, false, err
 	}
 	ai, result := s.ai, "ok"
-	if spent >= s.capUSD {
+	switch {
+	case spent >= s.capUSD:
 		ai, result = s.free, "tope"
+	case rulesOnly: // el asesor ya llamó a la IA y falló: el respaldo es sin costo
+		ai = s.free
 	}
 	start := time.Now()
 	cctx, cancel := context.WithTimeout(ctx, AITimeout)

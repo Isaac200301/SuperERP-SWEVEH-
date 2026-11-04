@@ -31,7 +31,11 @@ type Services struct {
 
 // Build arma los servicios del motor sobre los módulos ya cableados.
 func Build(m *server.Modules, wa config.WhatsApp, ai config.AI) *Services {
-	return BuildWith(m, Channel(wa), Interpreter(ai), ai)
+	s := BuildWith(m, Channel(wa), Interpreter(ai), ai)
+	if ai.Provider == "openrouter" { // el asesor con tools necesita un modelo; con reglas queda el flujo de plantillas
+		s.Assistant.SetAdvisor(openrouter.New(ai.APIBase, ai.APIKey, ai.Model, 20*time.Second))
+	}
+	return s
 }
 
 // Interpreter elige el intérprete del agente según AI_PROVIDER (ADR-0026). config ya validó la combinación.
@@ -77,6 +81,7 @@ func (parser) Parse(body []byte) ([]messagingapp.Inbound, []messagingapp.Status,
 func BuildWith(m *server.Modules, ch messagingapp.Channel, it assistantapp.Interpreter, ai config.AI) *Services {
 	s := &Services{M: m}
 	s.Messaging = messagingapp.NewService(m.Tx, messagingpg.Repository{}, ch, Parser(), m.Events, m.Clock)
+	s.Messaging.SetMediaSource(media{s})
 	s.Automations = automationsapp.NewService(m.Tx, automationspg.Repository{}, autoOrders{m}, autoCustomers{m}, autoWorkshops{m},
 		autoQuotes{m}, autoMessenger{s}, m.Audit, m.Clock)
 	cap := ai.MonthlyCapMicroUSD

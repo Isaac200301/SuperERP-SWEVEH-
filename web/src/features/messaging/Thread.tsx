@@ -25,6 +25,12 @@ export function botones(m: Mensaje): Boton[] {
   return m.payload?.botones ?? [];
 }
 
+/** Foto enviada por el asesor: "repuesto:<id>" es la foto de la vitrina (ADR-0029). */
+function foto(m: Mensaje): string | null {
+  const ref = m.payload?.imagen ?? '';
+  return ref.startsWith('repuesto:') ? `/api/v1/parts/${ref.slice('repuesto:'.length)}/photo` : null;
+}
+
 /**
  * Hilo de WhatsApp como lo ve el cliente (docs/10 §4.5): lo suyo a la izquierda y lo del taller a la derecha, con
  * hora, quién lo envió y si no se entregó. Con onPress los botones se pueden pulsar (simulador).
@@ -39,6 +45,7 @@ export function Thread({ mensajes, onPress }: { mensajes: Mensaje[]; onPress?: (
         return (
           <li key={m.id} className={`flex max-w-[85%] flex-col gap-1 ${mio ? 'self-end items-end' : 'self-start items-start'}`}>
             <div className={`rounded-2xl px-4 py-2 text-[15px] ${mio ? 'bg-[#DCF8C6]' : 'bg-white ring-1 ring-line'} ${m.estado === 'fallido' ? 'ring-2 ring-err' : ''}`}>
+              {foto(m) ? <img src={foto(m) ?? ''} alt={m.cuerpo} className="mb-1 max-h-56 rounded-xl bg-white object-contain" /> : null}
               <p className="whitespace-pre-wrap">{m.cuerpo}</p>
               {bs.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-2">

@@ -104,6 +104,7 @@ type Service struct {
 	parser  InboundParser
 	events  EventPublisher
 	clock   Clock
+	media   MediaSource
 }
 
 func NewService(tx TxRunner, r Repository, ch Channel, p InboundParser, e EventPublisher, c Clock) *Service {
@@ -249,7 +250,18 @@ type Outgoing struct {
 	// Template indica que el texto está aprobado como plantilla de utilidad y puede salir fuera de la ventana.
 	// Hoy no hay plantillas aprobadas (Q-07/Q-17, Sin dato), así que fuera de la ventana no sale.
 	Template bool
+	// Media es una foto que va con el texto como pie (p. ej. "repuesto:<id>", vitrina ADR-0029). La resuelve
+	// MediaSource al enviar; el mensaje solo guarda la referencia.
+	Media string
 }
+
+// MediaSource trae la foto de una referencia de Outgoing.Media (la conecta el composition root).
+type MediaSource interface {
+	Media(ctx context.Context, tallerID shared.ID, ref string) (Image, error)
+}
+
+// SetMediaSource conecta de dónde salen las fotos que se envían.
+func (s *Service) SetMediaSource(m MediaSource) { s.media = m }
 
 var ErrOutsideWindow = shared.Rule("fuera_de_ventana", "El cliente no ha escrito en las últimas 24 horas; este aviso necesita una plantilla aprobada por Meta.")
 var ErrEmptyText = shared.Validation("mensaje_vacio", "Escribe el mensaje.")
@@ -272,11 +284,14 @@ func (s *Service) Enqueue(ctx context.Context, o Outgoing) (Message, error) {
 		if !domain.InWindow(conv.LastInbound, s.clock.Now()) && !o.Template {
 			return ErrOutsideWindow
 		}
-		kind := "texto"
-		if len(o.Buttons) > 0 {
+		kind, p := "texto", map[string]any{"botones": o.Buttons}
+		switch {
+		case o.Media != "":
+			kind, p = "imagen", map[string]any{"imagen": o.Media}
+		case len(o.Buttons) > 0:
 			kind = "botones"
 		}
-		payload, _ := json.Marshal(map[string]any{"botones": o.Buttons})
+		payload, _ := json.Marshal(p)
 		cat := "servicio"
 		m := Message{ID: shared.NewID(), TallerID: o.TallerID, ConversationID: conv.ID, Direction: "saliente", Kind: kind, Body: o.Text,
 			Payload: payload, State: "pendiente", Origin: o.Origin, Category: &cat, OrderID: o.OrderID, Automation: o.Automation, CreatedAt: s.clock.Now()}
@@ -326,13 +341,22 @@ func (s *Service) Deliver(ctx context.Context, tallerID, msgID shared.ID, attemp
 	}
 	var p struct {
 		Buttons []domain.Button `json:"botones"`
+		Image   string          `json:"imagen"`
 	}
 	_ = json.Unmarshal(m.Payload, &p)
 	var wamid string
 	var err error
-	if len(p.Buttons) > 0 {
+	switch {
+	case p.Image != "" && s.media != nil:
+		var img Image
+		if img, err = s.media.Media(ctx, tallerID, p.Image); err != nil {
+			return s.failed(ctx, m, errors.New("no se encontró la foto para enviar"))
+		}
+		img.Caption = m.Body
+		wamid, err = s.channel.SendImage(ctx, ch.PhoneNumberID, conv.Phone, img)
+	case len(p.Buttons) > 0:
 		wamid, err = s.channel.SendButtons(ctx, ch.PhoneNumberID, conv.Phone, m.Body, p.Buttons)
-	} else {
+	default:
 		wamid, err = s.channel.SendText(ctx, ch.PhoneNumberID, conv.Phone, m.Body)
 	}
 	if err != nil {
