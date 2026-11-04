@@ -158,7 +158,8 @@ func TestAdvisor_GreetsOffersAndSchedules(t *testing.T) {
 	}
 }
 
-// Un precio que no salió de una tool no llega al cliente; si la IA falla, responden las reglas sin volver a llamarla;
+// Un precio que no salió de una tool no llega al cliente (tiene una ronda para corregir); si la IA falla, responden las
+// reglas sin volver a llamarla;
 // y si el asesor pasa la conversación a una persona, se detiene.
 func TestAdvisor_GuardsAndFallbacks(t *testing.T) {
 	e := newEnv(t)
@@ -172,10 +173,12 @@ func TestAdvisor_GuardsAndFallbacks(t *testing.T) {
 	adv.step = func(assistantapp.ChatRequest) (assistantapp.ChatMessage, error) {
 		return say("El cambio de aceite te sale en $39.000."), nil // inventado: no consultó servicios
 	}
-	before := len(w.sent(laura))
+	// Insiste en el precio inventado aun después de la ronda de corrección: no sale; responde el flujo de reglas
+	// con el precio de la lista.
+	n0 := len(adv.reqs)
 	w.write(laura, "Laura Gómez", "¿cuánto el cambio de aceite?")
-	if len(w.sent(laura)) != before || len(w.drafts()) != 1 || !strings.Contains(w.drafts()[0]["propuesto"].(string), "Responde tú") {
-		t.Fatalf("precio inventado: enviados %d, por revisar %v", len(w.sent(laura))-before, w.drafts())
+	if got := w.last(laura)["cuerpo"].(string); strings.Contains(got, "39.000") || !strings.Contains(got, "$45.000") || len(adv.reqs) != n0+2 {
+		t.Fatalf("precio inventado: %q, llamadas %d", got, len(adv.reqs)-n0)
 	}
 
 	adv.step = func(assistantapp.ChatRequest) (assistantapp.ChatMessage, error) {
