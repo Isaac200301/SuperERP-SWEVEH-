@@ -13,7 +13,7 @@ grep -v -E 'sqlcgen|internal/platform/testdb' "$OUT.raw" > "$OUT"
 fail=0
 for p in identity/domain identity/app customers/domain customers/app vehicles/domain vehicles/app \
          orders/domain orders/app tenancy/domain quotes/domain quotes/app inventory/domain inventory/app \
-         catalog/domain catalog/app; do
+         catalog/domain catalog/app assistant/domain; do
   grep -E "^mode|sweveh/internal/$p/" "$OUT" > "$OUT.pkg"
   pct=$(go tool cover -func="$OUT.pkg" | tail -1 | awk '{print $3}' | tr -d '%')
   printf '%-20s %s%%\n' "$p" "$pct"
