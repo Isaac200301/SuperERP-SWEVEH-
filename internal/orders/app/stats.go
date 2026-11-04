@@ -14,8 +14,8 @@ type Since struct {
 	At      time.Time
 }
 
-// Filter acota las cifras del tablero: Kind "" (todos), "carro" o "moto" (HU-68, HU-70); Example=true cuenta solo
-// las órdenes de ejemplo del registro (HU-05), que el tablero muestra con la marca "ejemplo" (HU-71).
+// Filter acota las cifras del tablero: Kind "" (todos), "carro" o "moto" (HU-68, HU-70); Example=true suma también
+// las órdenes de ejemplo (registro, HU-05, y taller ficticio, HU-97), que el tablero marca "ejemplo" (HU-71).
 type Filter struct {
 	Kind    string
 	Example bool
@@ -31,8 +31,8 @@ type Stats interface {
 	Returning(ctx context.Context, tallerID shared.ID, since time.Time, f Filter) (int, int, error)
 	DeliveredSince(ctx context.Context, tallerID shared.ID, since time.Time, f Filter) ([]shared.ID, error)
 	StateSince(ctx context.Context, tallerID shared.ID, state string) ([]Since, error)
-	// HasReal dice si el taller ya tiene órdenes propias (no de ejemplo).
-	HasReal(ctx context.Context, tallerID shared.ID) (bool, error)
+	// HasExample dice si el taller tiene órdenes de ejemplo (sus cifras van marcadas "ejemplo", HU-71).
+	HasExample(ctx context.Context, tallerID shared.ID) (bool, error)
 }
 
 func (f *Flow) SetStats(s Stats) { f.stats = s }

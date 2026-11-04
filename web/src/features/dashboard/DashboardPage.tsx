@@ -70,7 +70,7 @@ export function DashboardPage() {
       ) : null}
       {kpis.data?.ejemplo ? (
         <p role="note" className="rounded-2xl bg-primary-tint p-3 text-sm">
-          Todavía no tienes órdenes propias: los números marcados <b>ejemplo</b> salen de la orden de ejemplo del registro.
+          Los números marcados <b>ejemplo</b> incluyen órdenes de ejemplo para que el tablero no salga vacío.
         </p>
       ) : null}
       {kpis.data ? (

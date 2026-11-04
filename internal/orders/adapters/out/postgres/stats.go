@@ -14,8 +14,8 @@ import (
 // Las órdenes de ejemplo del registro (HU-05) solo cuentan con Filter.Example (el tablero las marca, HU-71).
 type Stats struct{}
 
-// filtro: las órdenes de ejemplo o las reales, y solo un tipo de vehículo si viene (HU-68, HU-70, HU-71).
-const filtro = ` AND ejemplo = $%d AND ($%d = '' OR tipo_vehiculo = $%d)`
+// filtro: las reales y, si se piden, también las de ejemplo; y solo un tipo de vehículo si viene (HU-68, HU-70, HU-71).
+const filtro = ` AND (NOT ejemplo OR $%d) AND ($%d = '' OR tipo_vehiculo = $%d)`
 
 func where(n int) string { return fmt.Sprintf(filtro, n, n+1, n+1) }
 
@@ -74,8 +74,8 @@ func (Stats) DeliveredSince(ctx context.Context, tallerID shared.ID, since time.
 	return out, err
 }
 
-func (Stats) HasReal(ctx context.Context, tallerID shared.ID) (bool, error) {
-	return db.Scalar[bool](ctx, `SELECT EXISTS (SELECT 1 FROM orders.orden WHERE taller_id = $1 AND NOT ejemplo)`, tallerID)
+func (Stats) HasExample(ctx context.Context, tallerID shared.ID) (bool, error) {
+	return db.Scalar[bool](ctx, `SELECT EXISTS (SELECT 1 FROM orders.orden WHERE taller_id = $1 AND ejemplo)`, tallerID)
 }
 
 // StateSince devuelve desde cuándo cada orden abierta del estado dado está en él.

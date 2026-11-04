@@ -31,9 +31,8 @@ func motoOrder(t *testing.T, c *client, plate string) string {
 		"estadoInicial": "recibido"})).str("id")
 }
 
-// HU-71 (criterio 2) y HU-68: mientras solo existe la orden de ejemplo del registro, el tablero la cuenta y marca los
-// números "ejemplo"; con la primera orden propia deja de contarla y quita la marca. El conteo por estado coincide con
-// uno manual.
+// HU-71 (criterio 2) y HU-68: las órdenes de ejemplo suman para que el tablero no salga en cero y sus números van
+// marcados "ejemplo" mientras existan (docs/03, taller ficticio). El conteo por estado coincide con uno manual.
 func TestDashboard_ExampleMarkAndStateCounts(t *testing.T) {
 	e := newEnv(t)
 	c := e.register("3105550600", "Rosa Pérez")
@@ -50,16 +49,23 @@ func TestDashboard_ExampleMarkAndStateCounts(t *testing.T) {
 	motoOrder(t, c, "MTO60F")
 	d = c.must(http.StatusOK, c.do("GET", "/api/v1/dashboard", nil)).body
 	byState := d["porEstado"].(map[string]any)
-	if d["ejemplo"] != false || kpi(t, d, "abiertas")["ejemplo"] != false || kpi(t, d, "abiertas")["texto"] != "2" ||
-		byState["en_diagnostico"] != float64(1) || byState["recibido"] != float64(1) || byState["por_recibir"] != nil {
-		t.Fatalf("con órdenes propias: %v", d)
+	if d["ejemplo"] != true || kpi(t, d, "abiertas")["ejemplo"] != true || kpi(t, d, "abiertas")["texto"] != "3" ||
+		byState["en_diagnostico"] != float64(1) || byState["recibido"] != float64(1) || byState["por_recibir"] != float64(1) {
+		t.Fatalf("órdenes propias y de ejemplo: %v", d)
 	}
 	// HU-68 (Should): por tipo, carros y motos por separado.
 	car := c.must(http.StatusOK, c.do("GET", "/api/v1/dashboard?tipo=carro", nil)).body
 	moto := c.must(http.StatusOK, c.do("GET", "/api/v1/dashboard?tipo=moto", nil)).body
-	if car["tipo"] != "carro" || kpi(t, car, "abiertas")["texto"] != "1" || car["porEstado"].(map[string]any)["en_diagnostico"] != float64(1) ||
+	if car["tipo"] != "carro" || kpi(t, car, "abiertas")["texto"] != "2" || car["porEstado"].(map[string]any)["en_diagnostico"] != float64(1) ||
 		kpi(t, moto, "abiertas")["texto"] != "1" || moto["porEstado"].(map[string]any)["recibido"] != float64(1) {
 		t.Fatalf("por tipo: carro %v, moto %v", car, moto)
+	}
+	// Sin órdenes de ejemplo, sin marca.
+	e2 := newEnv(t)
+	c2 := e2.register("3105550609", "Iván Soto")
+	orderInDiagnosis(t, c2, "SIN609", 1)
+	if d := c2.must(http.StatusOK, c2.do("GET", "/api/v1/dashboard", nil)).body; d["ejemplo"] != false || kpi(t, d, "abiertas")["ejemplo"] != false {
+		t.Fatalf("sin ejemplo: %v", d)
 	}
 }
 

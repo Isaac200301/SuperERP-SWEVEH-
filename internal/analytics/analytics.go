@@ -116,8 +116,8 @@ func money(v int64) string {
 }
 
 // dashboard son los 6 números del taller (HU-68 a HU-73). ?tipo=carro|moto los separa por tipo de vehículo (HU-68 y
-// HU-70, Should). Mientras el taller no tenga órdenes propias, se calculan con las de ejemplo y van marcados "ejemplo"
-// (HU-71).
+// HU-70, Should). Las órdenes de ejemplo (registro y taller ficticio) suman para que los números no salgan en cero, y
+// los números que salen de órdenes llevan la marca "ejemplo" mientras existan (HU-71, docs/03 "taller ficticio").
 func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, error) {
 	now := h.now()
 	kind := r.URL.Query().Get("tipo")
@@ -128,13 +128,12 @@ func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, erro
 	var byState map[string]int
 	example := false
 	err := h.uow.Do(r.Context(), func(ctx context.Context) error {
+		var err error
 		st := h.orders.Stats()
-		real, err := st.HasReal(ctx, p.TallerID)
-		if err != nil {
+		if example, err = st.HasExample(ctx, p.TallerID); err != nil {
 			return err
 		}
-		example = !real
-		flt := orders.Filter{Kind: kind, Example: example}
+		flt := orders.Filter{Kind: kind, Example: true}
 		if byState, err = st.StateCounts(ctx, p.TallerID, flt); err != nil {
 			return err
 		}
