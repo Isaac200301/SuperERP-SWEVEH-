@@ -179,8 +179,8 @@ func (r Report) Print(w io.Writer) {
 			continue
 		}
 		if mark != "ok" {
-			_, _ = fmt.Fprintf(w, "      intención %s (esperada %s) · tipo %q (esperado %q) · servicios [%s] (esperados [%s])\n", x.Got.Intent, x.Intent,
-				x.Got.Vehicle.Type, x.Vehicle, strings.Join(x.Got.Services, ", "), strings.Join(x.Services, ", "))
+			_, _ = fmt.Fprintf(w, "      intención %s (esperada %s) · tipo %q (esperado %q) · servicios [%s] (esperados [%s]) · otros [%s]\n", x.Got.Intent, x.Intent,
+				x.Got.Vehicle.Type, x.Vehicle, strings.Join(x.Got.Services, ", "), strings.Join(x.Services, ", "), strings.Join(x.Got.Others, ", "))
 		}
 	}
 	_, _ = fmt.Fprintf(w, "\nServicios bien: %d/%d (HU-102 pide %d) · intención: %d/%d · tipo de vehículo: %d/%d\n",

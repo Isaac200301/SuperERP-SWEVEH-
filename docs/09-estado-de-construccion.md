@@ -17,7 +17,7 @@
 ## Qué sigue (lo escribe el agente al cerrar cada sesión)
 
 1. Isaac/Pablo: revisar y hacer merge del PR #8 (`dev/pablo`) con el CI en verde.
-2. **T3 quedó en código y probado con reglas** (`internal/server/agent_test.go`, `internal/assistant/eval`). Para la demo: una clave de **OpenRouter** y un modelo; correr `AI_PROVIDER=openrouter AI_API_KEY=… AI_MODEL=… make agent-eval` y anotar el resultado en D-08 (las reglas dan 28/30).
+2. **T3 quedó en código y probado con reglas** (`internal/server/agent_test.go`, `internal/assistant/eval`). Para la demo: OpenRouter gratis con Nemotron 3 Ultra y dos respaldos (`AI_MODEL` con varios separados por coma, clave en `.env`); `make agent-eval` da 28/30 servicios y 30/30 intenciones a US$0 (ver `docs/07`, D-08). Las reglas dan 28/30 y 29/30.
 3. WhatsApp real: número de prueba de Meta + URL pública del webhook (ADR-0025). Para la demo, el adaptador de **WAHA** (pendiente).
 4. **Supabase staging:** borrar "weveh" y crear `sweveh-staging` en `sa-east-1`. Bloqueado: el conector de Supabase solo ve "Isaac200301's Org"; hay que reconectarlo con la cuenta de weveh.
 5. Siguiente tramo: **T4 (números y catálogo)**. HU-99 tiene el registro por llamada; la vista del costo va con el medidor del administrador (HU-40).

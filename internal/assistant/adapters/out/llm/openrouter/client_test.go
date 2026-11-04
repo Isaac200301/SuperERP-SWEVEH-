@@ -51,8 +51,11 @@ func TestInterpret_RequestShapeAndUsage(t *testing.T) {
 		t.Fatalf("%+v, %v", u, err)
 	}
 
-	if got["model"] != "openai/gpt-4o-mini" || got["temperature"] != 0.0 {
-		t.Fatalf("modelo/temperatura: %v %v", got["model"], got["temperature"])
+	if got["model"] != "openai/gpt-4o-mini" || got["temperature"] != 0.0 || got["models"] != nil {
+		t.Fatalf("modelo/temperatura: %v %v %v", got["model"], got["temperature"], got["models"])
+	}
+	if r, _ := got["reasoning"].(map[string]any); r["enabled"] != false {
+		t.Fatalf("reasoning = %v", got["reasoning"])
 	}
 	rf := got["response_format"].(map[string]any)
 	schema := rf["json_schema"].(map[string]any)
@@ -70,6 +73,30 @@ func TestInterpret_RequestShapeAndUsage(t *testing.T) {
 	// El texto del cliente va solo en el mensaje de usuario, delimitado: es dato, no instrucción (R-08).
 	if strings.Contains(sys, "gratis") || !strings.Contains(user, "<<<\n"+req.Text+"\n>>>") {
 		t.Fatalf("texto del cliente mal ubicado:\n%s\n%s", sys, user)
+	}
+}
+
+// Varios modelos separados por coma van como models (respaldo de OpenRouter, en orden); el registro guarda el
+// modelo que respondió. Fuente: https://openrouter.ai/docs/guides/routing/model-fallbacks (consultada el 2026-11-04).
+func TestInterpret_ModelFallbacks(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(b, &got)
+		_, _ = io.WriteString(w, strings.Replace(okBody, "openai/gpt-4o-mini", "b:free", 1))
+	}))
+	defer srv.Close()
+
+	res, err := New(srv.URL, "k", " a:free, b:free ,,c:free", time.Second).Interpret(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	models, _ := got["models"].([]any)
+	if got["model"] != "a:free" || len(models) != 3 || models[0] != "a:free" || models[2] != "c:free" {
+		t.Fatalf("model=%v models=%v", got["model"], got["models"])
+	}
+	if res.Model != "b:free" {
+		t.Fatalf("modelo registrado = %q", res.Model)
 	}
 }
 

@@ -25,13 +25,22 @@ import (
 
 // Client llama a la API. La clave nunca sale en errores ni en logs.
 type Client struct {
-	base, key, model string
-	http             *http.Client
+	base, key string
+	models    []string
+	http      *http.Client
 }
 
-// New arma el cliente. timeout es el límite total de la llamada (HU-54: 30 s).
+// New arma el cliente. model es uno o varios modelos separados por coma, en orden de preferencia: con varios,
+// OpenRouter pasa al siguiente si el anterior falla, está limitado o caído (parámetro models). timeout es el
+// límite total de la llamada, con respaldos incluidos (HU-54: 30 s).
 func New(base, key, model string, timeout time.Duration) *Client {
-	return &Client{base: strings.TrimRight(base, "/"), key: key, model: model, http: &http.Client{Timeout: timeout}}
+	var models []string
+	for _, m := range strings.Split(model, ",") {
+		if m = strings.TrimSpace(m); m != "" {
+			models = append(models, m)
+		}
+	}
+	return &Client{base: strings.TrimRight(base, "/"), key: key, models: models, http: &http.Client{Timeout: timeout}}
 }
 
 // APIError es una respuesta no exitosa del proveedor: solo el código, sin eco del cuerpo (puede traer el mensaje).
@@ -62,10 +71,12 @@ Reglas:
 
 type request struct {
 	Model          string    `json:"model"`
+	Models         []string  `json:"models,omitempty"`
 	Messages       []message `json:"messages"`
 	Temperature    float64   `json:"temperature"`
 	MaxTokens      int       `json:"max_tokens"`
 	ResponseFormat any       `json:"response_format"`
+	Reasoning      any       `json:"reasoning"`
 	Usage          any       `json:"usage"`
 }
 
@@ -96,10 +107,20 @@ type response struct {
 
 // Interpret hace una sola llamada por mensaje (RNF-05) y devuelve el JSON crudo para que el código lo valide.
 func (c *Client) Interpret(ctx context.Context, r app.InterpretRequest) (app.InterpretResult, error) {
-	out := app.InterpretResult{Provider: "openrouter", Model: c.model}
+	out := app.InterpretResult{Provider: "openrouter"}
+	if len(c.models) > 0 {
+		out.Model = c.models[0]
+	}
+	var fallbacks []string
+	if len(c.models) > 1 {
+		fallbacks = c.models
+	}
 	catalog, _ := json.Marshal(r.Catalog)
 	body, err := json.Marshal(request{
-		Model: c.model, Temperature: 0, MaxTokens: 400,
+		Model: out.Model, Models: fallbacks, Temperature: 0, MaxTokens: 800,
+		// Extraer datos no necesita razonar: con el razonamiento prendido los modelos que piensan (Nemotron 3.5)
+		// gastan todo el límite pensando y devuelven el contenido vacío. Medido con make agent-eval el 2026-11-04.
+		Reasoning: map[string]bool{"enabled": false},
 		Messages: []message{
 			{Role: "system", Content: fmt.Sprintf(system, r.Workshop, attends(r.Attends), catalog)},
 			{Role: "user", Content: "Mensaje del cliente:\n<<<\n" + r.Text + "\n>>>"},
