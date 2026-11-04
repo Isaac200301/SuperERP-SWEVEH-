@@ -97,9 +97,13 @@ func Money(v int64) string {
 func BuildDraft(in DraftInput) Draft {
 	var parts []string
 	var src []Source
-	greet := "¡Hola!"
-	if f := strings.Fields(in.CustomerName); len(f) > 0 {
-		greet = "¡Hola " + f[0] + "!"
+	greet := Greet("¡Hola", in.CustomerName)
+	switch {
+	case in.Intent.Kind == "saludo":
+		return Draft{Text: fmt.Sprintf("%s Te escribe el asistente de %s. Puedo darte precios de nuestros servicios, agendar tu visita o "+
+			"contarte cómo va tu vehículo. ¿En qué te ayudo?", greet, in.Workshop)}
+	case in.Intent.Kind == "otro" && len(in.Intent.Services)+len(in.Intent.Others) == 0:
+		return Draft{Text: "Perdona, no te entendí bien. Puedo ayudarte con precios de servicios, citas o el estado de tu vehículo. ¿Qué necesitas?"}
 	}
 	vt := in.Intent.Vehicle.Type
 	if vt != "" && (in.Attends == "carro" || in.Attends == "moto") && in.Attends != vt { // HU-52, criterio 3
@@ -162,7 +166,7 @@ func BuildDraft(in DraftInput) Draft {
 		parts = append(parts, "Tenemos cupo "+strings.TrimSuffix(in.NextOpening, ".")+".")
 		src = append(src, Source{Field: "horario", Value: in.NextOpening, Origin: "Horario del taller"})
 	}
-	if !in.HasPlate {
+	if !in.HasPlate && (in.Intent.Kind == "cotizar" || in.Intent.Kind == "cita" || in.Intent.Kind == "diagnostico") {
 		parts = append(parts, "¿Me regalas la placa del vehículo?")
 	}
 	if len(parts) == 0 {
@@ -213,4 +217,27 @@ func Capitalize(s string) string {
 	}
 	r := []rune(s)
 	return strings.ToUpper(string(r[0])) + string(r[1:])
+}
+
+// FirstName es el primer nombre del cliente, o "" si es un nombre de relleno ("Cliente WhatsApp", "Cliente de
+// prueba", una sola letra o números): así no se saluda a nadie como "Cliente".
+func FirstName(name string) string {
+	f := strings.Fields(name)
+	if len(f) == 0 {
+		return ""
+	}
+	first := f[0]
+	low := strings.ToLower(first)
+	if len([]rune(first)) < 2 || low == "cliente" || strings.Trim(first, "0123456789+") == "" {
+		return ""
+	}
+	return first
+}
+
+// Greet arma "¡Hola Laura!" o "¡Hola!" si no hay un nombre real. prefix va sin el cierre: "¡Hola", "¡Gracias".
+func Greet(prefix, name string) string {
+	if n := FirstName(name); n != "" {
+		return prefix + " " + n + "!"
+	}
+	return prefix + "!"
 }

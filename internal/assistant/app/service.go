@@ -33,7 +33,11 @@ type Taller interface {
 	RespondQuote(ctx context.Context, tallerID, orderID shared.ID, decision, ref string) error
 	// AnswerReceipt guarda "Está bien" (ok) o "Algo no cuadra" de la constancia; false si ya había respuesta.
 	AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, ok bool, ref string) (bool, error)
-	CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string) (string, error)
+	// PlateOf dice de quién es la placa en el taller: "nueva", "propia" (con su orden abierta, si tiene) o "ajena".
+	PlateOf(ctx context.Context, tallerID, customerID shared.ID, plate string) (PlateInfo, error)
+	// CreateOrderFromPlate abre la orden "Por recibir" (HU-55). Nunca duplica ni toca un vehículo ajeno: si la placa
+	// ya tiene orden abierta devuelve esa; si es de otro cliente no crea nada (Outcome "ajena").
+	CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string) (PlateInfo, error)
 
 	Catalog(ctx context.Context, tallerID shared.ID) ([]domain.Priced, []domain.Priced, error) // servicios, repuestos
 	Workshop(ctx context.Context, tallerID shared.ID) (name string, open bool, nextOpening string, err error)
@@ -69,6 +73,14 @@ type Order struct {
 }
 
 type Button struct{ ID, Title string }
+
+// PlateInfo es lo que se sabe de una placa para este cliente. Owner: nueva | propia | ajena. Open es la orden abierta
+// del cliente con esa placa; Code, el número de la orden creada o encontrada.
+type PlateInfo struct {
+	Owner string
+	Open  *Order
+	Code  string
+}
 
 // DraftRecord es un borrador guardado.
 type DraftRecord struct {
@@ -178,6 +190,7 @@ const (
 	receiptOK   = "¡Gracias! Quedó registrado que el recibo está bien. Te avisamos cada avance."
 	receiptAsk  = "Gracias por avisarnos. Una persona del taller te escribe para revisarlo contigo."
 	cantAnswer  = "No pudimos armar una respuesta segura. Responde tú."
+	plateAsk    = "¡Gracias! Una persona del taller revisa esa placa y te escribe en un momento."
 )
 
 // HandleInbound procesa un mensaje entrante (lo llama el worker al recibir "messaging.mensaje_recibido").
@@ -405,16 +418,17 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 		}
 	}
 	var action *Action
-	if intent.Plate != "" { // HU-55: la placa crea la orden "Por recibir" cuando el dueño envía
-		orders, err := s.taller.OpenOrders(ctx, tallerID, c.ID)
+	if intent.Plate != "" { // HU-55: la placa crea la orden "Por recibir" al enviar la respuesta
+		p, err := s.taller.PlateOf(ctx, tallerID, c.ID, intent.Plate)
 		if err != nil {
 			return err
 		}
-		exists := false
-		for _, o := range orders {
-			exists = exists || o.Plate == intent.Plate
-		}
-		if !exists {
+		switch {
+		case p.Owner == "ajena": // de otro cliente: no se crea nada ni se dice nada del vehículo (HU-12)
+			return s.plateReview(ctx, tallerID, in)
+		case p.Open != nil && len(intent.Services)+len(intent.Others) == 0: // ya tiene orden: se cuenta cómo va
+			return s.status(ctx, tallerID, in, c, *p.Open)
+		case p.Open == nil:
 			prev, _ := s.taller.PreviousText(ctx, tallerID, in.ConversationID, in.At)
 			sym := in.Text
 			if prev != nil {
@@ -426,7 +440,7 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 			}{Plate: intent.Plate, Symptom: sym}}
 			// La placa sola no repite la cotización: se confirma la recepción.
 			if len(intent.Services)+len(intent.Others) == 0 {
-				d := domain.Draft{Text: "¡Gracias " + firstName(c.Name) + "! Te dejamos registrada la placa " + intent.Plate + ". Te esperamos " +
+				d := domain.Draft{Text: domain.Greet("¡Gracias", c.Name) + " Te dejamos registrada la placa " + intent.Plate + ". Te esperamos " +
 					strings.TrimSuffix(nextOpening, ".") + "."}
 				return s.answer(ctx, tallerID, in, "placa", d.Text, d.Sources, action, "ia")
 			}
@@ -441,11 +455,14 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 	return s.answer(ctx, tallerID, in, intent.Kind, d.Text, d.Sources, action, "ia")
 }
 
-func firstName(n string) string {
-	if f := strings.Fields(n); len(f) > 0 {
-		return f[0]
+// plateReview: la placa es de otro cliente. No se crea nada ni se dice nada del vehículo; una persona del taller
+// revisa (la conversación pasa a modo humano con alerta, HU-59).
+func (s *Service) plateReview(ctx context.Context, tallerID shared.ID, in Inbound) error {
+	if err := s.taller.SetMode(ctx, tallerID, in.ConversationID, "humano", true); err != nil {
+		return err
 	}
-	return n
+	_, err := s.taller.Send(ctx, tallerID, in.Phone, plateAsk, nil, "AU-04", nil)
+	return err
 }
 
 // interpret hace la única llamada al intérprete (RNF-05) fuera de la transacción, con límite de 30 s, y la
@@ -565,12 +582,12 @@ func (s *Service) deliver(ctx context.Context, tallerID shared.ID, d DraftRecord
 		}
 	}
 	if d.Action != nil && d.Action.CreateOrder != nil {
-		code, err := s.createOrder(ctx, tallerID, d)
+		p, err := s.createOrder(ctx, tallerID, d)
 		if err != nil {
 			return "", false, err
 		}
-		if code != "" {
-			text += " Tu orden es la " + code + "."
+		if p.Code != "" {
+			text += " Tu orden es la " + p.Code + "."
 		}
 	}
 	ok, err := s.taller.Send(ctx, tallerID, d.Phone, text, nil, "AU-04", nil)
@@ -680,14 +697,14 @@ func (s *Service) Resolve(ctx context.Context, tallerID, draftID shared.ID, acto
 	return out, err
 }
 
-func (s *Service) createOrder(ctx context.Context, tallerID shared.ID, d DraftRecord) (string, error) {
+func (s *Service) createOrder(ctx context.Context, tallerID shared.ID, d DraftRecord) (PlateInfo, error) {
 	in, err := s.taller.Message(ctx, tallerID, d.InboundID)
 	if err != nil {
-		return "", err
+		return PlateInfo{}, err
 	}
 	c, err := s.taller.CustomerByPhone(ctx, tallerID, in.Phone)
 	if err != nil || c == nil {
-		return "", err
+		return PlateInfo{}, err
 	}
 	return s.taller.CreateOrderFromPlate(ctx, tallerID, c.ID, d.Action.CreateOrder.Plate, d.Action.CreateOrder.Symptom)
 }

@@ -18,6 +18,7 @@ import (
 	ordersdomain "sweveh/internal/orders/domain"
 	"sweveh/internal/shared"
 	vehiclesapp "sweveh/internal/vehicles/app"
+	vehiclesdomain "sweveh/internal/vehicles/domain"
 )
 
 // taller implementa assistantapp.Taller sobre las fachadas y servicios ya cableados.
@@ -187,19 +188,54 @@ func (t *taller) AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID,
 }
 
 // CreateOrderFromPlate crea vehículo (motor pendiente) y orden "Por recibir" (HU-55, HU-91).
-func (t *taller) CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string) (string, error) {
-	var code string
+func (t *taller) PlateOf(ctx context.Context, tallerID, customerID shared.ID, plate string) (assistantapp.PlateInfo, error) {
+	var out assistantapp.PlateInfo
 	err := t.s.M.Tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = t.plateOf(ctx, tallerID, customerID, plate)
+		return err
+	})
+	return out, err
+}
+
+// plateOf corre en la transacción del llamador.
+func (t *taller) plateOf(ctx context.Context, tallerID, customerID shared.ID, plate string) (assistantapp.PlateInfo, error) {
+	v, err := t.s.M.VehDir.ByPlate(ctx, tallerID, plate)
+	switch {
+	case errors.Is(err, vehiclesdomain.ErrVehicleNotFound):
+		return assistantapp.PlateInfo{Owner: "nueva"}, nil
+	case err != nil:
+		return assistantapp.PlateInfo{}, err
+	case v.CustomerID != customerID:
+		return assistantapp.PlateInfo{Owner: "ajena"}, nil
+	}
+	open, err := t.s.M.OrdersF.OpenByCustomer(ctx, tallerID, customerID, []shared.ID{v.ID})
+	if err != nil || len(open) == 0 {
+		return assistantapp.PlateInfo{Owner: "propia"}, err
+	}
+	i := open[0]
+	return assistantapp.PlateInfo{Owner: "propia", Code: i.Code, Open: &assistantapp.Order{ID: i.ID, Code: i.Code, Plate: i.Plate,
+		Vehicle: i.Vehicle, State: i.State, PromisedAt: i.PromisedAt}}, nil
+}
+
+func (t *taller) CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string) (assistantapp.PlateInfo, error) {
+	var out assistantapp.PlateInfo
+	err := t.s.M.Tx.Do(ctx, func(ctx context.Context) error {
+		p, err := t.plateOf(ctx, tallerID, customerID, plate)
+		if err != nil || p.Owner == "ajena" || p.Open != nil { // ajena: nada; con orden abierta: esa misma
+			out = p
+			return err
+		}
 		v, err := t.s.M.Vehicles.Register(ctx, vehiclesapp.RegisterVehicle{TallerID: tallerID, Actor: agent, Plate: plate, CustomerID: customerID})
 		if err != nil {
 			return err
 		}
 		o, err := t.s.M.Orders.Open(ctx, ordersapp.OpenOrder{TallerID: tallerID, Actor: agent, VehicleID: v.Vehicle.ID, Symptom: symptom,
-			InitialState: ordersdomain.StatePending, ConfirmDuplicate: true})
-		code = o.Code()
+			InitialState: ordersdomain.StatePending})
+		out = assistantapp.PlateInfo{Owner: p.Owner, Code: o.Code()}
 		return err
 	})
-	return code, err
+	return out, err
 }
 
 func (t *taller) Catalog(ctx context.Context, tallerID shared.ID) ([]domain.Priced, []domain.Priced, error) {

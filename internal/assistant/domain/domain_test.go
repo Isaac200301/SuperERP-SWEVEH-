@@ -176,3 +176,24 @@ func mustJSON(t *testing.T, v any) []byte {
 	}
 	return b
 }
+
+func TestGreetSkipsPlaceholderNames(t *testing.T) {
+	for name, want := range map[string]string{"Laura Gómez": "¡Hola Laura!", "Cliente de prueba": "¡Hola!", "Cliente WhatsApp": "¡Hola!",
+		"": "¡Hola!", "J": "¡Hola!", "+573001234567": "¡Hola!"} {
+		if got := Greet("¡Hola", name); got != want {
+			t.Errorf("Greet(%q) = %q; quiero %q", name, got, want)
+		}
+	}
+}
+
+// "hola" se responde con lo que hace el asistente; lo que no se entiende no pide la placa.
+func TestBuildDraft_GreetingAndUnknown(t *testing.T) {
+	d := BuildDraft(DraftInput{CustomerName: "Laura Gómez", Workshop: "Taller El Pistón", Intent: Intent{Kind: "saludo"}})
+	if !strings.Contains(d.Text, "¡Hola Laura! Te escribe el asistente de Taller El Pistón") || strings.Contains(d.Text, "placa") {
+		t.Fatalf("saludo: %q", d.Text)
+	}
+	d = BuildDraft(DraftInput{Intent: Intent{Kind: "otro"}})
+	if !strings.Contains(d.Text, "no te entendí") || strings.Contains(d.Text, "placa") {
+		t.Fatalf("otro: %q", d.Text)
+	}
+}

@@ -300,6 +300,47 @@ func TestAgent_AutoReply(t *testing.T) {
 	}
 }
 
+// HU-55 / HU-12: la placa nunca duplica la orden ni toca un vehículo ajeno. Con orden abierta, el agente cuenta cómo
+// va; si la placa es de otro cliente, no se crea nada, no se dice nada del vehículo y una persona revisa. "hola"
+// recibe el saludo con lo que hace el asistente, sin pedir la placa ni llamar "Cliente" a nadie.
+func TestAgent_PlateNeverDuplicates(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550537", "Rosa Pérez")
+	w := e.whatsapp(t, owner, nil)
+	w.autoReply(true)
+	const ana, beto = "3001234537", "3001234538"
+	anaID := w.customer(ana, "Ana Ruiz")
+	w.orderFor(anaID, "GNO667")
+	open := func() int {
+		return len(owner.must(http.StatusOK, owner.do("GET", "/api/v1/orders?abiertas=1", nil)).body["ordenes"].([]any))
+	}
+	n := open()
+
+	w.write(ana, "Ana Ruiz", "GNO667")
+	if open() != n || !strings.Contains(w.last(ana)["cuerpo"].(string), "GNO667") {
+		t.Fatalf("placa propia con orden: abiertas %d→%d, respuesta %q", n, open(), w.last(ana)["cuerpo"])
+	}
+
+	w.customer(beto, "Cliente de prueba")
+	w.write(beto, "Cliente de prueba", "hola")
+	if got := w.last(beto)["cuerpo"].(string); !strings.Contains(got, "¿En qué te ayudo?") || strings.Contains(got, "placa") ||
+		strings.Contains(got, "Cliente") {
+		t.Fatalf("saludo: %q", got)
+	}
+	w.write(beto, "Cliente de prueba", "no lo he llevado")
+	if got := w.last(beto)["cuerpo"].(string); strings.Contains(got, "placa") {
+		t.Fatalf("pidió la placa sin motivo: %q", got)
+	}
+	w.write(beto, "Cliente de prueba", "gno667")
+	got := w.last(beto)["cuerpo"].(string)
+	if open() != n || strings.Contains(got, "OS-") || strings.Contains(got, "Renault") || !strings.Contains(got, "Una persona del taller") {
+		t.Fatalf("placa ajena: abiertas %d→%d, respuesta %q", n, open(), got)
+	}
+	if conv, _ := w.conversation(beto); conv["modo"] != "humano" || conv["pideHumano"] != true {
+		t.Fatalf("la placa ajena no pasó a una persona: %v", conv)
+	}
+}
+
 // Con el envío automático encendido, si la IA falla la tarjeta "Responde tú" queda para el dueño y al cliente no le
 // sale nada (HU-54).
 func TestAgent_AutoReplyKeepsOwnerNotes(t *testing.T) {
