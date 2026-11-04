@@ -37,6 +37,6 @@ func (c Catalog) Active(ctx context.Context, tallerID shared.ID) ([]Item, error)
 }
 
 // Preload carga los servicios iniciales (HU-04) dentro de la transacción en curso.
-func (c Catalog) Preload(ctx context.Context, tallerID shared.ID, attends string) error {
-	return c.svc.Preload(ctx, tallerID, attends)
+func (c Catalog) Preload(ctx context.Context, tallerID shared.ID, attends string, specialties []string) error {
+	return c.svc.Preload(ctx, tallerID, attends, specialties)
 }

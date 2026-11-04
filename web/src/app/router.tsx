@@ -17,9 +17,11 @@ const FloorPage = page(() => import('../features/orders/FloorPage'), 'FloorPage'
 const InboxPage = page(() => import('../features/inbox/InboxPage'), 'InboxPage');
 const AutomationsPage = page(() => import('../features/automations/AutomationsPage'), 'AutomationsPage');
 const DashboardPage = page(() => import('../features/dashboard/DashboardPage'), 'DashboardPage');
-const CatalogPage = page(() => import('../features/catalog/CatalogPage'), 'CatalogPage');
+const ServicesPage = page(() => import('../features/catalog/ServicesPage'), 'ServicesPage');
+const PartsPage = page(() => import('../features/inventory/PartsPage'), 'PartsPage');
 const TeamPage = page(() => import('../features/team/TeamPage'), 'TeamPage');
 const WorkshopPage = page(() => import('../features/workshop/WorkshopPage'), 'WorkshopPage');
+const OnboardingPage = page(() => import('../features/workshop/OnboardingPage'), 'OnboardingPage');
 
 function Lazy({ Page }: { Page: LazyExoticComponent<ComponentType> }) {
   return (
@@ -52,9 +54,12 @@ export const router = createBrowserRouter([
       { path: 'por-revisar', element: <Lazy Page={InboxPage} /> },
       { path: 'automatizaciones', element: <Lazy Page={AutomationsPage} /> },
       { path: 'tablero', element: <Lazy Page={DashboardPage} /> },
-      { path: 'catalogo', element: <Lazy Page={CatalogPage} /> },
+      { path: 'servicios', element: <Lazy Page={ServicesPage} /> },
+      { path: 'repuestos', element: <Lazy Page={PartsPage} /> },
+      { path: 'catalogo', element: <Navigate to="/panel/repuestos" replace /> },
       { path: 'equipo', element: <Lazy Page={TeamPage} /> },
       { path: 'taller', element: <Lazy Page={WorkshopPage} /> },
+      { path: 'arranque', element: <Lazy Page={OnboardingPage} /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

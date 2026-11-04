@@ -200,6 +200,15 @@ paths:
                 kilometraje: { type: integer, nullable: true, minimum: 0 }
                 cilindraje: { type: string, nullable: true, description: '"1200", "1200 cc" o "1.2 L"; se guarda en cc' }
                 turbo: { type: boolean, nullable: true }
+                energia: { type: string, nullable: true, enum: [gasolina, diesel, gas, hibrido, hibrido_enchufable, electrico, null], description: 'Moto: gasolina o electrico' }
+                aspiracion: { type: string, nullable: true, enum: [atmosferico, turbo, supercargado, null], description: 'Si llega, manda sobre turbo; moto: atmosferico o turbo' }
+                transmision: { type: string, nullable: true, enum: [manual, automatica, cvt, doble_embrague, amt, semiautomatica, null], description: 'Carro: manual, automatica, cvt, doble_embrague, amt; moto: manual, automatica, semiautomatica' }
+                traccion: { type: string, nullable: true, enum: [delantera, trasera, awd, 4x4, null], description: 'Solo carro' }
+                ciclo: { type: string, nullable: true, enum: [2t, 4t, null], description: 'Solo moto' }
+                refrigeracion: { type: string, nullable: true, enum: [aire, liquido, null], description: 'Solo moto' }
+                color: { type: string, nullable: true, maxLength: 60 }
+                carroceria: { type: string, nullable: true, enum: [sedan, hatchback, suv, pickup, van, otra, null], description: 'Solo carro' }
+                llanta: { type: string, nullable: true, maxLength: 20, description: '205/55 R16 o 90/90-17' }
       responses:
         '200':
           description: La placa ya existía en el taller.
@@ -246,7 +255,7 @@ paths:
   /vehicles/{id}/engine:
     patch:
       operationId: updateVehicleEngine
-      summary: Cambiar cilindraje y/o turbo; queda en la bitácora (HU-11). Permiso vehicle:update
+      summary: Completar o cambiar la ficha del vehículo (motor, caja, tracción, color, carrocería, llanta); queda en la bitácora (HU-11). Permiso vehicle:update
       parameters:
         - { $ref: '#/components/parameters/Id' }
         - { name: If-Match, in: header, required: true, schema: { type: string, example: '"v1"' } }
@@ -260,6 +269,15 @@ paths:
               properties:
                 cilindraje: { type: string, nullable: true }
                 turbo: { type: boolean, nullable: true }
+                energia: { type: string, nullable: true, enum: [gasolina, diesel, gas, hibrido, hibrido_enchufable, electrico, null], description: 'Moto: gasolina o electrico' }
+                aspiracion: { type: string, nullable: true, enum: [atmosferico, turbo, supercargado, null], description: 'Si llega, manda sobre turbo; moto: atmosferico o turbo' }
+                transmision: { type: string, nullable: true, enum: [manual, automatica, cvt, doble_embrague, amt, semiautomatica, null], description: 'Carro: manual, automatica, cvt, doble_embrague, amt; moto: manual, automatica, semiautomatica' }
+                traccion: { type: string, nullable: true, enum: [delantera, trasera, awd, 4x4, null], description: 'Solo carro' }
+                ciclo: { type: string, nullable: true, enum: [2t, 4t, null], description: 'Solo moto' }
+                refrigeracion: { type: string, nullable: true, enum: [aire, liquido, null], description: 'Solo moto' }
+                color: { type: string, nullable: true, maxLength: 60 }
+                carroceria: { type: string, nullable: true, enum: [sedan, hatchback, suv, pickup, van, otra, null], description: 'Solo carro' }
+                llanta: { type: string, nullable: true, maxLength: 20, description: '205/55 R16 o 90/90-17' }
       responses:
         '200':
           description: OK
@@ -289,6 +307,7 @@ paths:
                 sintoma: { type: string, maxLength: 2000 }
                 estadoInicial: { type: string, enum: [por_recibir, recibido] }
                 confirmarDuplicada: { type: boolean }
+                ejemplo: { type: boolean, description: 'Orden de ejemplo del arranque (HU-05); no cuenta en los KPIs' }
       responses:
         '201':
           description: Orden creada con número consecutivo del taller.
@@ -436,11 +455,66 @@ paths:
                 combustible: { type: string, nullable: true }
                 accesorios: { type: array, items: { type: string } }
                 salvedades: { type: array, items: { $ref: '#/components/schemas/Salvedad' } }
+                items: { type: array, items: { $ref: '#/components/schemas/ItemRevisado' }, description: 'Solo clave, estado y nota; los nombres los pone el taller' }
       responses:
         '200': { $ref: '#/components/responses/Checklist' }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
 
+  /orders/{id}/findings:
+    get:
+      operationId: listFindings
+      summary: Hallazgos del diagnóstico de la orden (HU-103 propuesta). Sin precios. Permiso order:read
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [hallazgos]
+                properties:
+                  hallazgos: { type: array, items: { $ref: '#/components/schemas/Hallazgo' } }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: addFinding
+      summary: Registrar un hallazgo (desde Recibido hasta En reparación). Lo hace una persona, no la IA. Permiso order:diagnose
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sistema, descripcion, gravedad]
+              properties:
+                sistema: { $ref: '#/components/schemas/SistemaVehiculo' }
+                descripcion: { type: string, maxLength: 1000 }
+                gravedad: { $ref: '#/components/schemas/Gravedad' }
+                codigosFalla: { type: array, maxItems: 10, items: { type: string, example: 'P0301' } }
+                manoObra: { type: integer, format: int64, minimum: 0, nullable: true }
+      responses:
+        '201':
+          description: Hallazgo registrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Hallazgo' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /orders/{id}/findings/{fid}:
+    delete:
+      operationId: deleteFinding
+      summary: Borrar un hallazgo antes de enviar la cotización. Permiso order:diagnose
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: fid, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Borrado }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /orders/{id}/evidence:
     get:
       operationId: listEvidence
@@ -471,7 +545,8 @@ paths:
                 lado: { type: string }
                 nota: { type: string }
                 mostrarCliente: { type: boolean }
-                foto: { type: string, format: binary }
+                hallazgoId: { type: string, format: uuid, description: 'Foto de un hallazgo de esta orden' }
+                foto: { type: array, maxItems: 8, items: { type: string, format: binary }, description: 'Una o varias fotos (máx. 8); van al final del formulario' }
       responses:
         '201':
           description: Creada
@@ -524,6 +599,7 @@ paths:
                 descripcion: { type: string }
                 cantidad: { type: integer, minimum: 1 }
                 precioUnitario: { type: integer, format: int64, nullable: true, description: 'COP sin decimales' }
+                horas: { type: number, minimum: 0.25, maximum: 200, description: 'Mano de obra por horas: el precio es horas × tarifa del taller' }
       responses:
         '200': { $ref: '#/components/responses/Cotizacion' }
         '400': { $ref: '#/components/responses/Problem' }
@@ -531,12 +607,45 @@ paths:
         '422': { $ref: '#/components/responses/Problem' }
 
   /orders/{id}/quote/lines/{lineId}:
+    patch:
+      operationId: updateQuoteLine
+      summary: Cambiar la cantidad o, solo en precio libre, el precio de un ítem del borrador (HU-27). Permiso quote:edit
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: lineId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                cantidad: { type: integer, minimum: 1 }
+                precioUnitario: { type: integer, format: int64, minimum: 0, description: 'Solo si la línea tiene precioLibre' }
+                horas: { type: number, minimum: 0.25, maximum: 200, description: 'Solo en líneas de mano de obra por horas' }
+                descuentoPct: { type: integer, minimum: 0, maximum: 100, description: 'Hasta el máximo del taller; permiso quote:discount' }
+      responses:
+        '200': { $ref: '#/components/responses/Cotizacion' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
     delete:
       operationId: removeQuoteLine
       summary: Quitar una línea de la cotización (HU-27). Permiso quote:edit
       parameters:
         - { $ref: '#/components/parameters/Id' }
         - { name: lineId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/Cotizacion' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /orders/{id}/quote/renew:
+    post:
+      operationId: renewQuote
+      summary: Renovar la vigencia de una cotización enviada (parámetros del taller). Permiso quote:send
+      parameters: [{ $ref: '#/components/parameters/Id' }]
       responses:
         '200': { $ref: '#/components/responses/Cotizacion' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -735,6 +844,8 @@ paths:
                 tipoVehiculo: { type: string }
                 precio: { type: integer, format: int64, nullable: true }
                 duracionMin: { type: integer, nullable: true }
+                categoria: { allOf: [{ $ref: '#/components/schemas/Categoria' }], nullable: true }
+                garantiaDias: { type: integer, nullable: true, minimum: 0, maximum: 3650 }
       responses:
         '201':
           description: Creado
@@ -762,6 +873,8 @@ paths:
                 duracionMin: { type: integer, nullable: true }
                 activo: { type: boolean }
                 version: { type: integer }
+                categoria: { allOf: [{ $ref: '#/components/schemas/Categoria' }], nullable: true }
+                garantiaDias: { type: integer, nullable: true, minimum: 0, maximum: 3650 }
       responses:
         '200':
           description: OK
@@ -786,6 +899,7 @@ paths:
       parameters:
         - { name: q, in: query, schema: { type: string } }
         - { name: todos, in: query, description: '1 = incluir inactivos (requiere part:manage)', schema: { type: string, enum: ['1'] } }
+        - { name: categoria, in: query, schema: { $ref: '#/components/schemas/Categoria' } }
       responses:
         '200': { $ref: '#/components/responses/Repuestos' }
     post:
@@ -806,6 +920,10 @@ paths:
                 precioVenta: { type: integer, format: int64 }
                 existencia: { type: integer }
                 minimo: { type: integer }
+                marca: { type: string, maxLength: 60 }
+                categoria: { type: string, description: 'Una de Categoria o vacío' }
+                ubicacion: { type: string, maxLength: 40 }
+                referenciaOem: { type: string, maxLength: 40 }
       responses:
         '201':
           description: Creado
@@ -842,6 +960,10 @@ paths:
                 minimo: { type: integer }
                 activo: { type: boolean }
                 version: { type: integer }
+                marca: { type: string, maxLength: 60 }
+                categoria: { type: string, description: 'Una de Categoria o vacío' }
+                ubicacion: { type: string, maxLength: 40 }
+                referenciaOem: { type: string, maxLength: 40 }
       responses:
         '200':
           description: OK
@@ -874,10 +996,95 @@ paths:
       parameters: [{ $ref: '#/components/parameters/Id' }]
       requestBody: { $ref: '#/components/requestBodies/Cantidad' }
       responses:
-        '204': { description: Devuelto }
+        '200':
+          description: Devuelto
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [devueltas, quedanPorDevolver, existencia]
+                properties:
+                  devueltas: { type: integer }
+                  quedanPorDevolver: { type: integer }
+                  existencia: { type: integer }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
+
+  /orders/{id}/part-movements:
+    get:
+      operationId: listOrderPartMovements
+      summary: Por repuesto, lo que la orden descontó, devolvió y dejó pendiente (HU-33, HU-38). Permiso part:read
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [repuestos]
+                properties:
+                  repuestos:
+                    type: array
+                    items:
+                      type: object
+                      required: [repuestoId, referencia, nombre, descontado, devuelto, pendiente, porDevolver]
+                      properties:
+                        repuestoId: { type: string, format: uuid }
+                        referencia: { type: string }
+                        nombre: { type: string }
+                        descontado: { type: integer }
+                        devuelto: { type: integer }
+                        pendiente: { type: integer, description: 'Aprobado sin existencia: no se descontó' }
+                        porDevolver: { type: integer }
+
+  /parts/{id}/movements:
+    get:
+      operationId: listPartMovements
+      summary: Movimientos del repuesto, lo más reciente primero (HU-35, HU-38). Permiso part:read
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [movimientos]
+                properties:
+                  movimientos:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, cantidad, motivo, ordenId, creadoEn]
+                      properties:
+                        id: { type: string, format: uuid }
+                        cantidad: { type: integer, description: 'Positivo entra, negativo sale' }
+                        motivo: { type: string, enum: [entrada, salida_orden, pendiente_orden, devolucion, ajuste, importacion] }
+                        ordenId: { type: string, format: uuid, nullable: true }
+                        creadoEn: { type: string, format: date-time }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /parts/import:
+    post:
+      operationId: importParts
+      summary: Importar repuestos desde CSV (HU-37). Sin confirmar=1 es solo la vista previa; con errores no se importa nada. Permiso import:run
+      parameters:
+        - { name: confirmar, in: query, schema: { type: string, enum: ['0', '1'] } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [archivo]
+              properties:
+                archivo: { type: string, format: binary, description: 'CSV de la plantilla, separado por , o ;' }
+      responses:
+        '200': { $ref: '#/components/responses/Importacion' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Importacion' }
 
   /users:
     get:
@@ -1011,6 +1218,33 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Taller' }
         '400': { $ref: '#/components/responses/Problem' }
+
+  /workshop/settings:
+    get:
+      operationId: getWorkshopSettings
+      summary: Parámetros del taller (órdenes, recepción, cotización). Sin configurar, los valores por defecto. Todos los roles
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Parametros' }
+    put:
+      operationId: saveWorkshopSettings
+      summary: Guardar los parámetros con versión optimista (0 = nunca se guardaron). Permiso workshop:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Parametros' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Parametros' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 
   /workshop/schedule:
     put:
@@ -1357,6 +1591,28 @@ components:
       schema: { type: string, enum: [sweveh] }
 
   responses:
+    Importacion:
+      description: Resultado fila por fila de la importación
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [filas, conError, importadas, avisos]
+            properties:
+              avisos: { type: array, items: { type: string }, description: 'Lo que no impide importar, p. ej. columnas que no se reconocen' }
+              conError: { type: integer }
+              importadas: { type: integer }
+              filas:
+                type: array
+                items:
+                  type: object
+                  required: [fila, referencia, nombre, estado, errores]
+                  properties:
+                    fila: { type: integer }
+                    referencia: { type: string }
+                    nombre: { type: string }
+                    estado: { type: string, enum: [ok, error] }
+                    errores: { type: array, items: { type: string } }
     Problem:
       description: Error (RFC 9457)
       content:
@@ -1419,6 +1675,48 @@ components:
               ordenId: { type: string, format: uuid, description: 'Obligatorio en devoluciones' }
 
   schemas:
+    ItemRecepcion:
+      type: object
+      required: [clave, nombre]
+      properties:
+        clave: { type: string, description: 'Estable; vacía = se arma con el nombre' }
+        nombre: { type: string, maxLength: 60 }
+    Parametros:
+      type: object
+      additionalProperties: false
+      required: [usarEsperandoRepuesto, usarControlCalidad, fotosMinimas, kmObligatorio, itemsCarro, itemsMoto, ivaPct, preciosConIva,
+        tarifaHora, descuentoMaxPct, descuentoRecepcion, vigenciaDias, version]
+      properties:
+        usarEsperandoRepuesto: { type: boolean }
+        usarControlCalidad: { type: boolean }
+        fotosMinimas: { type: integer, minimum: 0, maximum: 8 }
+        kmObligatorio: { type: boolean }
+        itemsCarro: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/ItemRecepcion' } }
+        itemsMoto: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/ItemRecepcion' } }
+        ivaPct: { type: integer, minimum: 0, maximum: 30, description: 'Por defecto 19, a confirmar con un contador' }
+        preciosConIva: { type: boolean, description: 'Los precios de lista ya incluyen IVA' }
+        tarifaHora: { type: integer, format: int64, nullable: true, minimum: 0 }
+        descuentoMaxPct: { type: integer, minimum: 0, maximum: 100 }
+        descuentoRecepcion: { type: boolean }
+        vigenciaDias: { type: integer, minimum: 1, maximum: 90 }
+        version: { type: integer }
+    SistemaVehiculo:
+      type: string
+      enum: [motor, frenos, suspension, direccion, electrico, transmision, refrigeracion, llantas, carroceria, otro]
+    Gravedad:
+      type: string
+      enum: [urgente, recomendado, puede_esperar]
+    Hallazgo:
+      type: object
+      required: [id, sistema, descripcion, gravedad, codigosFalla, creadoEn]
+      properties:
+        id: { type: string, format: uuid }
+        sistema: { $ref: '#/components/schemas/SistemaVehiculo' }
+        descripcion: { type: string }
+        gravedad: { $ref: '#/components/schemas/Gravedad' }
+        codigosFalla: { type: array, items: { type: string } }
+        creadoEn: { type: string, format: date-time }
+        manoObra: { type: integer, format: int64, nullable: true, description: 'Mano de obra estimada en COP' }
     Kpi:
       type: object
       required: [codigo, titulo, valor, texto, detalle, queSignifica]
@@ -1511,6 +1809,14 @@ components:
         fotoId: { type: string, format: uuid }
         hora: { type: string, format: date-time }
 
+    ItemRevisado:
+      type: object
+      required: [clave, nombre, estado]
+      properties:
+        clave: { type: string }
+        nombre: { type: string }
+        estado: { type: string, enum: [bien, mal, no_tiene, ''], description: 'Vacío = sin revisar' }
+        nota: { type: string, maxLength: 300 }
     Checklist:
       type: object
       required: [tipo, accesorios, salvedades, ladosConFoto, ladosPedidos, falta]
@@ -1524,6 +1830,9 @@ components:
         ladosPedidos: { type: array, items: { type: string } }
         falta: { type: array, items: { type: string } }
         completadoEn: { type: string, format: date-time, nullable: true }
+        items: { type: array, items: { $ref: '#/components/schemas/ItemRevisado' } }
+        fotosMinimas: { type: integer, description: 'Parámetro del taller' }
+        kmObligatorio: { type: boolean }
 
     Evidencia:
       type: object
@@ -1537,6 +1846,8 @@ components:
         etapa: { type: string }
         autorId: { type: string, format: uuid, nullable: true }
         creadoEn: { type: string, format: date-time }
+        grupoId: { type: string, format: uuid, nullable: true, description: 'Fotos subidas juntas con una nota' }
+        hallazgoId: { type: string, format: uuid, nullable: true, description: 'Foto de un hallazgo del diagnóstico' }
 
     Cotizacion:
       type: object
@@ -1560,10 +1871,20 @@ components:
               precioUnitario: { type: integer, format: int64 }
               subtotal: { type: integer, format: int64 }
               sinStock: { type: boolean }
+              precioLibre: { type: boolean, description: 'El precio lo puso una persona y se puede corregir' }
               aprobada: { type: boolean, nullable: true }
+              descuentoPct: { type: integer }
+              horas: { type: number, nullable: true, description: 'Mano de obra por horas × tarifa del taller' }
         enviadaEn: { type: string, format: date-time, nullable: true }
         respondidaEn: { type: string, format: date-time, nullable: true }
         canalRespuesta: { type: string, nullable: true }
+        subtotal: { type: integer, format: int64, description: 'Cantidad × precio, antes de descuentos' }
+        descuento: { type: integer, format: int64 }
+        ivaPct: { type: integer, description: 'Copiado de los parámetros al crear la cotización' }
+        iva: { type: integer, format: int64 }
+        preciosConIva: { type: boolean }
+        venceEn: { type: string, format: date-time, nullable: true }
+        vencida: { type: boolean }
 
     ResultadoVehiculo:
       type: object
@@ -1590,6 +1911,12 @@ components:
         duracionMin: { type: integer, nullable: true }
         activo: { type: boolean }
         version: { type: integer }
+        categoria: { allOf: [{ $ref: '#/components/schemas/Categoria' }], nullable: true }
+        garantiaDias: { type: integer, nullable: true }
+
+    Categoria:
+      type: string
+      enum: [motor, frenos, suspension, direccion, electrico, transmision, refrigeracion, llantas, carroceria, filtros, lubricantes, otro]
 
     Repuesto:
       type: object
@@ -1606,6 +1933,10 @@ components:
         bajoMinimo: { type: boolean }
         activo: { type: boolean }
         version: { type: integer }
+        marca: { type: string, description: 'Vacío = sin dato' }
+        categoria: { type: string, description: 'Una de Categoria o vacío' }
+        ubicacion: { type: string }
+        referenciaOem: { type: string, description: 'Referencia original o equivalente' }
 
     Miembro:
       type: object
@@ -1716,7 +2047,16 @@ components:
         kilometraje: { type: integer, nullable: true }
         cilindrajeCc: { type: integer, nullable: true }
         turbo: { type: boolean, nullable: true }
-        motorPendiente: { type: boolean }
+        energia: { type: string, nullable: true, enum: [gasolina, diesel, gas, hibrido, hibrido_enchufable, electrico, null], description: 'Moto: gasolina o electrico' }
+        aspiracion: { type: string, nullable: true, enum: [atmosferico, turbo, supercargado, null], description: 'Si llega, manda sobre turbo; moto: atmosferico o turbo' }
+        transmision: { type: string, nullable: true, enum: [manual, automatica, cvt, doble_embrague, amt, semiautomatica, null], description: 'Carro: manual, automatica, cvt, doble_embrague, amt; moto: manual, automatica, semiautomatica' }
+        traccion: { type: string, nullable: true, enum: [delantera, trasera, awd, 4x4, null], description: 'Solo carro' }
+        ciclo: { type: string, nullable: true, enum: [2t, 4t, null], description: 'Solo moto' }
+        refrigeracion: { type: string, nullable: true, enum: [aire, liquido, null], description: 'Solo moto' }
+        color: { type: string, nullable: true, maxLength: 60 }
+        carroceria: { type: string, nullable: true, enum: [sedan, hatchback, suv, pickup, van, otra, null], description: 'Solo carro' }
+        llanta: { type: string, nullable: true, maxLength: 20, description: '205/55 R16 o 90/90-17' }
+        motorPendiente: { type: boolean, description: 'Falta energía, caja, o en combustión cilindraje y aspiración (y ciclo en moto)' }
         version: { type: integer }
         creadoEn: { type: string, format: date-time }
 
@@ -1729,7 +2069,8 @@ components:
 
     EstadoOrden:
       type: string
-      enum: [por_recibir, recibido, en_diagnostico, esperando_aprobacion, en_reparacion, listo, entregado, cancelada]
+      enum: [por_recibir, recibido, en_diagnostico, esperando_aprobacion, en_reparacion, esperando_repuesto, control_calidad, listo, entregado, cancelada]
+      description: 'esperando_repuesto y control_calidad solo si el taller los activa en sus parámetros'
 
     Orden:
       type: object

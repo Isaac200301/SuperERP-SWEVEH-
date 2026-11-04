@@ -11,7 +11,7 @@ import (
 )
 
 type Repository interface {
-	Search(ctx context.Context, tallerID shared.ID, q string, onlyActive bool, limit int) ([]domain.Part, error)
+	Search(ctx context.Context, tallerID shared.ID, q string, onlyActive bool, limit int, category string) ([]domain.Part, error)
 	Get(ctx context.Context, tallerID, id shared.ID) (domain.Part, error)
 	GetMany(ctx context.Context, tallerID shared.ID, ids []shared.ID) ([]domain.Part, error)
 	Insert(ctx context.Context, p domain.Part) error
@@ -21,6 +21,16 @@ type Repository interface {
 	Low(ctx context.Context, tallerID shared.ID) ([]domain.Part, error)
 	// Returnable bloquea el repuesto y dice cuánto descontó la orden y no se ha devuelto (HU-38).
 	Returnable(ctx context.Context, tallerID, partID, orderID shared.ID) (int, error)
+	Movements(ctx context.Context, tallerID, partID shared.ID, limit int) ([]domain.Movement, error)
+	ExistingRefs(ctx context.Context, tallerID shared.ID, refs []string) (map[string]bool, error)
+	OrderParts(ctx context.Context, tallerID, orderID shared.ID) ([]domain.OrderPart, error)
+}
+
+// ReturnResult dice qué pasó con la devolución, para mostrarlo en la orden (HU-38).
+type ReturnResult struct {
+	Returned int
+	Left     int // lo que aún se puede devolver de esa orden
+	Stock    int // existencia del repuesto después de devolver
 }
 
 // ErrReturnTooMany evita que una devolución infle la existencia por encima de lo que la orden usó (HU-38).
@@ -63,11 +73,12 @@ func NewService(uow UnitOfWork, r Repository, a AuditLog, e EventPublisher, c Cl
 	return &Service{uow: uow, repo: r, audit: a, events: e, clock: c}
 }
 
-func (s *Service) Search(ctx context.Context, tallerID shared.ID, q string, all bool) ([]domain.Part, error) {
+// Search busca repuestos (HU-34). all incluye inactivos; category "" = todas.
+func (s *Service) Search(ctx context.Context, tallerID shared.ID, q string, all bool, category string) ([]domain.Part, error) {
 	var out []domain.Part
 	err := s.uow.Do(ctx, func(ctx context.Context) error {
 		var err error
-		out, err = s.repo.Search(ctx, tallerID, q, !all, 50)
+		out, err = s.repo.Search(ctx, tallerID, q, !all, 200, category)
 		return err
 	})
 	return out, err
@@ -101,12 +112,16 @@ func (s *Service) Create(ctx context.Context, actor shared.Actor, p domain.Part)
 }
 
 type Patch struct {
-	Name   *string
-	Kind   *string
-	Cost   *int64
-	Price  *int64
-	Min    *int
-	Active *bool
+	Name     *string
+	Kind     *string
+	Cost     *int64
+	Price    *int64
+	Min      *int
+	Active   *bool
+	Brand    *string
+	Category *string
+	Location *string
+	OEM      *string
 }
 
 // Update edita o desactiva (HU-32). Desactivado deja de salir al cotizar; el historial lo conserva.
@@ -127,6 +142,10 @@ func (s *Service) Update(ctx context.Context, actor shared.Actor, tallerID, id s
 		set(&next.Price, ch.Price)
 		set(&next.Min, ch.Min)
 		set(&next.Active, ch.Active)
+		set(&next.Brand, ch.Brand)
+		set(&next.Category, ch.Category)
+		set(&next.Location, ch.Location)
+		set(&next.OEM, ch.OEM)
 		if err := next.Normalize(); err != nil {
 			return err
 		}
@@ -217,11 +236,12 @@ func (s *Service) Discount(ctx context.Context, tallerID, orderID shared.ID, lin
 }
 
 // Return devuelve al inventario lo que no se usó (HU-38).
-func (s *Service) Return(ctx context.Context, actor shared.Actor, tallerID, partID, orderID shared.ID, qty int) error {
+func (s *Service) Return(ctx context.Context, actor shared.Actor, tallerID, partID, orderID shared.ID, qty int) (ReturnResult, error) {
 	if qty <= 0 {
-		return domain.ErrQty
+		return ReturnResult{}, domain.ErrQty
 	}
-	return s.uow.Do(ctx, func(ctx context.Context) error {
+	var res ReturnResult
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
 		if _, err := s.repo.Get(ctx, tallerID, partID); err != nil {
 			return err
 		}
@@ -235,9 +255,26 @@ func (s *Service) Return(ctx context.Context, actor shared.Actor, tallerID, part
 		if _, err := s.repo.Move(ctx, Movement{TallerID: tallerID, PartID: partID, Qty: qty, Reason: "devolucion", OrderID: &orderID, UserID: &actor.ID}); err != nil {
 			return err
 		}
+		p, err := s.repo.Get(ctx, tallerID, partID)
+		if err != nil {
+			return err
+		}
+		res = ReturnResult{Returned: qty, Left: left - qty, Stock: p.Stock}
 		return s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "repuesto.devolucion", Entity: "repuesto",
-			EntityID: partID, After: map[string]any{"cantidad": qty, "orden_id": orderID.String()}, OccurredAt: s.clock.Now()})
+			EntityID: partID, After: map[string]any{"cantidad": qty, "orden_id": orderID.String(), "existencia": p.Stock}, OccurredAt: s.clock.Now()})
 	})
+	return res, err
+}
+
+// OrderParts resume por repuesto lo descontado, devuelto y pendiente de una orden (HU-33, HU-38).
+func (s *Service) OrderParts(ctx context.Context, tallerID, orderID shared.ID) ([]domain.OrderPart, error) {
+	var out []domain.OrderPart
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.OrderParts(ctx, tallerID, orderID)
+		return err
+	})
+	return out, err
 }
 
 // GetMany devuelve varios repuestos (lo usa la cotización dentro de su transacción).
@@ -261,5 +298,5 @@ func set[T any](dst *T, v *T) {
 
 func view(p domain.Part) map[string]any {
 	return map[string]any{"referencia": p.Ref, "nombre": p.Name, "costo": p.Cost, "precio_venta": p.Price,
-		"minimo": p.Min, "activo": p.Active}
+		"minimo": p.Min, "activo": p.Active, "marca": p.Brand, "categoria": p.Category, "ubicacion": p.Location, "referencia_oem": p.OEM}
 }

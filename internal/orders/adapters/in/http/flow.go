@@ -118,15 +118,18 @@ func (h *Handler) assign(r *http.Request, p reqctx.Principal) (int, any, error) 
 }
 
 type checklistDTO struct {
-	Tipo         string             `json:"tipo"`
-	Kilometraje  *int               `json:"kilometraje"`
-	Combustible  *string            `json:"combustible"`
-	Accesorios   []string           `json:"accesorios"`
-	Salvedades   []domain.Exception `json:"salvedades"`
-	LadosConFoto []string           `json:"ladosConFoto"`
-	LadosPedidos []string           `json:"ladosPedidos"`
-	Falta        []string           `json:"falta"`
-	CompletadoEn *time.Time         `json:"completadoEn"`
+	Tipo          string             `json:"tipo"`
+	Kilometraje   *int               `json:"kilometraje"`
+	Combustible   *string            `json:"combustible"`
+	Accesorios    []string           `json:"accesorios"`
+	Salvedades    []domain.Exception `json:"salvedades"`
+	LadosConFoto  []string           `json:"ladosConFoto"`
+	LadosPedidos  []string           `json:"ladosPedidos"`
+	Falta         []string           `json:"falta"`
+	CompletadoEn  *time.Time         `json:"completadoEn"`
+	Items         []domain.ItemCheck `json:"items"`
+	FotosMinimas  int                `json:"fotosMinimas"`
+	KmObligatorio bool               `json:"kmObligatorio"`
 }
 
 func checklistOut(v app.ChecklistView) checklistDTO {
@@ -136,7 +139,10 @@ func checklistOut(v app.ChecklistView) checklistDTO {
 	}
 	d := checklistDTO{Tipo: v.Checklist.Kind, Kilometraje: v.Checklist.Km, Combustible: v.Checklist.Fuel,
 		Accesorios: v.Checklist.Accessories, Salvedades: v.Checklist.Exceptions, LadosConFoto: v.Sides, LadosPedidos: pedidos,
-		Falta: v.Missing, CompletadoEn: v.Checklist.DoneAt}
+		Falta: v.Missing, CompletadoEn: v.Checklist.DoneAt, Items: v.Checklist.Items, FotosMinimas: v.MinPhotos, KmObligatorio: v.MileageRequired}
+	if d.Items == nil {
+		d.Items = []domain.ItemCheck{}
+	}
 	if d.Accesorios == nil {
 		d.Accesorios = []string{}
 	}
@@ -163,6 +169,7 @@ type checklistReq struct {
 	Combustible *string            `json:"combustible"`
 	Accesorios  []string           `json:"accesorios"`
 	Salvedades  []domain.Exception `json:"salvedades"`
+	Items       []domain.ItemCheck `json:"items"`
 }
 
 func (h *Handler) saveChecklist(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -175,7 +182,7 @@ func (h *Handler) saveChecklist(r *http.Request, p reqctx.Principal) (int, any, 
 		return 0, nil, err
 	}
 	v, err := h.flow.SaveChecklist(r.Context(), p.TallerID, id, p.Actor(), domain.Checklist{Km: q.Kilometraje, Fuel: q.Combustible,
-		Accessories: append([]string{}, q.Accesorios...), Exceptions: q.Salvedades})
+		Accessories: append([]string{}, q.Accesorios...), Exceptions: q.Salvedades, Items: q.Items})
 	return http.StatusOK, checklistOut(v), err
 }
 
@@ -188,6 +195,8 @@ type evidenceDTO struct {
 	Etapa          string    `json:"etapa"`
 	AutorID        *string   `json:"autorId"`
 	CreadoEn       time.Time `json:"creadoEn"`
+	GrupoID        *string   `json:"grupoId"`
+	HallazgoID     *string   `json:"hallazgoId"`
 }
 
 func evidenceOut(e ports.Evidence) evidenceDTO {
@@ -197,7 +206,16 @@ func evidenceOut(e ports.Evidence) evidenceDTO {
 		s := e.AuthorID.String()
 		d.AutorID = &s
 	}
+	d.GrupoID, d.HallazgoID = idOut(e.GroupID), idOut(e.FindingID)
 	return d
+}
+
+func idOut(id *shared.ID) *string {
+	if id == nil {
+		return nil
+	}
+	s := id.String()
+	return &s
 }
 
 func (h *Handler) listEvidence(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -219,14 +237,16 @@ func (h *Handler) addEvidence(r *http.Request, p reqctx.Principal) (int, any, er
 	if err != nil {
 		return 0, nil, err
 	}
-	r.Body = http.MaxBytesReader(nil, r.Body, app.MaxPhotoBytes+64<<10)
+	// Hasta 8 fotos por nota; el total del envío cabe en el límite de la plataforma (32 MB en Cloud Run).
+	r.Body = http.MaxBytesReader(nil, r.Body, 32<<20)
 	mr, err := r.MultipartReader()
 	if err != nil {
 		return 0, nil, httpx.ErrBadJSON.WithMessage("Envía la foto como formulario (multipart).")
 	}
-	in := app.EvidenceInput{TallerID: p.TallerID, OrderID: id, Actor: p.Actor()}
-	var e ports.Evidence
-	done := false
+	group := shared.NewID()
+	in := app.EvidenceInput{TallerID: p.TallerID, OrderID: id, Actor: p.Actor(), GroupID: &group}
+	var first ports.Evidence
+	photos := 0
 	for {
 		part, err := mr.NextPart()
 		if errors.Is(err, io.EOF) {
@@ -236,7 +256,7 @@ func (h *Handler) addEvidence(r *http.Request, p reqctx.Principal) (int, any, er
 			return 0, nil, httpx.ErrBadJSON
 		}
 		switch part.FormName() {
-		case "lado", "nota", "mostrarCliente":
+		case "lado", "nota", "mostrarCliente", "hallazgoId":
 			b, _ := io.ReadAll(io.LimitReader(part, 4096))
 			s := string(b)
 			switch part.FormName() {
@@ -250,24 +270,38 @@ func (h *Handler) addEvidence(r *http.Request, p reqctx.Principal) (int, any, er
 				}
 			case "mostrarCliente":
 				in.ShowClient, _ = strconv.ParseBool(s)
+			case "hallazgoId":
+				fid, err := shared.ParseID(s)
+				if err != nil {
+					return 0, nil, shared.NotFound("hallazgo_no_encontrado", "No encontramos ese hallazgo en la orden.")
+				}
+				in.FindingID = &fid
 			}
 		case "foto":
-			// La foto va al final del formulario: se procesa en streaming sin cargarla en memoria.
+			// Las fotos van al final del formulario: cada una se procesa en streaming sin cargarla en memoria.
+			// Todas quedan en el mismo grupo; la nota va solo en la primera.
+			if photos == app.MaxPhotosPerNote {
+				return 0, nil, app.ErrTooManyPhotos
+			}
 			in.Photo = part
-			e, err = h.flow.AddEvidence(r.Context(), in)
+			e, err := h.flow.AddEvidence(r.Context(), in)
 			if err != nil {
 				return 0, nil, err
 			}
-			done = true
+			if photos == 0 {
+				first = e
+			}
+			photos++
+			in.Note = nil
 		}
 	}
-	if !done {
-		e, err = h.flow.AddEvidence(r.Context(), in)
-		if err != nil {
+	if photos == 0 {
+		in.GroupID = nil
+		if first, err = h.flow.AddEvidence(r.Context(), in); err != nil {
 			return 0, nil, err
 		}
 	}
-	return http.StatusCreated, evidenceOut(e), nil
+	return http.StatusCreated, evidenceOut(first), nil
 }
 
 func (h *Handler) photo(w http.ResponseWriter, r *http.Request) {

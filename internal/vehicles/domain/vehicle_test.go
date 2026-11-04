@@ -84,7 +84,7 @@ func TestNewVehicle_MotoTurboDefaultsToNo(t *testing.T) {
 	if v.Engine.Turbo == nil || *v.Engine.Turbo {
 		t.Fatalf("turbo de moto debía ser No, es %v", v.Engine.Turbo)
 	}
-	if !v.Engine.Pending() {
+	if !v.Engine.Pending(v.Kind) {
 		t.Fatal("sin cilindraje el motor queda pendiente")
 	}
 }
@@ -92,7 +92,7 @@ func TestNewVehicle_MotoTurboDefaultsToNo(t *testing.T) {
 func TestNewVehicle_CarWithoutEngineIsPending(t *testing.T) {
 	p, _ := ParsePlate("KLM482")
 	v, err := NewVehicle(shared.NewID(), shared.NewID(), NewVehicleInput{Plate: p}, now)
-	if err != nil || !v.Engine.Pending() || v.Engine.Turbo != nil {
+	if err != nil || !v.Engine.Pending(v.Kind) || v.Engine.Turbo != nil {
 		t.Fatalf("carro sin motor: %+v %v", v.Engine, err)
 	}
 }
@@ -143,17 +143,17 @@ func TestParseDisplacement(t *testing.T) {
 func TestUpdateEngine_ReturnsPreviousAndBumpsVersion(t *testing.T) {
 	p, _ := ParsePlate("KLM482")
 	v, _ := NewVehicle(shared.NewID(), shared.NewID(), NewVehicleInput{Plate: p, Engine: Engine{DisplacementCC: ptr(1200), Turbo: ptr(false)}}, now)
-	prev, err := v.UpdateEngine(Engine{Turbo: ptr(true)}, 1)
+	prev, err := v.UpdateEngine(Engine{Turbo: ptr(true)}, Details{}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if *prev.Turbo || !*v.Engine.Turbo || *v.Engine.DisplacementCC != 1200 || v.Version != 2 {
 		t.Fatalf("prev=%+v ahora=%+v versión=%d", prev, v.Engine, v.Version)
 	}
-	if _, err := v.UpdateEngine(Engine{Turbo: ptr(false)}, 1); !errors.Is(err, shared.ErrVersionConflict) {
+	if _, err := v.UpdateEngine(Engine{Turbo: ptr(false)}, Details{}, 1); !errors.Is(err, shared.ErrVersionConflict) {
 		t.Fatalf("versión vieja debía dar conflicto: %v", err)
 	}
-	if _, err := v.UpdateEngine(Engine{DisplacementCC: ptr(5)}, 2); !errors.Is(err, ErrDisplacementInvalid) {
+	if _, err := v.UpdateEngine(Engine{DisplacementCC: ptr(5)}, Details{}, 2); !errors.Is(err, ErrDisplacementInvalid) {
 		t.Fatalf("cilindraje inválido: %v", err)
 	}
 }

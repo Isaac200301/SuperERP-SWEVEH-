@@ -9,7 +9,8 @@ import (
 	"sweveh/internal/shared"
 )
 
-// State es uno de los 7 estados del flujo más Cancelada (Q-04, Q-05).
+// State es uno de los 7 estados del flujo más Cancelada (Q-04, Q-05), y los 2 opcionales por taller
+// (decisión de Pablo, 3-nov-2026): Esperando repuesto (lateral a En reparación) y Control de calidad (antes de Listo).
 type State string
 
 const (
@@ -21,6 +22,9 @@ const (
 	StateReady      State = "listo"
 	StateDelivered  State = "entregado"
 	StateCancelled  State = "cancelada"
+
+	StateAwaitingParts State = "esperando_repuesto"
+	StateQuality       State = "control_calidad"
 )
 
 // Open indica si la orden sigue abierta (Entregado y Cancelada la cierran).
@@ -33,7 +37,7 @@ var (
 	ErrInitialState    = shared.Validation("estado_inicial_invalido", "Una orden nueva empieza en Por recibir o en Recibido.").WithField("estadoInicial")
 	// HU-11: "motor pendiente" no bloquea la orden hasta que se intenta pasar a Recibido (HU-20).
 	ErrEngineRequired = shared.Rule("motor_pendiente",
-		"Falta el cilindraje o el turbo del vehículo. Complétalos para pasar la orden a Recibido.")
+		"Falta completar la ficha del vehículo (combustible, caja, cilindraje y turbo o ciclo). Complétala para pasar la orden a Recibido.")
 	// HU-16, criterio 2: avisar y dejar abrir otra solo si confirma.
 	ErrOpenOrderExists = shared.Conflict("orden_abierta_existente",
 		"Este vehículo ya tiene una orden abierta. Confirma si quieres abrir otra.")

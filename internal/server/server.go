@@ -84,6 +84,7 @@ func New(d Deps) *chi.Mux {
 		cataloghttp.NewHandler(m.Catalog, guard, d.Log).Routes,
 		inventoryhttp.NewHandler(m.Inventory, guard, d.Log).Routes,
 		quoteshttp.NewHandler(m.Quotes, guard, d.Log).Routes,
+		ordershttp.NewFindingsHandler(m.Findings, guard, d.Log).Routes,
 		search.NewHandler(tx, m.VehDir, m.CustDir, m.OrdersF, guard, d.Log).Routes,
 	}
 	if d.Extra != nil {

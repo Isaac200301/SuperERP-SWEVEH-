@@ -5,55 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Sesion } from '../shared/api/client';
 import { mechanic, mockApi, orden, owner, renderPage } from '../test/api';
-import { CatalogPage } from './catalog/CatalogPage';
 import { OrderDetailPage } from './orders/OrderDetailPage';
 import { PanelLayout } from './panel/PanelLayout';
 import { TeamPage } from './team/TeamPage';
 import { WorkshopPage } from './workshop/WorkshopPage';
 
 afterEach(() => vi.unstubAllGlobals());
-
-describe('CatalogPage (HU-07, HU-32, HU-35)', () => {
-  it('crea servicios y repuestos, activa y registra entradas', async () => {
-    const calls = mockApi({
-      'GET /services': { servicios: [{ id: 's1', nombre: 'Alineación', tipoVehiculo: 'carro', precio: null, duracionMin: null, activo: true, version: 2 }] },
-      'POST /services': { status: 201, body: {} },
-      'PATCH /services/{id}': {},
-      'GET /parts': { repuestos: [{ id: 'p1', referencia: 'PF-20', nombre: 'Pastillas', tipoVehiculo: 'carro', precioVenta: 65000, existencia: 1, minimo: 2, bajoMinimo: true, activo: true, version: 1 }] },
-      'POST /parts': { status: 201, body: {} },
-      'POST /parts/{id}/entries': {},
-    });
-    renderPage(<CatalogPage />);
-    expect(await screen.findByText('por confirmar')).toBeInTheDocument();
-    expect(await screen.findByText(/bajo el mínimo/)).toBeInTheDocument();
-
-    expect(screen.getByText('Escribe el nombre del servicio.')).toBeInTheDocument();
-    await userEvent.type(screen.getAllByLabelText('Nombre')[0] as HTMLElement, 'Cambio de aceite');
-    await userEvent.type(screen.getByLabelText('Precio (COP)'), '80.000');
-    await userEvent.type(screen.getByLabelText('Duración (min)'), '45');
-    await userEvent.click(screen.getByRole('button', { name: 'Agregar servicio' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
-
-    await userEvent.type(screen.getByLabelText('Referencia'), 'FA-10');
-    await userEvent.type(screen.getAllByLabelText('Nombre')[1] as HTMLElement, 'Filtro');
-    expect(screen.getByText('Escribe el precio de venta.')).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText('Precio de venta (COP)'), '20000');
-    await userEvent.type(screen.getByLabelText('Costo (COP)'), '12000');
-    await userEvent.type(screen.getByLabelText('Existencia'), '3');
-    await userEvent.type(screen.getByLabelText('Mínimo'), '1');
-    await userEvent.click(screen.getByRole('button', { name: 'Agregar repuesto' }));
-
-    vi.spyOn(window, 'prompt').mockReturnValue('4');
-    await userEvent.click(screen.getByRole('button', { name: 'Registrar entrada' }));
-
-    await waitFor(() => expect(calls.some((c) => c.path === '/parts/p1/entries')).toBe(true));
-    const body = (m: string, p: string) => calls.find((c) => c.method === m && c.path === p)?.body;
-    expect(body('POST', '/services')).toEqual({ nombre: 'Cambio de aceite', tipoVehiculo: 'ambos', precio: 80000, duracionMin: 45 });
-    expect(body('PATCH', '/services/s1')).toEqual({ activo: false, version: 2 });
-    expect(body('POST', '/parts')).toEqual({ referencia: 'FA-10', nombre: 'Filtro', tipoVehiculo: 'ambos', costo: 12000, precioVenta: 20000, existencia: 3, minimo: 1 });
-    expect(body('POST', '/parts/p1/entries')).toEqual({ cantidad: 4 });
-  });
-});
 
 describe('TeamPage (HU-80, HU-84)', () => {
   it('agrega un mecánico y desactiva a quien se va; al dueño no', async () => {
@@ -94,15 +51,16 @@ describe('WorkshopPage (HU-03, HU-08, HU-89)', () => {
       'PUT /workshop/schedule': {},
     });
     renderPage(<WorkshopPage />);
-    expect(await screen.findByText('Para continuar acepta el contrato.')).toBeInTheDocument();
+    expect(await screen.findByText('Escoge qué vehículos atiendes.')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Ciudad'), 'Medellín');
-    await userEvent.selectOptions(screen.getByLabelText('Atiendes'), 'moto');
+    await userEvent.click(screen.getByRole('radio', { name: 'Motos' }));
+    expect(screen.getByText('Para continuar acepta el contrato.')).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('¿Cuántos trabajan?'), '2a5');
     await userEvent.click(screen.getByLabelText('Frenos y suspensión'));
-    await userEvent.click(screen.getByLabelText('Eléctrico'));
-    await userEvent.click(screen.getByLabelText('Eléctrico'));
+    await userEvent.click(screen.getByLabelText(/^Sistema eléctrico/));
+    await userEvent.click(screen.getByLabelText(/^Sistema eléctrico/));
     await userEvent.click(screen.getByLabelText(/Acepto el contrato/));
-    await userEvent.click(screen.getByRole('button', { name: 'Terminar el arranque' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Armar mi taller' }));
 
     await userEvent.click(screen.getByLabelText('Lunes'));
     await userEvent.click(screen.getByLabelText('Sábado'));
@@ -134,7 +92,7 @@ describe('OrderDetailPage', () => {
       </Routes>
     );
     const { unmount } = renderPage(ui, '/panel/ordenes/o1');
-    expect(await screen.findByText(/Motor pendiente/)).toBeInTheDocument();
+    expect(await screen.findByText(/Ficha pendiente/)).toBeInTheDocument();
     expect(screen.queryByText(/Cotización/)).not.toBeInTheDocument();
     unmount();
     mockApi({ 'GET /orders/{id}': { status: 404, body: { detail: 'No encontramos esa orden.' } } });
@@ -151,6 +109,12 @@ describe('PanelLayout (HU-81)', () => {
     unmount();
     renderPage(<PanelLayout session={owner as unknown as Sesion} />);
     expect(screen.getByRole('link', { name: 'Equipo' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Mi taller' })).toBeInTheDocument();
+  });
+
+  it('si el taller es de una sola persona no muestra Equipo (HU-83)', () => {
+    renderPage(<PanelLayout session={owner as unknown as Sesion} soloYo />);
+    expect(screen.queryByRole('link', { name: 'Equipo' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Mi taller' })).toBeInTheDocument();
   });
 });

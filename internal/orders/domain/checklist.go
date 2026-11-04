@@ -2,6 +2,7 @@ package domain
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,13 +18,36 @@ var (
 	MotoAccessories = []string{"casco", "baul", "maletas", "documentos"}
 )
 
+// MinPhotos es el mínimo por defecto; cada taller lo ajusta en sus parámetros (ReceptionRules).
 const MinPhotos = 4
+
+// ReceptionRules son los parámetros del taller que cambian qué se exige al recibir (decisión de Pablo, 3-nov-2026).
+type ReceptionRules struct {
+	MinPhotos       int
+	MileageRequired bool
+}
+
+// DefaultReceptionRules: 4 fotos y kilometraje obligatorio, como antes de los parámetros.
+var DefaultReceptionRules = ReceptionRules{MinPhotos: MinPhotos, MileageRequired: true}
+
+// Estados de un ítem revisado al recibir. "" = todavía no se revisó.
+var ItemStates = []string{"bien", "mal", "no_tiene"}
+
+// ItemCheck es un ítem del checklist del taller (luces, gato, documentos…) con lo que se encontró.
+// El checklist guarda la copia del ítem: si el taller lo renombra después, la recepción hecha no cambia.
+type ItemCheck struct {
+	Key   string `json:"clave"`
+	Name  string `json:"nombre"`
+	State string `json:"estado"`
+	Note  string `json:"nota,omitempty"`
+}
 
 var (
 	ErrFuel      = shared.Validation("combustible_invalido", "Elige el nivel de combustible.").WithField("combustible")
 	ErrFuelNA    = shared.Validation("combustible_no_aplica", "\"No aplica\" solo es para motos sin indicador.").WithField("combustible")
 	ErrKm        = shared.Validation("kilometraje_invalido", "El kilometraje no puede ser negativo.").WithField("kilometraje")
 	ErrException = shared.Validation("salvedad_invalida", "La salvedad necesita una descripción de hasta 300 letras.")
+	ErrItemState = shared.Validation("item_invalido", "Cada ítem se marca como bien, mal o no tiene; la nota va hasta 300 letras.").WithField("items")
 )
 
 // Exception es una salvedad del recibo: rayón, golpe, objeto (HU-17, criterio 3).
@@ -41,6 +65,7 @@ type Checklist struct {
 	Fuel        *string
 	Accessories []string
 	Exceptions  []Exception
+	Items       []ItemCheck
 	DoneBy      *shared.ID
 	DoneAt      *time.Time
 	Version     int
@@ -66,6 +91,12 @@ func (c *Checklist) Validate() error {
 		}
 	}
 	c.Accessories = clean
+	for i := range c.Items {
+		c.Items[i].Note = strings.TrimSpace(c.Items[i].Note)
+		if (c.Items[i].State != "" && !slices.Contains(ItemStates, c.Items[i].State)) || len([]rune(c.Items[i].Note)) > 300 {
+			return ErrItemState
+		}
+	}
 	for i := range c.Exceptions {
 		n := strings.TrimSpace(c.Exceptions[i].Note)
 		if n == "" || len([]rune(n)) > 300 {
@@ -77,7 +108,8 @@ func (c *Checklist) Validate() error {
 }
 
 // Missing dice qué falta para pasar a Recibido, en palabras del taller (DR-06). sides = lados con foto.
-func (c Checklist) Missing(sides []string) []string {
+// Las fotos y el kilometraje siguen los parámetros del taller; los ítems revisados no bloquean.
+func (c Checklist) Missing(sides []string, rules ReceptionRules) []string {
 	var miss []string
 	required := CarSides
 	if c.Kind == "moto" {
@@ -92,12 +124,15 @@ func (c Checklist) Missing(sides []string) []string {
 			missingSides = append(missingSides, s)
 		}
 	}
-	if c.Kind == "carro" && len(missingSides) > 0 {
+	need := min(rules.MinPhotos, len(required))
+	switch {
+	case have >= need:
+	case need == len(required):
 		miss = append(miss, "fotos: "+strings.Join(missingSides, ", "))
-	} else if c.Kind == "moto" && have < MinPhotos {
-		miss = append(miss, "fotos (mínimo 4 de: "+strings.Join(missingSides, ", ")+")")
+	default:
+		miss = append(miss, "fotos (mínimo "+strconv.Itoa(need)+" de: "+strings.Join(missingSides, ", ")+")")
 	}
-	if c.Km == nil {
+	if c.Km == nil && rules.MileageRequired {
 		miss = append(miss, "kilometraje")
 	}
 	if c.Fuel == nil {

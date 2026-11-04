@@ -7,6 +7,8 @@ export const estados: Record<EstadoOrden, string> = {
   en_diagnostico: 'En diagnóstico',
   esperando_aprobacion: 'Esperando aprobación',
   en_reparacion: 'En reparación',
+  esperando_repuesto: 'Esperando repuesto',
+  control_calidad: 'Control de calidad',
   listo: 'Listo',
   entregado: 'Entregado',
   cancelada: 'Cancelada',
@@ -22,6 +24,13 @@ export const flujo: EstadoOrden[] = [
   'listo',
   'entregado',
 ];
+
+/** El flujo del taller según sus parámetros: Control de calidad va entre En reparación y Listo si está activo.
+ *  Esperando repuesto no es un paso: es un desvío desde En reparación (ver OrderActions). */
+export function flujoFor(p?: { usarControlCalidad: boolean } | null): EstadoOrden[] {
+  if (!p?.usarControlCalidad) return flujo;
+  return flujo.flatMap((e) => (e === 'listo' ? (['control_calidad', 'listo'] as EstadoOrden[]) : [e]));
+}
 
 export const roles: Record<string, string> = {
   dueno: 'Dueño',

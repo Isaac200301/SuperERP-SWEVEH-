@@ -53,7 +53,8 @@ export function useChecklist(id: string) {
   });
 }
 
-export type ChecklistInput = { kilometraje?: number | null; combustible?: string | null; accesorios?: string[] };
+export type ItemRevisado = Schemas['ItemRevisado'];
+export type ChecklistInput = { kilometraje?: number | null; combustible?: string | null; accesorios?: string[]; items?: ItemRevisado[] };
 
 export function useSaveChecklist(id: string) {
   const invalidate = useInvalidateOrder(id);
@@ -71,7 +72,9 @@ export function useEvidence(id: string) {
   });
 }
 
-export type EvidenceInput = { lado?: string; nota?: string; mostrarCliente?: boolean; foto?: File };
+// Una nota puede llevar varias fotos (rayones, piezas encontradas); hallazgoId las pega a un hallazgo.
+export type EvidenceInput = { lado?: string; nota?: string; mostrarCliente?: boolean; foto?: File; fotos?: File[]; hallazgoId?: string };
+export const maxFotosPorNota = 8;
 
 /** HU-21: la foto va al final del formulario para que el servidor la procese en streaming. */
 export function useAddEvidence(id: string) {
@@ -87,7 +90,8 @@ export function useAddEvidence(id: string) {
             if (v.lado) fd.append('lado', v.lado);
             if (v.nota) fd.append('nota', v.nota);
             fd.append('mostrarCliente', String(v.mostrarCliente ?? false));
-            if (v.foto) fd.append('foto', v.foto);
+            if (v.hallazgoId) fd.append('hallazgoId', v.hallazgoId);
+            for (const f of [...(v.foto ? [v.foto] : []), ...(v.fotos ?? [])]) fd.append('foto', f);
             return fd;
           },
         }),
@@ -109,7 +113,7 @@ export function useQuote(id: string, enabled = true) {
   });
 }
 
-export type LineInput = { tipo: 'servicio' | 'repuesto'; refId?: string; descripcion?: string; cantidad: number; precioUnitario?: number };
+export type LineInput = { tipo: 'servicio' | 'repuesto'; refId?: string; descripcion?: string; cantidad: number; precioUnitario?: number; horas?: number };
 
 export function useQuoteActions(id: string) {
   const invalidate = useInvalidateOrder(id);
@@ -132,7 +136,34 @@ export function useQuoteActions(id: string) {
       unwrap(await api.POST('/orders/{id}/quote/response', { params: { path: { id } }, body })),
     onSettled: invalidate,
   });
-  return { add, remove, send, respond };
+  // Cantidad y, solo en precio libre, el precio de un ítem del borrador.
+  const update = useMutation({
+    mutationFn: async ({ lineId, ...body }: { lineId: string; cantidad?: number; precioUnitario?: number; horas?: number; descuentoPct?: number }) =>
+      unwrap(await api.PATCH('/orders/{id}/quote/lines/{lineId}', { params: { path: { id, lineId } }, body })),
+    onSettled: invalidate,
+  });
+  // HU-38: devolver una unidad de un repuesto ya descontado; responde cuánto queda por devolver.
+  const giveBack = useMutation({
+    mutationFn: async (v: { partId: string; nombre: string }) => ({
+      ...unwrap(await api.POST('/parts/{id}/returns', { params: { path: { id: v.partId } }, body: { cantidad: 1, ordenId: id } })),
+      nombre: v.nombre,
+    }),
+    onSettled: invalidate,
+  });
+  const renew = useMutation({
+    mutationFn: async () => unwrap(await api.POST('/orders/{id}/quote/renew', { params: { path: { id } } })),
+    onSettled: invalidate,
+  });
+  return { add, remove, send, respond, giveBack, update, renew };
+}
+
+/** Por repuesto, lo que la orden descontó, devolvió y dejó pendiente (HU-33, HU-38). */
+export function useOrderParts(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...ordersKey, id, 'repuestos-movidos'],
+    enabled,
+    queryFn: async () => unwrap(await api.GET('/orders/{id}/part-movements', { params: { path: { id } } })).repuestos,
+  });
 }
 
 /** Servicios y repuestos del taller para cotizar (HU-07, HU-34). */

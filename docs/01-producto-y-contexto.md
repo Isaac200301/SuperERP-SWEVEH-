@@ -49,7 +49,7 @@ WEVEH (app de mantenimiento para el usuario común) se dejó porque el problema 
 | DE-14 | **Implementación acompañada** (migrar desde CSV, fotos de cuadernos) | 27-oct |
 | DE-15 | **Asistente** que guía al dueño y sirve a cliente y mecánico (qué hace primero: por decidir, D-06/Q-15) | 29-oct |
 | DE-16 | **Sin VIN** al registrar vehículos | 1-nov |
-| DE-17 | Todo vehículo tiene **motor con cilindraje y turbo** | 1-nov |
+| DE-17 | Todo vehículo tiene **ficha**: combustible, caja y, en combustión, cilindraje y aspiración (atmosférico/turbo/supercargado); carro con tracción y carrocería, moto con 2T/4T y refrigeración; color y llanta. Reemplaza "motor con cilindraje y turbo" (1-nov) | 3-nov (Pablo) |
 | DE-18 | **HU-74** (medidor de mensajes y costo de IA) es del Administrador del ERP: el costo de IA va dentro de la suscripción mensual | 1-nov |
 | DE-19 | **HU-50 cancelada**: el ERP no recuerda técnico-mecánica | 1-nov |
 | DE-20 | **Todas las HU son Must**: todo entra en el MVP | 1-nov |

@@ -24,7 +24,7 @@ const (
 
 // Lo que todos los roles del taller pueden hacer en el trabajo diario.
 var common = []string{
-	"order:create", "order:read", "order:update_state", "evidence:upload",
+	"order:create", "order:read", "order:update_state", "order:diagnose", "evidence:upload",
 	"customer:create", "vehicle:create", "vehicle:update", "vehicle:read",
 	"service:read", "part:read", "part:return",
 	"quote:read", "quote:edit", "quote:send", // Q-10: por defecto el mecánico envía la cotización
@@ -32,7 +32,7 @@ var common = []string{
 
 // Front office: recepción y dueño (clientes completos, dinero, bandeja, conversaciones).
 var frontOffice = []string{
-	"order:cancel", "order:assign", "customer:read_all", "vehicle:change_owner", "quote:register_response",
+	"order:cancel", "order:assign", "customer:read_all", "vehicle:change_owner", "quote:register_response", "quote:discount",
 	"money:read", "inbox:manage", "conversation:read",
 }
 

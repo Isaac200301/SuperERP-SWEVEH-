@@ -40,17 +40,18 @@ func (h *Handler) Routes(r chi.Router) {
 }
 
 type vehicleDTO struct {
-	ID             string    `json:"id"`
-	ClienteID      string    `json:"clienteId"`
-	Tipo           string    `json:"tipo"`
-	Placa          string    `json:"placa"`
-	FormatoPlaca   string    `json:"formatoPlaca"`
-	Marca          *string   `json:"marca"`
-	Linea          *string   `json:"linea"`
-	ModeloAnio     *int      `json:"modeloAnio"`
-	Kilometraje    *int      `json:"kilometraje"`
-	CilindrajeCc   *int      `json:"cilindrajeCc"`
-	Turbo          *bool     `json:"turbo"`
+	ID           string  `json:"id"`
+	ClienteID    string  `json:"clienteId"`
+	Tipo         string  `json:"tipo"`
+	Placa        string  `json:"placa"`
+	FormatoPlaca string  `json:"formatoPlaca"`
+	Marca        *string `json:"marca"`
+	Linea        *string `json:"linea"`
+	ModeloAnio   *int    `json:"modeloAnio"`
+	Kilometraje  *int    `json:"kilometraje"`
+	CilindrajeCc *int    `json:"cilindrajeCc"`
+	Turbo        *bool   `json:"turbo"`
+	ficha
 	MotorPendiente bool      `json:"motorPendiente"`
 	Version        int       `json:"version"`
 	CreadoEn       time.Time `json:"creadoEn"`
@@ -61,7 +62,9 @@ func toDTO(v domain.Vehicle) vehicleDTO {
 		ID: v.ID.String(), ClienteID: v.CustomerID.String(), Tipo: string(v.Kind),
 		Placa: v.Plate.String(), FormatoPlaca: string(v.Plate.Format()),
 		Marca: v.Details.Brand, Linea: v.Details.Line, ModeloAnio: v.Details.Year, Kilometraje: v.Details.Mileage,
-		CilindrajeCc: v.Engine.DisplacementCC, Turbo: v.Engine.Turbo, MotorPendiente: v.Engine.Pending(),
+		CilindrajeCc: v.Engine.DisplacementCC, Turbo: v.Engine.Turbo, MotorPendiente: v.Engine.Pending(v.Kind),
+		ficha: ficha{Energia: v.Engine.Energy, Aspiracion: v.Engine.Aspiration, Transmision: v.Engine.Transmission, Traccion: v.Engine.Drive,
+			Ciclo: v.Engine.Cycle, Refrigeracion: v.Engine.Cooling, Color: v.Details.Color, Carroceria: v.Details.Body, Llanta: v.Details.Tire},
 		Version: v.Version, CreadoEn: v.CreatedAt,
 	}
 }
@@ -85,7 +88,25 @@ type registerReq struct {
 	ModeloAnio        *int    `json:"modeloAnio"`
 	Kilometraje       *int    `json:"kilometraje"`
 	Cilindraje        *string `json:"cilindraje"` // "1.2 L" o "1200": se guarda en cc (HU-11)
-	Turbo             *bool   `json:"turbo"`
+	Turbo             *bool   `json:"turbo"`      // API anterior; si llega aspiración, manda la aspiración
+	ficha
+}
+
+// ficha son los datos del vehículo que pidió el taller (decisión del 3-nov-2026). Todos opcionales.
+type ficha struct {
+	Energia       *string `json:"energia"`
+	Aspiracion    *string `json:"aspiracion"`
+	Transmision   *string `json:"transmision"`
+	Traccion      *string `json:"traccion"`
+	Ciclo         *string `json:"ciclo"`
+	Refrigeracion *string `json:"refrigeracion"`
+	Color         *string `json:"color"`
+	Carroceria    *string `json:"carroceria"`
+	Llanta        *string `json:"llanta"`
+}
+
+func (f ficha) details() domain.Details {
+	return domain.Details{Color: f.Color, Body: f.Carroceria, Tire: f.Llanta}
 }
 
 type registerResp struct {
@@ -93,8 +114,9 @@ type registerResp struct {
 	Existente bool       `json:"existente"`
 }
 
-func parseEngine(cil *string, turbo *bool) (domain.Engine, error) {
-	e := domain.Engine{Turbo: turbo}
+func parseEngine(cil *string, turbo *bool, f ficha) (domain.Engine, error) {
+	e := domain.Engine{Turbo: turbo, Energy: f.Energia, Aspiration: f.Aspiracion, Transmission: f.Transmision,
+		Drive: f.Traccion, Cycle: f.Ciclo, Cooling: f.Refrigeracion}
 	if cil != nil && *cil != "" {
 		cc, err := domain.ParseDisplacement(*cil)
 		if err != nil {
@@ -112,7 +134,7 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, h.log, err)
 		return
 	}
-	engine, err := parseEngine(req.Cilindraje, req.Turbo)
+	engine, err := parseEngine(req.Cilindraje, req.Turbo, req.ficha)
 	if err != nil {
 		httpx.WriteError(w, r, h.log, err)
 		return
@@ -127,8 +149,9 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	res, err := h.svc.Register(r.Context(), app.RegisterVehicle{
 		TallerID: p.TallerID, Actor: p.Actor(), Plate: req.Placa, Kind: req.Tipo,
 		ConfirmSpecial: req.ConfirmarEspecial, CustomerID: customerID,
-		Details: domain.Details{Brand: req.Marca, Line: req.Linea, Year: req.ModeloAnio, Mileage: req.Kilometraje},
-		Engine:  engine,
+		Details: domain.Details{Brand: req.Marca, Line: req.Linea, Year: req.ModeloAnio, Mileage: req.Kilometraje,
+			Color: req.Color, Body: req.Carroceria, Tire: req.Llanta},
+		Engine: engine,
 	})
 	if err != nil {
 		httpx.WriteError(w, r, h.log, err)
@@ -169,6 +192,7 @@ func (h *Handler) byID(w http.ResponseWriter, r *http.Request) {
 type engineReq struct {
 	Cilindraje *string `json:"cilindraje"`
 	Turbo      *bool   `json:"turbo"`
+	ficha
 }
 
 func (h *Handler) updateEngine(w http.ResponseWriter, r *http.Request) {
@@ -188,13 +212,13 @@ func (h *Handler) updateEngine(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, h.log, err)
 		return
 	}
-	engine, err := parseEngine(req.Cilindraje, req.Turbo)
+	engine, err := parseEngine(req.Cilindraje, req.Turbo, req.ficha)
 	if err != nil {
 		httpx.WriteError(w, r, h.log, err)
 		return
 	}
 	v, err := h.svc.UpdateEngine(r.Context(), app.UpdateEngine{
-		TallerID: p.TallerID, Actor: p.Actor(), VehicleID: id, Engine: engine, ExpectedVersion: version,
+		TallerID: p.TallerID, Actor: p.Actor(), VehicleID: id, Engine: engine, Details: req.details(), ExpectedVersion: version,
 	})
 	if err != nil {
 		httpx.WriteError(w, r, h.log, err)

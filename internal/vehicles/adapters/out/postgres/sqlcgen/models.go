@@ -90,6 +90,8 @@ type CatalogServicio struct {
 	Version      int32
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	Categoria    *string
+	GarantiaDias *int32
 }
 
 type CustomersAutorizacion struct {
@@ -179,19 +181,23 @@ type IdentityUsuario struct {
 }
 
 type InventoryArticulo struct {
-	ID           uuid.UUID
-	TallerID     uuid.UUID
-	Referencia   string
-	Nombre       string
-	TipoVehiculo string
-	Costo        int64
-	PrecioVenta  int64
-	Existencia   int32
-	Minimo       int32
-	Activo       bool
-	Version      int32
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID            uuid.UUID
+	TallerID      uuid.UUID
+	Referencia    string
+	Nombre        string
+	TipoVehiculo  string
+	Costo         int64
+	PrecioVenta   int64
+	Existencia    int32
+	Minimo        int32
+	Activo        bool
+	Version       int32
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Marca         *string
+	Categoria     *string
+	Ubicacion     *string
+	ReferenciaOem *string
 }
 
 type InventoryMovimiento struct {
@@ -267,6 +273,7 @@ type OrdersChecklist struct {
 	CompletadoEn  *time.Time
 	Version       int32
 	UpdatedAt     time.Time
+	Items         json.RawMessage
 }
 
 type OrdersContador struct {
@@ -297,6 +304,21 @@ type OrdersEvidencium struct {
 	Etapa          string
 	AutorID        *uuid.UUID
 	CreatedAt      time.Time
+	GrupoID        *uuid.UUID
+	HallazgoID     *uuid.UUID
+}
+
+type OrdersHallazgo struct {
+	ID           uuid.UUID
+	TallerID     uuid.UUID
+	OrdenID      uuid.UUID
+	Sistema      string
+	Descripcion  string
+	Gravedad     string
+	CodigosFalla []string
+	AutorID      *uuid.UUID
+	CreatedAt    time.Time
+	ManoObra     *int64
 }
 
 type OrdersOrden struct {
@@ -348,6 +370,12 @@ type QuotesCotizacion struct {
 	Version        int32
 	CreatedAt      time.Time
 	CreatedBy      *uuid.UUID
+	IvaPct         int32
+	PreciosConIva  bool
+	VenceEn        *time.Time
+	Subtotal       int64
+	Descuento      int64
+	Iva            int64
 }
 
 type QuotesLinea struct {
@@ -362,6 +390,27 @@ type QuotesLinea struct {
 	SinStock       bool
 	Aprobada       *bool
 	CreatedAt      time.Time
+	PrecioLibre    bool
+	DescuentoPct   int32
+	HorasCent      *int32
+}
+
+type TenancyParametro struct {
+	TallerID              uuid.UUID
+	UsarEsperandoRepuesto bool
+	UsarControlCalidad    bool
+	FotosMinimas          int32
+	KmObligatorio         bool
+	ItemsCarro            json.RawMessage
+	ItemsMoto             json.RawMessage
+	IvaPct                int32
+	PreciosConIva         bool
+	TarifaHora            *int64
+	DescuentoMaxPct       int32
+	DescuentoRecepcion    bool
+	VigenciaDias          int32
+	Version               int32
+	UpdatedAt             time.Time
 }
 
 type TenancyTaller struct {
@@ -391,20 +440,29 @@ type VehiclesPropietarioHistorial struct {
 }
 
 type VehiclesVehiculo struct {
-	ID           uuid.UUID
-	TallerID     uuid.UUID
-	ClienteID    uuid.UUID
-	Tipo         string
-	Placa        string
-	FormatoPlaca string
-	Marca        *string
-	Linea        *string
-	ModeloAnio   *int32
-	Kilometraje  *int32
-	CilindrajeCc *int32
-	Turbo        *bool
-	Version      int32
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	CreatedBy    *uuid.UUID
+	ID            uuid.UUID
+	TallerID      uuid.UUID
+	ClienteID     uuid.UUID
+	Tipo          string
+	Placa         string
+	FormatoPlaca  string
+	Marca         *string
+	Linea         *string
+	ModeloAnio    *int32
+	Kilometraje   *int32
+	CilindrajeCc  *int32
+	Turbo         *bool
+	Version       int32
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	CreatedBy     *uuid.UUID
+	Energia       *string
+	Aspiracion    *string
+	Transmision   *string
+	Traccion      *string
+	Ciclo         *string
+	Refrigeracion *string
+	Color         *string
+	Carroceria    *string
+	Llanta        *string
 }

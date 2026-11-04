@@ -135,13 +135,14 @@ type checklistRow struct {
 	Combustible *string         `db:"combustible"`
 	Accesorios  []string        `db:"accesorios"`
 	Salvedades  json.RawMessage `db:"salvedades"`
+	Items       json.RawMessage `db:"items"`
 	Por         *shared.ID      `db:"completado_por"`
 	En          *time.Time      `db:"completado_en"`
 	Version     int             `db:"version"`
 }
 
 func (Flow) GetChecklist(ctx context.Context, tallerID, orderID shared.ID) (domain.Checklist, bool, error) {
-	rows, err := db.Many[checklistRow](ctx, `SELECT tipo, kilometraje, combustible, accesorios, salvedades, completado_por, completado_en, version
+	rows, err := db.Many[checklistRow](ctx, `SELECT tipo, kilometraje, combustible, accesorios, salvedades, items, completado_por, completado_en, version
 		FROM orders.checklist WHERE taller_id = $1 AND orden_id = $2`, tallerID, orderID)
 	if err != nil || len(rows) == 0 {
 		return domain.Checklist{OrderID: orderID, Accessories: []string{}}, false, err
@@ -150,6 +151,9 @@ func (Flow) GetChecklist(ctx context.Context, tallerID, orderID shared.ID) (doma
 	c := domain.Checklist{OrderID: orderID, Kind: r.Tipo, Km: r.Km, Fuel: r.Combustible, Accessories: r.Accesorios,
 		DoneBy: r.Por, DoneAt: r.En, Version: r.Version}
 	if err := json.Unmarshal(r.Salvedades, &c.Exceptions); err != nil {
+		return c, true, err
+	}
+	if err := json.Unmarshal(r.Items, &c.Items); err != nil {
 		return c, true, err
 	}
 	return c, true, nil
@@ -166,12 +170,19 @@ func (Flow) SaveChecklist(ctx context.Context, tallerID shared.ID, c domain.Chec
 	if c.Accessories == nil {
 		c.Accessories = []string{}
 	}
+	items, err := json.Marshal(c.Items)
+	if err != nil {
+		return err
+	}
+	if c.Items == nil {
+		items = []byte("[]")
+	}
 	_, err = db.Exec(ctx, `INSERT INTO orders.checklist (orden_id, taller_id, tipo, kilometraje, combustible, accesorios, salvedades,
-		completado_por, completado_en) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		completado_por, completado_en, items) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (orden_id) DO UPDATE SET kilometraje = EXCLUDED.kilometraje, combustible = EXCLUDED.combustible,
 		accesorios = EXCLUDED.accesorios, salvedades = EXCLUDED.salvedades, completado_por = EXCLUDED.completado_por,
-		completado_en = EXCLUDED.completado_en, version = orders.checklist.version + 1, updated_at = now()`,
-		c.OrderID, tallerID, c.Kind, c.Km, c.Fuel, c.Accessories, exc, c.DoneBy, c.DoneAt)
+		completado_en = EXCLUDED.completado_en, items = EXCLUDED.items, version = orders.checklist.version + 1, updated_at = now()`,
+		c.OrderID, tallerID, c.Kind, c.Km, c.Fuel, c.Accessories, exc, c.DoneBy, c.DoneAt, items)
 	return err
 }
 
@@ -187,19 +198,27 @@ type evidenceRow struct {
 	Etapa       string     `db:"etapa"`
 	AutorID     *shared.ID `db:"autor_id"`
 	CreatedAt   time.Time  `db:"created_at"`
+	GrupoID     *shared.ID `db:"grupo_id"`
+	HallazgoID  *shared.ID `db:"hallazgo_id"`
 }
 
 func (r evidenceRow) port() ports.Evidence {
 	return ports.Evidence{ID: r.ID, TallerID: r.TallerID, OrderID: r.OrdenID, Side: r.Lado, Note: r.Nota, StorageKey: r.StorageKey,
-		ContentType: r.ContentType, ShowClient: r.Mostrar, Stage: r.Etapa, AuthorID: r.AutorID, CreatedAt: r.CreatedAt}
+		ContentType: r.ContentType, ShowClient: r.Mostrar, Stage: r.Etapa, AuthorID: r.AutorID, CreatedAt: r.CreatedAt,
+		GroupID: r.GrupoID, FindingID: r.HallazgoID}
 }
 
-const evCols = `id, taller_id, orden_id, lado, nota, storage_key, content_type, mostrar_cliente, etapa, autor_id, created_at`
+const evCols = `id, taller_id, orden_id, lado, nota, storage_key, content_type, mostrar_cliente, etapa, autor_id, created_at, grupo_id, hallazgo_id`
 
 func (Flow) InsertEvidence(ctx context.Context, e ports.Evidence) error {
-	_, err := db.Exec(ctx, `INSERT INTO orders.evidencia (`+evCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-		e.ID, e.TallerID, e.OrderID, e.Side, e.Note, e.StorageKey, e.ContentType, e.ShowClient, e.Stage, e.AuthorID, e.CreatedAt)
+	_, err := db.Exec(ctx, `INSERT INTO orders.evidencia (`+evCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+		e.ID, e.TallerID, e.OrderID, e.Side, e.Note, e.StorageKey, e.ContentType, e.ShowClient, e.Stage, e.AuthorID, e.CreatedAt, e.GroupID, e.FindingID)
 	return err
+}
+
+func (Flow) FindingInOrder(ctx context.Context, tallerID, orderID, findingID shared.ID) (bool, error) {
+	return db.Scalar[bool](ctx, `SELECT EXISTS (SELECT 1 FROM orders.hallazgo WHERE taller_id = $1 AND orden_id = $2 AND id = $3)`,
+		tallerID, orderID, findingID)
 }
 
 func (Flow) ListEvidence(ctx context.Context, tallerID, orderID shared.ID) ([]ports.Evidence, error) {

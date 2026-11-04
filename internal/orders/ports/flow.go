@@ -26,6 +26,8 @@ type FlowRepository interface {
 	ListEvidence(ctx context.Context, tallerID, orderID shared.ID) ([]Evidence, error)
 	GetEvidence(ctx context.Context, tallerID, orderID, id shared.ID) (Evidence, error)
 	PhotoSides(ctx context.Context, tallerID, orderID shared.ID) ([]string, error)
+	// FindingInOrder dice si el hallazgo es de esa orden (anti-IDOR al adjuntar fotos).
+	FindingInOrder(ctx context.Context, tallerID, orderID, findingID shared.ID) (bool, error)
 }
 
 // ListFilter filtra la lista de órdenes.
@@ -52,6 +54,8 @@ type Evidence struct {
 	Stage       string
 	AuthorID    *shared.ID
 	CreatedAt   time.Time
+	GroupID     *shared.ID // fotos que se subieron juntas con una nota
+	FindingID   *shared.ID // foto de un hallazgo del diagnóstico
 }
 
 // ErrStorageTooLarge lo devuelve Storage.Put cuando el archivo pasa el tamaño máximo.

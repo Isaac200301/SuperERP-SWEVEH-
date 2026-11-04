@@ -14,7 +14,8 @@ import (
 
 const getVehicleByID = `-- name: GetVehicleByID :one
 SELECT id, taller_id, cliente_id, tipo, placa, formato_placa, marca, linea, modelo_anio, kilometraje,
-       cilindraje_cc, turbo, version, created_at
+       cilindraje_cc, turbo, energia, aspiracion, transmision, traccion, ciclo, refrigeracion, color, carroceria, llanta,
+       version, created_at
 FROM vehicles.vehiculo
 WHERE taller_id = $1 AND id = $2
 `
@@ -25,20 +26,29 @@ type GetVehicleByIDParams struct {
 }
 
 type GetVehicleByIDRow struct {
-	ID           uuid.UUID
-	TallerID     uuid.UUID
-	ClienteID    uuid.UUID
-	Tipo         string
-	Placa        string
-	FormatoPlaca string
-	Marca        *string
-	Linea        *string
-	ModeloAnio   *int32
-	Kilometraje  *int32
-	CilindrajeCc *int32
-	Turbo        *bool
-	Version      int32
-	CreatedAt    time.Time
+	ID            uuid.UUID
+	TallerID      uuid.UUID
+	ClienteID     uuid.UUID
+	Tipo          string
+	Placa         string
+	FormatoPlaca  string
+	Marca         *string
+	Linea         *string
+	ModeloAnio    *int32
+	Kilometraje   *int32
+	CilindrajeCc  *int32
+	Turbo         *bool
+	Energia       *string
+	Aspiracion    *string
+	Transmision   *string
+	Traccion      *string
+	Ciclo         *string
+	Refrigeracion *string
+	Color         *string
+	Carroceria    *string
+	Llanta        *string
+	Version       int32
+	CreatedAt     time.Time
 }
 
 func (q *Queries) GetVehicleByID(ctx context.Context, arg GetVehicleByIDParams) (GetVehicleByIDRow, error) {
@@ -57,6 +67,15 @@ func (q *Queries) GetVehicleByID(ctx context.Context, arg GetVehicleByIDParams) 
 		&i.Kilometraje,
 		&i.CilindrajeCc,
 		&i.Turbo,
+		&i.Energia,
+		&i.Aspiracion,
+		&i.Transmision,
+		&i.Traccion,
+		&i.Ciclo,
+		&i.Refrigeracion,
+		&i.Color,
+		&i.Carroceria,
+		&i.Llanta,
 		&i.Version,
 		&i.CreatedAt,
 	)
@@ -65,7 +84,8 @@ func (q *Queries) GetVehicleByID(ctx context.Context, arg GetVehicleByIDParams) 
 
 const getVehicleByPlate = `-- name: GetVehicleByPlate :one
 SELECT id, taller_id, cliente_id, tipo, placa, formato_placa, marca, linea, modelo_anio, kilometraje,
-       cilindraje_cc, turbo, version, created_at
+       cilindraje_cc, turbo, energia, aspiracion, transmision, traccion, ciclo, refrigeracion, color, carroceria, llanta,
+       version, created_at
 FROM vehicles.vehiculo
 WHERE taller_id = $1 AND placa = $2
 `
@@ -76,20 +96,29 @@ type GetVehicleByPlateParams struct {
 }
 
 type GetVehicleByPlateRow struct {
-	ID           uuid.UUID
-	TallerID     uuid.UUID
-	ClienteID    uuid.UUID
-	Tipo         string
-	Placa        string
-	FormatoPlaca string
-	Marca        *string
-	Linea        *string
-	ModeloAnio   *int32
-	Kilometraje  *int32
-	CilindrajeCc *int32
-	Turbo        *bool
-	Version      int32
-	CreatedAt    time.Time
+	ID            uuid.UUID
+	TallerID      uuid.UUID
+	ClienteID     uuid.UUID
+	Tipo          string
+	Placa         string
+	FormatoPlaca  string
+	Marca         *string
+	Linea         *string
+	ModeloAnio    *int32
+	Kilometraje   *int32
+	CilindrajeCc  *int32
+	Turbo         *bool
+	Energia       *string
+	Aspiracion    *string
+	Transmision   *string
+	Traccion      *string
+	Ciclo         *string
+	Refrigeracion *string
+	Color         *string
+	Carroceria    *string
+	Llanta        *string
+	Version       int32
+	CreatedAt     time.Time
 }
 
 func (q *Queries) GetVehicleByPlate(ctx context.Context, arg GetVehicleByPlateParams) (GetVehicleByPlateRow, error) {
@@ -108,6 +137,15 @@ func (q *Queries) GetVehicleByPlate(ctx context.Context, arg GetVehicleByPlatePa
 		&i.Kilometraje,
 		&i.CilindrajeCc,
 		&i.Turbo,
+		&i.Energia,
+		&i.Aspiracion,
+		&i.Transmision,
+		&i.Traccion,
+		&i.Ciclo,
+		&i.Refrigeracion,
+		&i.Color,
+		&i.Carroceria,
+		&i.Llanta,
 		&i.Version,
 		&i.CreatedAt,
 	)
@@ -116,26 +154,36 @@ func (q *Queries) GetVehicleByPlate(ctx context.Context, arg GetVehicleByPlatePa
 
 const insertVehicle = `-- name: InsertVehicle :execrows
 INSERT INTO vehicles.vehiculo (id, taller_id, cliente_id, tipo, placa, formato_placa, marca, linea,
-                               modelo_anio, kilometraje, cilindraje_cc, turbo, created_at, updated_at, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13, $14)
+                               modelo_anio, kilometraje, cilindraje_cc, turbo, energia, aspiracion, transmision,
+                               traccion, ciclo, refrigeracion, color, carroceria, llanta, created_at, updated_at, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $22, $23)
 ON CONFLICT ON CONSTRAINT vehiculo_placa_unica DO NOTHING
 `
 
 type InsertVehicleParams struct {
-	ID           uuid.UUID
-	TallerID     uuid.UUID
-	ClienteID    uuid.UUID
-	Tipo         string
-	Placa        string
-	FormatoPlaca string
-	Marca        *string
-	Linea        *string
-	ModeloAnio   *int32
-	Kilometraje  *int32
-	CilindrajeCc *int32
-	Turbo        *bool
-	CreatedAt    time.Time
-	CreatedBy    *uuid.UUID
+	ID            uuid.UUID
+	TallerID      uuid.UUID
+	ClienteID     uuid.UUID
+	Tipo          string
+	Placa         string
+	FormatoPlaca  string
+	Marca         *string
+	Linea         *string
+	ModeloAnio    *int32
+	Kilometraje   *int32
+	CilindrajeCc  *int32
+	Turbo         *bool
+	Energia       *string
+	Aspiracion    *string
+	Transmision   *string
+	Traccion      *string
+	Ciclo         *string
+	Refrigeracion *string
+	Color         *string
+	Carroceria    *string
+	Llanta        *string
+	CreatedAt     time.Time
+	CreatedBy     *uuid.UUID
 }
 
 // Igual que con el cliente: placa repetida en el mismo taller = 0 filas, se devuelve el existente (HU-10).
@@ -153,6 +201,15 @@ func (q *Queries) InsertVehicle(ctx context.Context, arg InsertVehicleParams) (i
 		arg.Kilometraje,
 		arg.CilindrajeCc,
 		arg.Turbo,
+		arg.Energia,
+		arg.Aspiracion,
+		arg.Transmision,
+		arg.Traccion,
+		arg.Ciclo,
+		arg.Refrigeracion,
+		arg.Color,
+		arg.Carroceria,
+		arg.Llanta,
 		arg.CreatedAt,
 		arg.CreatedBy,
 	)
@@ -164,7 +221,8 @@ func (q *Queries) InsertVehicle(ctx context.Context, arg InsertVehicleParams) (i
 
 const listVehiclesByIDs = `-- name: ListVehiclesByIDs :many
 SELECT id, taller_id, cliente_id, tipo, placa, formato_placa, marca, linea, modelo_anio, kilometraje,
-       cilindraje_cc, turbo, version, created_at
+       cilindraje_cc, turbo, energia, aspiracion, transmision, traccion, ciclo, refrigeracion, color, carroceria, llanta,
+       version, created_at
 FROM vehicles.vehiculo
 WHERE taller_id = $1 AND id = ANY($2::uuid[])
 `
@@ -175,20 +233,29 @@ type ListVehiclesByIDsParams struct {
 }
 
 type ListVehiclesByIDsRow struct {
-	ID           uuid.UUID
-	TallerID     uuid.UUID
-	ClienteID    uuid.UUID
-	Tipo         string
-	Placa        string
-	FormatoPlaca string
-	Marca        *string
-	Linea        *string
-	ModeloAnio   *int32
-	Kilometraje  *int32
-	CilindrajeCc *int32
-	Turbo        *bool
-	Version      int32
-	CreatedAt    time.Time
+	ID            uuid.UUID
+	TallerID      uuid.UUID
+	ClienteID     uuid.UUID
+	Tipo          string
+	Placa         string
+	FormatoPlaca  string
+	Marca         *string
+	Linea         *string
+	ModeloAnio    *int32
+	Kilometraje   *int32
+	CilindrajeCc  *int32
+	Turbo         *bool
+	Energia       *string
+	Aspiracion    *string
+	Transmision   *string
+	Traccion      *string
+	Ciclo         *string
+	Refrigeracion *string
+	Color         *string
+	Carroceria    *string
+	Llanta        *string
+	Version       int32
+	CreatedAt     time.Time
 }
 
 func (q *Queries) ListVehiclesByIDs(ctx context.Context, arg ListVehiclesByIDsParams) ([]ListVehiclesByIDsRow, error) {
@@ -213,6 +280,15 @@ func (q *Queries) ListVehiclesByIDs(ctx context.Context, arg ListVehiclesByIDsPa
 			&i.Kilometraje,
 			&i.CilindrajeCc,
 			&i.Turbo,
+			&i.Energia,
+			&i.Aspiracion,
+			&i.Transmision,
+			&i.Traccion,
+			&i.Ciclo,
+			&i.Refrigeracion,
+			&i.Color,
+			&i.Carroceria,
+			&i.Llanta,
 			&i.Version,
 			&i.CreatedAt,
 		); err != nil {
@@ -228,26 +304,45 @@ func (q *Queries) ListVehiclesByIDs(ctx context.Context, arg ListVehiclesByIDsPa
 
 const updateVehicleEngine = `-- name: UpdateVehicleEngine :execrows
 UPDATE vehicles.vehiculo
-SET cilindraje_cc = $3, turbo = $4, version = version + 1, updated_at = $5
-WHERE taller_id = $1 AND id = $2 AND version = $6
+SET cilindraje_cc = $3, turbo = $4, energia = $5, aspiracion = $6, transmision = $7, traccion = $8, ciclo = $9,
+    refrigeracion = $10, color = $11, carroceria = $12, llanta = $13, version = version + 1, updated_at = $14
+WHERE taller_id = $1 AND id = $2 AND version = $15
 `
 
 type UpdateVehicleEngineParams struct {
-	TallerID     uuid.UUID
-	ID           uuid.UUID
-	CilindrajeCc *int32
-	Turbo        *bool
-	UpdatedAt    time.Time
-	Version      int32
+	TallerID      uuid.UUID
+	ID            uuid.UUID
+	CilindrajeCc  *int32
+	Turbo         *bool
+	Energia       *string
+	Aspiracion    *string
+	Transmision   *string
+	Traccion      *string
+	Ciclo         *string
+	Refrigeracion *string
+	Color         *string
+	Carroceria    *string
+	Llanta        *string
+	UpdatedAt     time.Time
+	Version       int32
 }
 
-// Concurrencia optimista (R-07): solo actualiza si nadie cambió la versión.
+// Ficha del vehículo (HU-11). Concurrencia optimista (R-07): solo actualiza si nadie cambió la versión.
 func (q *Queries) UpdateVehicleEngine(ctx context.Context, arg UpdateVehicleEngineParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateVehicleEngine,
 		arg.TallerID,
 		arg.ID,
 		arg.CilindrajeCc,
 		arg.Turbo,
+		arg.Energia,
+		arg.Aspiracion,
+		arg.Transmision,
+		arg.Traccion,
+		arg.Ciclo,
+		arg.Refrigeracion,
+		arg.Color,
+		arg.Carroceria,
+		arg.Llanta,
 		arg.UpdatedAt,
 		arg.Version,
 	)

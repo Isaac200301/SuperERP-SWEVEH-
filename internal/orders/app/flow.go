@@ -26,6 +26,24 @@ type Flow struct {
 	events   ports.EventPublisher
 	clock    ports.Clock
 	stats    Stats
+	settings ports.SettingsReader
+}
+
+// SetSettings conecta los parámetros del taller (tenancy). Sin lector se usan los valores por defecto.
+func (f *Flow) SetSettings(r ports.SettingsReader) { f.settings = r }
+
+func (f *Flow) settingsIn(ctx context.Context, tallerID shared.ID) (ports.Settings, error) {
+	if f.settings == nil {
+		return ports.DefaultSettings, nil
+	}
+	return f.settings.Settings(ctx, tallerID)
+}
+
+// withItems pone en el checklist los ítems vigentes del taller si todavía no tiene su copia.
+func withItems(cl *domain.Checklist, s ports.Settings, kind string) {
+	if len(cl.Items) == 0 && cl.DoneAt == nil {
+		cl.Items = s.ItemsFor(kind)
+	}
 }
 
 func portsFilter(tallerID shared.ID, st *domain.State) ports.ListFilter {
@@ -78,8 +96,13 @@ func (f *Flow) move(ctx context.Context, c TransitionCmd, fromQuote bool) (domai
 		if err != nil {
 			return err
 		}
+		st, err := f.settingsIn(ctx, c.TallerID)
+		if err != nil {
+			return err
+		}
 		in := domain.TransitionInput{To: c.To, FromQuote: fromQuote, CanOverride: c.CanOverride, Reason: c.Reason,
-			PickedUpBy: c.PickedUpBy, AccessoriesOK: c.AccessoriesOK, ExpectedVersion: c.Version, At: f.clock.Now()}
+			PickedUpBy: c.PickedUpBy, AccessoriesOK: c.AccessoriesOK, ExpectedVersion: c.Version, At: f.clock.Now(),
+			Options: domain.FlowOptions{AwaitingParts: st.UseAwaitingParts, QualityCheck: st.UseQualityCheck}}
 		// La puerta de Recibido aplica al avanzar desde Por recibir, no al devolverse desde En diagnóstico.
 		if c.To == domain.StateReceived && o.State == domain.StatePending {
 			v, err := f.vehicles.ByID(ctx, c.TallerID, o.VehicleID)
@@ -96,7 +119,7 @@ func (f *Flow) move(ctx context.Context, c TransitionCmd, fromQuote bool) (domai
 				return err
 			}
 			cl.Kind = o.VehicleKind
-			missing := cl.Missing(sides)
+			missing := cl.Missing(sides, st.Reception)
 			in.ChecklistComplete = len(missing) == 0
 			if !in.ChecklistComplete {
 				return domain.ErrChecklist.WithMessage("Para pasar a Recibido falta: " + join(missing) + ".")
@@ -188,9 +211,11 @@ func (f *Flow) Assign(ctx context.Context, tallerID, orderID shared.ID, actor sh
 
 // ChecklistView es el checklist con lo que falta.
 type ChecklistView struct {
-	Checklist domain.Checklist
-	Sides     []string
-	Missing   []string
+	Checklist       domain.Checklist
+	Sides           []string
+	Missing         []string
+	MinPhotos       int
+	MileageRequired bool
 }
 
 func (f *Flow) GetChecklist(ctx context.Context, tallerID, orderID shared.ID) (ChecklistView, error) {
@@ -209,7 +234,13 @@ func (f *Flow) GetChecklist(ctx context.Context, tallerID, orderID shared.ID) (C
 		if err != nil {
 			return err
 		}
-		out = ChecklistView{Checklist: cl, Sides: sides, Missing: cl.Missing(sides)}
+		st, err := f.settingsIn(ctx, tallerID)
+		if err != nil {
+			return err
+		}
+		withItems(&cl, st, o.VehicleKind)
+		out = ChecklistView{Checklist: cl, Sides: sides, Missing: cl.Missing(sides, st.Reception), MinPhotos: st.Reception.MinPhotos,
+			MileageRequired: st.Reception.MileageRequired}
 		return nil
 	})
 	return out, err
@@ -230,6 +261,12 @@ func (f *Flow) SaveChecklist(ctx context.Context, tallerID, orderID shared.ID, a
 			return err
 		}
 		in.OrderID, in.Kind, in.DoneBy, in.DoneAt = o.ID, o.VehicleKind, cur.DoneBy, cur.DoneAt
+		st, err := f.settingsIn(ctx, tallerID)
+		if err != nil {
+			return err
+		}
+		withItems(&cur, st, o.VehicleKind)
+		in.Items = mergeItems(cur.Items, in.Items)
 		now := f.clock.Now()
 		for i := range in.Exceptions {
 			if in.Exceptions[i].At.IsZero() {
@@ -243,7 +280,8 @@ func (f *Flow) SaveChecklist(ctx context.Context, tallerID, orderID shared.ID, a
 			return err
 		}
 		return f.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "orden.checklist", Entity: "orden", EntityID: o.ID,
-			After:      map[string]any{"kilometraje": in.Km, "combustible": in.Fuel, "accesorios": in.Accessories, "salvedades": len(in.Exceptions)},
+			After: map[string]any{"kilometraje": in.Km, "combustible": in.Fuel, "accesorios": in.Accessories, "salvedades": len(in.Exceptions),
+				"items": in.Items},
 			OccurredAt: now})
 	})
 	if err != nil {
@@ -260,13 +298,21 @@ type EvidenceInput struct {
 	Note              *string
 	ShowClient        bool
 	Photo             io.Reader // nil si es solo nota
+	GroupID           *shared.ID
+	FindingID         *shared.ID
 }
+
+// MaxPhotosPerNote limita cuántas fotos se suben juntas (rayones, piezas encontradas).
+const MaxPhotosPerNote = 8
+
+var ErrTooManyPhotos = shared.Validation("demasiadas_fotos", "Sube hasta 8 fotos por nota.").WithField("foto")
+var errFindingNotInOrder = shared.NotFound("hallazgo_no_encontrado", "No encontramos ese hallazgo en la orden.")
 
 // AddEvidence guarda foto (validada por contenido) y/o nota con hora, autor y etapa (HU-21).
 // La foto se sube antes de abrir la transacción: nunca I/O lento dentro de ella.
 func (f *Flow) AddEvidence(ctx context.Context, in EvidenceInput) (ports.Evidence, error) {
 	e := ports.Evidence{ID: shared.NewID(), TallerID: in.TallerID, OrderID: in.OrderID, Side: in.Side, Note: in.Note,
-		ShowClient: in.ShowClient, AuthorID: actorID(in.Actor), CreatedAt: f.clock.Now()}
+		ShowClient: in.ShowClient, AuthorID: actorID(in.Actor), CreatedAt: f.clock.Now(), GroupID: in.GroupID, FindingID: in.FindingID}
 	if in.Side != nil && !slices.Contains(domain.MotoSides, *in.Side) && *in.Side != "otro" {
 		return e, shared.Validation("lado_invalido", "Ese lado no existe.").WithField("lado")
 	}
@@ -277,8 +323,20 @@ func (f *Flow) AddEvidence(ctx context.Context, in EvidenceInput) (ports.Evidenc
 	var stage domain.State
 	if err := f.uow.Do(ctx, func(ctx context.Context) error {
 		o, err := f.repo.Load(ctx, in.TallerID, in.OrderID)
+		if err != nil {
+			return err
+		}
 		stage = o.State
-		return err
+		if in.FindingID != nil {
+			ok, err := f.repo.FindingInOrder(ctx, in.TallerID, in.OrderID, *in.FindingID)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return errFindingNotInOrder
+			}
+		}
+		return nil
 	}); err != nil {
 		return e, err
 	}
@@ -305,7 +363,7 @@ func (f *Flow) AddEvidence(ctx context.Context, in EvidenceInput) (ports.Evidenc
 		}
 		return f.audit.Record(ctx, audit.Entry{TallerID: in.TallerID, Actor: in.Actor, Action: "orden.evidencia", Entity: "orden",
 			EntityID: in.OrderID, After: map[string]any{"evidencia_id": e.ID.String(), "lado": in.Side, "foto": in.Photo != nil,
-				"mostrar_cliente": in.ShowClient}, OccurredAt: e.CreatedAt})
+				"mostrar_cliente": in.ShowClient, "grupo_id": idString(in.GroupID), "hallazgo_id": idString(in.FindingID)}, OccurredAt: e.CreatedAt})
 	})
 	return e, err
 }
@@ -454,6 +512,30 @@ func join(s []string) string {
 			out += "; "
 		}
 		out += x
+	}
+	return out
+}
+
+func idString(id *shared.ID) *string {
+	if id == nil {
+		return nil
+	}
+	s := id.String()
+	return &s
+}
+
+// mergeItems aplica lo que marcó la persona sobre la copia de ítems del checklist; claves desconocidas se ignoran.
+func mergeItems(base, in []domain.ItemCheck) []domain.ItemCheck {
+	byKey := map[string]domain.ItemCheck{}
+	for _, it := range in {
+		byKey[it.Key] = it
+	}
+	out := make([]domain.ItemCheck, 0, len(base))
+	for _, b := range base {
+		if it, ok := byKey[b.Key]; ok {
+			b.State, b.Note = it.State, it.Note
+		}
+		out = append(out, b)
 	}
 	return out
 }

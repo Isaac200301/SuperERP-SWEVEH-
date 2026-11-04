@@ -9,6 +9,8 @@ const tone: Record<EstadoOrden, { cls: string; icon: 'check' | 'warn' | 'stop' |
   en_diagnostico: { cls: 'bg-primary-tint text-primary', icon: 'clock' },
   esperando_aprobacion: { cls: 'bg-warn-tint text-warn-ink', icon: 'warn' },
   en_reparacion: { cls: 'bg-primary-tint text-primary', icon: 'clock' },
+  esperando_repuesto: { cls: 'bg-warn-tint text-warn-ink', icon: 'warn' },
+  control_calidad: { cls: 'bg-primary-tint text-primary', icon: 'clock' },
   listo: { cls: 'bg-ok-tint text-ok-ink', icon: 'check' },
   entregado: { cls: 'bg-ok-tint text-ok-ink', icon: 'check' },
   cancelada: { cls: 'bg-err-tint text-err-ink', icon: 'stop' },

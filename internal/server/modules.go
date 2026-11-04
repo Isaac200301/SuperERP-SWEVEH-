@@ -17,6 +17,7 @@ import (
 	"sweveh/internal/orders/adapters/out/directory"
 	orderspg "sweveh/internal/orders/adapters/out/postgres"
 	"sweveh/internal/orders/adapters/out/quotesdir"
+	orderssettings "sweveh/internal/orders/adapters/out/settings"
 	ordersstorage "sweveh/internal/orders/adapters/out/storage"
 	ordersapp "sweveh/internal/orders/app"
 	"sweveh/internal/outbox"
@@ -52,6 +53,7 @@ type Modules struct {
 	VehDir    vehicles.Directory
 	Orders    *ordersapp.Service
 	Flow      *ordersapp.Flow
+	Findings  *ordersapp.Findings
 	OrdersF   orders.Orders
 	Inventory *inventoryapp.Service
 	InvF      inventory.Inventory
@@ -80,12 +82,15 @@ func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger
 	m.Orders.SetExampleMarker(flowRepo.MarkExample)
 	m.Flow = ordersapp.NewFlow(tx, flowRepo, m.Orders, vdir, ordersstorage.New(st), m.Audit, m.Events, clk)
 	m.OrdersF = orders.New(m.Flow)
+	m.Flow.SetSettings(orderssettings.Reader{A: m.Admin})
+	m.Findings = ordersapp.NewFindings(tx, flowRepo, orderspg.Findings{}, m.Audit, clk)
 
 	m.Inventory = inventoryapp.NewService(tx, inventorypg.Repository{}, m.Audit, m.Events, clk)
 	m.InvF = inventory.New(m.Inventory)
 	m.Quotes = quotesapp.NewService(tx, quotespg.Repository{}, quotesdeps.Orders{O: m.OrdersF}, quotesdeps.Catalog{C: m.CatalogF},
 		quotesdeps.Inventory{I: m.InvF}, m.Audit, m.Events, clk)
 	m.QuotesF = quotes.New(m.Quotes)
+	m.Quotes.SetRules(quotesdeps.Rules{A: m.Admin})
 	m.Flow.SetQuoteReader(quotesdir.Reader{Q: m.QuotesF})
 	return m
 }

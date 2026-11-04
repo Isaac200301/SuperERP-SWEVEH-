@@ -29,6 +29,71 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/workshop", httpx.JSON(h.log, h.get))
 	r.With(h.guard.Require("workshop:manage")).Post("/workshop/onboarding", httpx.JSON(h.log, h.onboard))
 	r.With(h.guard.Require("workshop:manage")).Put("/workshop/schedule", httpx.JSON(h.log, h.schedule))
+	// Todos los roles leen los parámetros (la recepción y la cotización los necesitan); solo el dueño los cambia.
+	r.Get("/workshop/settings", httpx.JSON(h.log, h.settings))
+	r.With(h.guard.Require("workshop:manage")).Put("/workshop/settings", httpx.JSON(h.log, h.saveSettings))
+}
+
+type itemDTO struct {
+	Clave  string `json:"clave"`
+	Nombre string `json:"nombre"`
+}
+
+type settingsDTO struct {
+	UsarEsperandoRepuesto bool      `json:"usarEsperandoRepuesto"`
+	UsarControlCalidad    bool      `json:"usarControlCalidad"`
+	FotosMinimas          int       `json:"fotosMinimas"`
+	KmObligatorio         bool      `json:"kmObligatorio"`
+	ItemsCarro            []itemDTO `json:"itemsCarro"`
+	ItemsMoto             []itemDTO `json:"itemsMoto"`
+	IvaPct                int       `json:"ivaPct"`
+	PreciosConIva         bool      `json:"preciosConIva"`
+	TarifaHora            *int64    `json:"tarifaHora"`
+	DescuentoMaxPct       int       `json:"descuentoMaxPct"`
+	DescuentoRecepcion    bool      `json:"descuentoRecepcion"`
+	VigenciaDias          int       `json:"vigenciaDias"`
+	Version               int       `json:"version"`
+}
+
+func items(in []domain.ChecklistItem) []itemDTO {
+	out := make([]itemDTO, 0, len(in))
+	for _, it := range in {
+		out = append(out, itemDTO{Clave: it.Key, Nombre: it.Name})
+	}
+	return out
+}
+
+func itemsIn(in []itemDTO) []domain.ChecklistItem {
+	out := make([]domain.ChecklistItem, 0, len(in))
+	for _, it := range in {
+		out = append(out, domain.ChecklistItem{Key: it.Clave, Name: it.Nombre})
+	}
+	return out
+}
+
+func settingsOut(p domain.Parametros) settingsDTO {
+	return settingsDTO{UsarEsperandoRepuesto: p.UseAwaitingParts, UsarControlCalidad: p.UseQualityCheck, FotosMinimas: p.MinPhotos,
+		KmObligatorio: p.MileageRequired, ItemsCarro: items(p.CarItems), ItemsMoto: items(p.MotoItems), IvaPct: p.VATPct,
+		PreciosConIva: p.PricesIncludeVAT, TarifaHora: p.HourlyRate, DescuentoMaxPct: p.MaxDiscountPct,
+		DescuentoRecepcion: p.ReceptionDiscount, VigenciaDias: p.ValidityDays, Version: p.Version}
+}
+
+func (h *Handler) settings(r *http.Request, p reqctx.Principal) (int, any, error) {
+	s, err := h.admin.Parametros(r.Context(), p.TallerID)
+	return http.StatusOK, settingsOut(s), err
+}
+
+func (h *Handler) saveSettings(r *http.Request, p reqctx.Principal) (int, any, error) {
+	var q settingsDTO
+	if err := httpx.Decode(r, &q); err != nil {
+		return 0, nil, err
+	}
+	in := domain.Parametros{UseAwaitingParts: q.UsarEsperandoRepuesto, UseQualityCheck: q.UsarControlCalidad, MinPhotos: q.FotosMinimas,
+		MileageRequired: q.KmObligatorio, CarItems: itemsIn(q.ItemsCarro), MotoItems: itemsIn(q.ItemsMoto), VATPct: q.IvaPct,
+		PricesIncludeVAT: q.PreciosConIva, HourlyRate: q.TarifaHora, MaxDiscountPct: q.DescuentoMaxPct,
+		ReceptionDiscount: q.DescuentoRecepcion, ValidityDays: q.VigenciaDias}
+	s, err := h.admin.SetParametros(r.Context(), p.TallerID, p.Actor(), in, q.Version)
+	return http.StatusOK, settingsOut(s), err
 }
 
 type dto struct {

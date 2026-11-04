@@ -205,7 +205,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Cambiar cilindraje y/o turbo; queda en la bitácora (HU-11). Permiso vehicle:update */
+        /** Completar o cambiar la ficha del vehículo (motor, caja, tracción, color, carrocería, llanta); queda en la bitácora (HU-11). Permiso vehicle:update */
         patch: operations["updateVehicleEngine"];
         trace?: never;
     };
@@ -330,6 +330,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orders/{id}/findings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hallazgos del diagnóstico de la orden (HU-103 propuesta). Sin precios. Permiso order:read */
+        get: operations["listFindings"];
+        put?: never;
+        /** Registrar un hallazgo (desde Recibido hasta En reparación). Lo hace una persona, no la IA. Permiso order:diagnose */
+        post: operations["addFinding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{id}/findings/{fid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Borrar un hallazgo antes de enviar la cotización. Permiso order:diagnose */
+        delete: operations["deleteFinding"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/orders/{id}/evidence": {
         parameters: {
             query?: never;
@@ -411,6 +446,24 @@ export interface paths {
         post?: never;
         /** Quitar una línea de la cotización (HU-27). Permiso quote:edit */
         delete: operations["removeQuoteLine"];
+        options?: never;
+        head?: never;
+        /** Cambiar la cantidad o, solo en precio libre, el precio de un ítem del borrador (HU-27). Permiso quote:edit */
+        patch: operations["updateQuoteLine"];
+        trace?: never;
+    };
+    "/orders/{id}/quote/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Renovar la vigencia de una cotización enviada (parámetros del taller). Permiso quote:send */
+        post: operations["renewQuote"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -657,6 +710,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orders/{id}/part-movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Por repuesto, lo que la orden descontó, devolvió y dejó pendiente (HU-33, HU-38). Permiso part:read */
+        get: operations["listOrderPartMovements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/parts/{id}/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Movimientos del repuesto, lo más reciente primero (HU-35, HU-38). Permiso part:read */
+        get: operations["listPartMovements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/parts/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Importar repuestos desde CSV (HU-37). Sin confirmar=1 es solo la vista previa; con errores no se importa nada. Permiso import:run */
+        post: operations["importParts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users": {
         parameters: {
             query?: never;
@@ -754,6 +858,24 @@ export interface paths {
         put?: never;
         /** Contar qué tipo de taller tengo y aceptar el contrato de transmisión (HU-03, HU-89). Permiso workshop:manage */
         post: operations["onboardWorkshop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workshop/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Parámetros del taller (órdenes, recepción, cotización). Sin configurar, los valores por defecto. Todos los roles */
+        get: operations["getWorkshopSettings"];
+        /** Guardar los parámetros con versión optimista (0 = nunca se guardaron). Permiso workshop:manage */
+        put: operations["saveWorkshopSettings"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1037,6 +1159,48 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ItemRecepcion: {
+            /** @description Estable; vacía = se arma con el nombre */
+            clave: string;
+            nombre: string;
+        };
+        Parametros: {
+            usarEsperandoRepuesto: boolean;
+            usarControlCalidad: boolean;
+            fotosMinimas: number;
+            kmObligatorio: boolean;
+            itemsCarro: components["schemas"]["ItemRecepcion"][];
+            itemsMoto: components["schemas"]["ItemRecepcion"][];
+            /** @description Por defecto 19, a confirmar con un contador */
+            ivaPct: number;
+            /** @description Los precios de lista ya incluyen IVA */
+            preciosConIva: boolean;
+            /** Format: int64 */
+            tarifaHora: number | null;
+            descuentoMaxPct: number;
+            descuentoRecepcion: boolean;
+            vigenciaDias: number;
+            version: number;
+        };
+        /** @enum {string} */
+        SistemaVehiculo: "motor" | "frenos" | "suspension" | "direccion" | "electrico" | "transmision" | "refrigeracion" | "llantas" | "carroceria" | "otro";
+        /** @enum {string} */
+        Gravedad: "urgente" | "recomendado" | "puede_esperar";
+        Hallazgo: {
+            /** Format: uuid */
+            id: string;
+            sistema: components["schemas"]["SistemaVehiculo"];
+            descripcion: string;
+            gravedad: components["schemas"]["Gravedad"];
+            codigosFalla: string[];
+            /** Format: date-time */
+            creadoEn: string;
+            /**
+             * Format: int64
+             * @description Mano de obra estimada en COP
+             */
+            manoObra?: number | null;
+        };
         Kpi: {
             codigo: string;
             titulo: string;
@@ -1129,6 +1293,16 @@ export interface components {
             /** Format: date-time */
             hora?: string;
         };
+        ItemRevisado: {
+            clave: string;
+            nombre: string;
+            /**
+             * @description Vacío = sin revisar
+             * @enum {string}
+             */
+            estado: "bien" | "mal" | "no_tiene" | "";
+            nota?: string;
+        };
         Checklist: {
             /** @enum {string} */
             tipo: "carro" | "moto";
@@ -1141,6 +1315,10 @@ export interface components {
             falta: string[];
             /** Format: date-time */
             completadoEn?: string | null;
+            items?: components["schemas"]["ItemRevisado"][];
+            /** @description Parámetro del taller */
+            fotosMinimas?: number;
+            kmObligatorio?: boolean;
         };
         Evidencia: {
             /** Format: uuid */
@@ -1154,6 +1332,16 @@ export interface components {
             autorId: string | null;
             /** Format: date-time */
             creadoEn: string;
+            /**
+             * Format: uuid
+             * @description Fotos subidas juntas con una nota
+             */
+            grupoId?: string | null;
+            /**
+             * Format: uuid
+             * @description Foto de un hallazgo del diagnóstico
+             */
+            hallazgoId?: string | null;
         };
         Cotizacion: {
             /** Format: uuid */
@@ -1179,13 +1367,33 @@ export interface components {
                 /** Format: int64 */
                 subtotal: number;
                 sinStock: boolean;
+                /** @description El precio lo puso una persona y se puede corregir */
+                precioLibre?: boolean;
                 aprobada: boolean | null;
+                descuentoPct?: number;
+                /** @description Mano de obra por horas × tarifa del taller */
+                horas?: number | null;
             }[];
             /** Format: date-time */
             enviadaEn: string | null;
             /** Format: date-time */
             respondidaEn: string | null;
             canalRespuesta: string | null;
+            /**
+             * Format: int64
+             * @description Cantidad × precio, antes de descuentos
+             */
+            subtotal?: number;
+            /** Format: int64 */
+            descuento?: number;
+            /** @description Copiado de los parámetros al crear la cotización */
+            ivaPct?: number;
+            /** Format: int64 */
+            iva?: number;
+            preciosConIva?: boolean;
+            /** Format: date-time */
+            venceEn?: string | null;
+            vencida?: boolean;
         };
         ResultadoVehiculo: {
             /** Format: uuid */
@@ -1215,7 +1423,11 @@ export interface components {
             duracionMin: number | null;
             activo: boolean;
             version: number;
+            categoria?: components["schemas"]["Categoria"] | null;
+            garantiaDias?: number | null;
         };
+        /** @enum {string} */
+        Categoria: "motor" | "frenos" | "suspension" | "direccion" | "electrico" | "transmision" | "refrigeracion" | "llantas" | "carroceria" | "filtros" | "lubricantes" | "otro";
         Repuesto: {
             /** Format: uuid */
             id: string;
@@ -1234,6 +1446,13 @@ export interface components {
             bajoMinimo: boolean;
             activo: boolean;
             version: number;
+            /** @description Vacío = sin dato */
+            marca?: string;
+            /** @description Una de Categoria o vacío */
+            categoria?: string;
+            ubicacion?: string;
+            /** @description Referencia original o equivalente */
+            referenciaOem?: string;
         };
         Miembro: {
             /** Format: uuid */
@@ -1331,6 +1550,45 @@ export interface components {
             kilometraje: number | null;
             cilindrajeCc: number | null;
             turbo: boolean | null;
+            /**
+             * @description Moto: gasolina o electrico
+             * @enum {string|null}
+             */
+            energia?: "gasolina" | "diesel" | "gas" | "hibrido" | "hibrido_enchufable" | "electrico" | null;
+            /**
+             * @description Si llega, manda sobre turbo; moto: atmosferico o turbo
+             * @enum {string|null}
+             */
+            aspiracion?: "atmosferico" | "turbo" | "supercargado" | null;
+            /**
+             * @description Carro: manual, automatica, cvt, doble_embrague, amt; moto: manual, automatica, semiautomatica
+             * @enum {string|null}
+             */
+            transmision?: "manual" | "automatica" | "cvt" | "doble_embrague" | "amt" | "semiautomatica" | null;
+            /**
+             * @description Solo carro
+             * @enum {string|null}
+             */
+            traccion?: "delantera" | "trasera" | "awd" | "4x4" | null;
+            /**
+             * @description Solo moto
+             * @enum {string|null}
+             */
+            ciclo?: "2t" | "4t" | null;
+            /**
+             * @description Solo moto
+             * @enum {string|null}
+             */
+            refrigeracion?: "aire" | "liquido" | null;
+            color?: string | null;
+            /**
+             * @description Solo carro
+             * @enum {string|null}
+             */
+            carroceria?: "sedan" | "hatchback" | "suv" | "pickup" | "van" | "otra" | null;
+            /** @description 205/55 R16 o 90/90-17 */
+            llanta?: string | null;
+            /** @description Falta energía, caja, o en combustión cilindraje y aspiración (y ciclo en moto) */
             motorPendiente: boolean;
             version: number;
             /** Format: date-time */
@@ -1340,8 +1598,11 @@ export interface components {
             vehiculo: components["schemas"]["Vehiculo"];
             existente: boolean;
         };
-        /** @enum {string} */
-        EstadoOrden: "por_recibir" | "recibido" | "en_diagnostico" | "esperando_aprobacion" | "en_reparacion" | "listo" | "entregado" | "cancelada";
+        /**
+         * @description esperando_repuesto y control_calidad solo si el taller los activa en sus parámetros
+         * @enum {string}
+         */
+        EstadoOrden: "por_recibir" | "recibido" | "en_diagnostico" | "esperando_aprobacion" | "en_reparacion" | "esperando_repuesto" | "control_calidad" | "listo" | "entregado" | "cancelada";
         Orden: {
             /** Format: uuid */
             id: string;
@@ -1391,6 +1652,28 @@ export interface components {
         };
     };
     responses: {
+        /** @description Resultado fila por fila de la importación */
+        Importacion: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    /** @description Lo que no impide importar, p. ej. columnas que no se reconocen */
+                    avisos: string[];
+                    conError: number;
+                    importadas: number;
+                    filas: {
+                        fila: number;
+                        referencia: string;
+                        nombre: string;
+                        /** @enum {string} */
+                        estado: "ok" | "error";
+                        errores: string[];
+                    }[];
+                };
+            };
+        };
         /** @description Error (RFC 9457) */
         Problem: {
             headers: {
@@ -1755,6 +2038,44 @@ export interface operations {
                     /** @description "1200", "1200 cc" o "1.2 L"; se guarda en cc */
                     cilindraje?: string | null;
                     turbo?: boolean | null;
+                    /**
+                     * @description Moto: gasolina o electrico
+                     * @enum {string|null}
+                     */
+                    energia?: "gasolina" | "diesel" | "gas" | "hibrido" | "hibrido_enchufable" | "electrico" | null;
+                    /**
+                     * @description Si llega, manda sobre turbo; moto: atmosferico o turbo
+                     * @enum {string|null}
+                     */
+                    aspiracion?: "atmosferico" | "turbo" | "supercargado" | null;
+                    /**
+                     * @description Carro: manual, automatica, cvt, doble_embrague, amt; moto: manual, automatica, semiautomatica
+                     * @enum {string|null}
+                     */
+                    transmision?: "manual" | "automatica" | "cvt" | "doble_embrague" | "amt" | "semiautomatica" | null;
+                    /**
+                     * @description Solo carro
+                     * @enum {string|null}
+                     */
+                    traccion?: "delantera" | "trasera" | "awd" | "4x4" | null;
+                    /**
+                     * @description Solo moto
+                     * @enum {string|null}
+                     */
+                    ciclo?: "2t" | "4t" | null;
+                    /**
+                     * @description Solo moto
+                     * @enum {string|null}
+                     */
+                    refrigeracion?: "aire" | "liquido" | null;
+                    color?: string | null;
+                    /**
+                     * @description Solo carro
+                     * @enum {string|null}
+                     */
+                    carroceria?: "sedan" | "hatchback" | "suv" | "pickup" | "van" | "otra" | null;
+                    /** @description 205/55 R16 o 90/90-17 */
+                    llanta?: string | null;
                 };
             };
         };
@@ -1845,6 +2166,44 @@ export interface operations {
                 "application/json": {
                     cilindraje?: string | null;
                     turbo?: boolean | null;
+                    /**
+                     * @description Moto: gasolina o electrico
+                     * @enum {string|null}
+                     */
+                    energia?: "gasolina" | "diesel" | "gas" | "hibrido" | "hibrido_enchufable" | "electrico" | null;
+                    /**
+                     * @description Si llega, manda sobre turbo; moto: atmosferico o turbo
+                     * @enum {string|null}
+                     */
+                    aspiracion?: "atmosferico" | "turbo" | "supercargado" | null;
+                    /**
+                     * @description Carro: manual, automatica, cvt, doble_embrague, amt; moto: manual, automatica, semiautomatica
+                     * @enum {string|null}
+                     */
+                    transmision?: "manual" | "automatica" | "cvt" | "doble_embrague" | "amt" | "semiautomatica" | null;
+                    /**
+                     * @description Solo carro
+                     * @enum {string|null}
+                     */
+                    traccion?: "delantera" | "trasera" | "awd" | "4x4" | null;
+                    /**
+                     * @description Solo moto
+                     * @enum {string|null}
+                     */
+                    ciclo?: "2t" | "4t" | null;
+                    /**
+                     * @description Solo moto
+                     * @enum {string|null}
+                     */
+                    refrigeracion?: "aire" | "liquido" | null;
+                    color?: string | null;
+                    /**
+                     * @description Solo carro
+                     * @enum {string|null}
+                     */
+                    carroceria?: "sedan" | "hatchback" | "suv" | "pickup" | "van" | "otra" | null;
+                    /** @description 205/55 R16 o 90/90-17 */
+                    llanta?: string | null;
                 };
             };
         };
@@ -1907,6 +2266,8 @@ export interface operations {
                     /** @enum {string} */
                     estadoInicial?: "por_recibir" | "recibido";
                     confirmarDuplicada?: boolean;
+                    /** @description Orden de ejemplo del arranque (HU-05); no cuenta en los KPIs */
+                    ejemplo?: boolean;
                 };
             };
         };
@@ -2084,6 +2445,8 @@ export interface operations {
                     combustible?: string | null;
                     accesorios?: string[];
                     salvedades?: components["schemas"]["Salvedad"][];
+                    /** @description Solo clave, estado y nota; los nombres los pone el taller */
+                    items?: components["schemas"]["ItemRevisado"][];
                 };
             };
         };
@@ -2091,6 +2454,90 @@ export interface operations {
             200: components["responses"]["Checklist"];
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    listFindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        hallazgos: components["schemas"]["Hallazgo"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    addFinding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    sistema: components["schemas"]["SistemaVehiculo"];
+                    descripcion: string;
+                    gravedad: components["schemas"]["Gravedad"];
+                    codigosFalla?: string[];
+                    /** Format: int64 */
+                    manoObra?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Hallazgo registrado */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Hallazgo"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    deleteFinding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                fid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Borrado */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     listEvidence: {
@@ -2133,8 +2580,13 @@ export interface operations {
                     lado?: string;
                     nota?: string;
                     mostrarCliente?: boolean;
-                    /** Format: binary */
-                    foto?: string;
+                    /**
+                     * Format: uuid
+                     * @description Foto de un hallazgo de esta orden
+                     */
+                    hallazgoId?: string;
+                    /** @description Una o varias fotos (máx. 8); van al final del formulario */
+                    foto?: string[];
                 };
             };
         };
@@ -2215,6 +2667,8 @@ export interface operations {
                      * @description COP sin decimales
                      */
                     precioUnitario?: number | null;
+                    /** @description Mano de obra por horas: el precio es horas × tarifa del taller */
+                    horas?: number;
                 };
             };
         };
@@ -2232,6 +2686,55 @@ export interface operations {
             path: {
                 id: components["parameters"]["Id"];
                 lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Cotizacion"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    updateQuoteLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    cantidad?: number;
+                    /**
+                     * Format: int64
+                     * @description Solo si la línea tiene precioLibre
+                     */
+                    precioUnitario?: number;
+                    /** @description Solo en líneas de mano de obra por horas */
+                    horas?: number;
+                    /** @description Hasta el máximo del taller; permiso quote:discount */
+                    descuentoPct?: number;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Cotizacion"];
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    renewQuote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
             };
             cookie?: never;
         };
@@ -2483,6 +2986,8 @@ export interface operations {
                     /** Format: int64 */
                     precio?: number | null;
                     duracionMin?: number | null;
+                    categoria?: components["schemas"]["Categoria"] | null;
+                    garantiaDias?: number | null;
                 };
             };
         };
@@ -2539,6 +3044,8 @@ export interface operations {
                     duracionMin?: number | null;
                     activo?: boolean;
                     version: number;
+                    categoria?: components["schemas"]["Categoria"] | null;
+                    garantiaDias?: number | null;
                 };
             };
         };
@@ -2563,6 +3070,7 @@ export interface operations {
                 q?: string;
                 /** @description 1 = incluir inactivos (requiere part:manage) */
                 todos?: "1";
+                categoria?: components["schemas"]["Categoria"];
             };
             header?: never;
             path?: never;
@@ -2592,6 +3100,11 @@ export interface operations {
                     precioVenta: number;
                     existencia?: number;
                     minimo?: number;
+                    marca?: string;
+                    /** @description Una de Categoria o vacío */
+                    categoria?: string;
+                    ubicacion?: string;
+                    referenciaOem?: string;
                 };
             };
         };
@@ -2642,6 +3155,11 @@ export interface operations {
                     minimo?: number;
                     activo?: boolean;
                     version: number;
+                    marca?: string;
+                    /** @description Una de Categoria o vacío */
+                    categoria?: string;
+                    ubicacion?: string;
+                    referenciaOem?: string;
                 };
             };
         };
@@ -2696,15 +3214,117 @@ export interface operations {
         requestBody: components["requestBodies"]["Cantidad"];
         responses: {
             /** @description Devuelto */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        devueltas: number;
+                        quedanPorDevolver: number;
+                        existencia: number;
+                    };
+                };
             };
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    listOrderPartMovements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        repuestos: {
+                            /** Format: uuid */
+                            repuestoId: string;
+                            referencia: string;
+                            nombre: string;
+                            descontado: number;
+                            devuelto: number;
+                            /** @description Aprobado sin existencia: no se descontó */
+                            pendiente: number;
+                            porDevolver: number;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    listPartMovements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        movimientos: {
+                            /** Format: uuid */
+                            id: string;
+                            /** @description Positivo entra, negativo sale */
+                            cantidad: number;
+                            /** @enum {string} */
+                            motivo: "entrada" | "salida_orden" | "pendiente_orden" | "devolucion" | "ajuste" | "importacion";
+                            /** Format: uuid */
+                            ordenId: string | null;
+                            /** Format: date-time */
+                            creadoEn: string;
+                        }[];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    importParts: {
+        parameters: {
+            query?: {
+                confirmar?: "0" | "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description CSV de la plantilla, separado por , o ;
+                     */
+                    archivo: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Importacion"];
+            400: components["responses"]["Problem"];
+            422: components["responses"]["Importacion"];
         };
     };
     listUsers: {
@@ -2880,6 +3500,52 @@ export interface operations {
         responses: {
             200: components["responses"]["Taller"];
             400: components["responses"]["Problem"];
+        };
+    };
+    getWorkshopSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Parametros"];
+                };
+            };
+        };
+    };
+    saveWorkshopSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Parametros"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Parametros"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
         };
     };
     setWorkshopSchedule: {

@@ -23,6 +23,7 @@ type Datos = z.infer<typeof schema>;
 
 const steps = [
   { title: 'Tu cuenta', detail: 'Celular verificado y datos autorizados' },
+  { title: 'Tu taller', detail: 'Qué atiendes; te lo dejamos armado' },
   { title: 'Primera orden', detail: 'Con una placa real o de ejemplo' },
 ];
 
@@ -47,7 +48,7 @@ export function RegisterPage() {
   return (
     <AuthLayout steps={steps} current={0}>
       <div>
-        <span className="font-mono text-[13px] font-bold text-primary">PASO 1 DE 2</span>
+        <span className="font-mono text-[13px] font-bold text-primary">PASO 1 DE 3</span>
         <h1 className="mt-1.5 mb-1.5 text-[32px] font-extrabold tracking-[-.02em]">Crea la cuenta de tu taller</h1>
         <p className="text-base text-ink-2">Solo tu nombre y tu celular. Sin correo y sin contraseña.</p>
       </div>
@@ -111,7 +112,8 @@ export function RegisterPage() {
                 { celular: datos.celular, codigo, nombre: datos.nombre, autorizacionDatos: datos.autorizacionDatos },
                 {
                   // HU-01 criterio 3: si el celular ya tenía cuenta, entra a ella en vez de crear otra.
-                  onSuccess: (s) => navigate(s.cuentaNueva ? '/panel/ordenes/nueva?primera=1' : '/panel/ordenes', { replace: true }),
+                  // Cuenta nueva: sigue al paso 2, tipo de taller y precarga (HU-03, HU-04).
+                  onSuccess: (s) => navigate(s.cuentaNueva ? '/panel/arranque' : '/panel/ordenes', { replace: true }),
                 },
               )
             }

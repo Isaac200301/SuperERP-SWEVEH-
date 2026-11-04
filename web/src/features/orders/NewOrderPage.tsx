@@ -1,16 +1,19 @@
+import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 
-import { ApiError } from '../../shared/api/client';
+import { api, ApiError, unwrap } from '../../shared/api/client';
 import { celularValido, formatoCelular, soloCelular } from '../../shared/lib/format';
 import { ayudaPlaca, normalizarPlaca, reconocerPlaca, tipoPorPlaca } from '../../shared/lib/plate';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { Field } from '../../shared/ui/Field';
-import { IconBack, IconCheck, IconWarn } from '../../shared/ui/icons';
+import { IconBack, IconCheck } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
 import { Segmented } from '../../shared/ui/Segmented';
 import { useCustomerByPhone, useOpenOrder, useVehicleByPlate, type NewOrderInput } from './api';
+import { conDefectos, faltantesFicha, fichaPayload, fichaVacia, type Ficha } from './sheet';
+import { VehicleSheet } from './VehicleSheet';
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -20,8 +23,6 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
     </section>
   );
 }
-
-type SiNo = 'si' | 'no' | '';
 
 /** HU-16 con HU-09, HU-10 y HU-11: abrir una orden escribiendo la placa y lo que dice el cliente. */
 export function NewOrderPage() {
@@ -39,11 +40,22 @@ export function NewOrderPage() {
   const [linea, setLinea] = useState('');
   const [anio, setAnio] = useState('');
   const [km, setKm] = useState('');
-  const [cilindraje, setCilindraje] = useState('');
-  const [turbo, setTurbo] = useState<SiNo>('');
+  const [ficha, setFicha] = useState<Ficha>(fichaVacia);
   const [sintoma, setSintoma] = useState('');
   const [estado, setEstado] = useState<'por_recibir' | 'recibido'>('por_recibir');
   const [intentado, setIntentado] = useState(false);
+  const [ejemplo, setEjemplo] = useState(false);
+  const taller = useQuery({ queryKey: ['taller'], queryFn: async () => unwrap(await api.GET('/workshop')), enabled: primera });
+
+  // HU-05 criterio 2: sin vehículo a mano, una orden de ejemplo con placa de carro o de moto según lo que atiende.
+  function usarEjemplo() {
+    const moto = taller.data?.atiende === 'moto';
+    setPlaca(moto ? 'EJM12A' : 'EJM123');
+    setCelular('3000000000');
+    setNombre('Cliente de ejemplo');
+    setSintoma(moto ? 'Revisión general de la moto (ejemplo)' : 'Revisión general del carro (ejemplo)');
+    setEjemplo(true);
+  }
 
   const formato = reconocerPlaca(placa);
   const placaLista = formato !== 'vacia' && formato !== 'invalida';
@@ -60,9 +72,9 @@ export function NewOrderPage() {
   const err = open.error instanceof ApiError ? open.error : null;
   const duplicada = err?.code === 'orden_abierta_existente';
 
-  // Turbo: en moto viene en No por defecto (HU-11, criterio 3).
-  const turboEfectivo: SiNo = turbo !== '' ? turbo : tipo === 'moto' ? 'no' : '';
-  const motorCompletoNuevo = cilindraje.trim() !== '' && turboEfectivo !== '';
+  // Ficha del vehículo: la moto viene atmosférica por defecto (HU-11, criterio 3).
+  const motor = fichaPayload(conDefectos(tipo, ficha));
+  const motorCompletoNuevo = faltantesFicha(tipo, ficha).length === 0;
   const motorPendiente = existente ? existente.motorPendiente && !motorCompletoNuevo : !motorCompletoNuevo;
 
   const faltantes: string[] = [];
@@ -74,10 +86,6 @@ export function NewOrderPage() {
   const missing = faltantes.length > 0 ? `Falta ${faltantes.join(', ')}.` : undefined;
 
   function enviar(confirmarDuplicada: boolean) {
-    const motor = {
-      ...(cilindraje.trim() !== '' ? { cilindraje: cilindraje.trim() } : {}),
-      ...(turboEfectivo !== '' ? { turbo: turboEfectivo === 'si' } : {}),
-    };
     const input: NewOrderInput = {
       placa: normalizarPlaca(placa),
       vehiculoExistente: existente,
@@ -96,12 +104,13 @@ export function NewOrderPage() {
         ...(km !== '' ? { kilometraje: Number(km) } : {}),
         ...motor,
       },
-      ...(existente?.motorPendiente && motorCompletoNuevo ? { motorParaExistente: motor } : {}),
+      ...(existente?.motorPendiente && Object.keys(motor).length > 0 ? { motorParaExistente: motor } : {}),
       sintoma: sintoma.trim(),
       estadoInicial: estado === 'recibido' && motorPendiente ? 'por_recibir' : estado,
       confirmarDuplicada,
+      ejemplo,
     };
-    open.mutate(input, { onSuccess: (o) => navigate(`/panel/ordenes/${o.id}`, { replace: true }) });
+    open.mutate(input, { onSuccess: (o) => navigate(`/panel/ordenes/${o.id}${primera ? '?primera=1' : ''}`, { replace: true }) });
   }
 
   function submit(e: FormEvent) {
@@ -121,6 +130,14 @@ export function NewOrderPage() {
         </Link>
         <h1 className="text-[28px] font-extrabold tracking-[-.02em]">{primera ? 'Tu primera orden' : 'Nueva orden'}</h1>
         <p className="text-ink-2">Escribe la placa y lo que dice el cliente. La orden queda con número y hora desde ya.</p>
+        {primera ? (
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <Button variant="secondary" onClick={usarEjemplo}>
+              Usar ejemplo
+            </Button>
+            <span className="text-sm text-ink-2">{ejemplo ? 'Orden de ejemplo: no cuenta en tus números.' : '¿No tienes un vehículo a mano?'}</span>
+          </div>
+        ) : null}
       </header>
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -205,46 +222,7 @@ export function NewOrderPage() {
             ) : null}
           </Card>
 
-          {esNuevo || existente?.motorPendiente ? (
-            <section
-              aria-label="Motor"
-              className={`flex flex-col gap-4 rounded-card p-5 ${motorPendiente ? 'bg-warn-tint' : 'bg-white'}`}
-            >
-              <h2 className="flex items-center gap-2 text-[17px] font-extrabold">
-                {motorPendiente ? (
-                  <>
-                    <IconWarn size={18} className="text-warn-ink" />
-                    Motor pendiente
-                  </>
-                ) : (
-                  <>
-                    <IconCheck size={18} className="text-ok" />
-                    Motor completo
-                  </>
-                )}
-              </h2>
-              <p className="text-sm text-ink-2">Puedes dejarlo para después; se pide antes de pasar la orden a Recibido.</p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field
-                  label="Cilindraje"
-                  value={cilindraje}
-                  onChange={(e) => setCilindraje(e.target.value)}
-                  placeholder="1200 o 1.2 L"
-                  hint="Se guarda siempre en cc."
-                  error={fieldErr('cilindrajeCc')}
-                />
-                <Segmented
-                  label="Turbo"
-                  value={turboEfectivo}
-                  onChange={(v) => setTurbo(v)}
-                  options={[
-                    { value: 'no', label: 'No' },
-                    { value: 'si', label: 'Sí' },
-                  ]}
-                />
-              </div>
-            </section>
-          ) : null}
+          {esNuevo || existente?.motorPendiente ? <VehicleSheet tipo={tipo} value={ficha} onChange={setFicha} error={fieldErr} /> : null}
         </div>
 
         <div className="flex flex-col gap-5">
@@ -313,7 +291,7 @@ export function NewOrderPage() {
                 { value: 'por_recibir', label: 'Por recibir' },
                 { value: 'recibido', label: 'Recibido', disabled: motorPendiente },
               ]}
-              hint={motorPendiente ? 'Para Recibido falta el cilindraje o el turbo del motor.' : undefined}
+              hint={motorPendiente ? 'Para Recibido falta completar la ficha del vehículo.' : undefined}
             />
           </Card>
 

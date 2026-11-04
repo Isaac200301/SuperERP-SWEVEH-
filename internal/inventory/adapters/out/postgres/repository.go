@@ -4,6 +4,7 @@ package postgres
 import (
 	"context"
 	"strings"
+	"time"
 
 	"sweveh/internal/inventory/app"
 	"sweveh/internal/inventory/domain"
@@ -25,11 +26,30 @@ type row struct {
 	Minimo     int       `db:"minimo"`
 	Activo     bool      `db:"activo"`
 	Version    int       `db:"version"`
+	Marca      *string   `db:"marca"`
+	Categoria  *string   `db:"categoria"`
+	Ubicacion  *string   `db:"ubicacion"`
+	OEM        *string   `db:"referencia_oem"`
+}
+
+func str(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
+func null(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func (r row) domain() domain.Part {
 	return domain.Part{ID: r.ID, TallerID: r.TallerID, Ref: r.Referencia, Name: r.Nombre, Kind: r.Tipo, Cost: r.Costo,
-		Price: r.Precio, Stock: r.Existencia, Min: r.Minimo, Active: r.Activo, Version: r.Version}
+		Price: r.Precio, Stock: r.Existencia, Min: r.Minimo, Active: r.Activo, Version: r.Version,
+		Brand: str(r.Marca), Category: str(r.Categoria), Location: str(r.Ubicacion), OEM: str(r.OEM)}
 }
 
 func list(rows []row, err error) ([]domain.Part, error) {
@@ -40,18 +60,22 @@ func list(rows []row, err error) ([]domain.Part, error) {
 	return out, err
 }
 
-const cols = `id, taller_id, referencia, nombre, tipo_vehiculo, costo, precio_venta, existencia, minimo, activo, version`
+const cols = `id, taller_id, referencia, nombre, tipo_vehiculo, costo, precio_venta, existencia, minimo, activo, version,
+	marca, categoria, ubicacion, referencia_oem`
 
 // escapeLike evita que % y _ del usuario actúen como comodines.
 func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
 
-func (Repository) Search(ctx context.Context, tallerID shared.ID, q string, onlyActive bool, limit int) ([]domain.Part, error) {
+// Search busca por nombre, referencia, marca o referencia original (HU-34); category "" = todas.
+func (Repository) Search(ctx context.Context, tallerID shared.ID, q string, onlyActive bool, limit int, category string) ([]domain.Part, error) {
 	pat := "%" + escapeLike(strings.TrimSpace(q)) + "%"
 	return list(db.Many[row](ctx, `SELECT `+cols+` FROM inventory.articulo
-		WHERE taller_id = $1 AND (activo OR NOT $2) AND (nombre ILIKE $3 OR referencia ILIKE $3)
-		ORDER BY nombre LIMIT $4`, tallerID, onlyActive, pat, limit))
+		WHERE taller_id = $1 AND (activo OR NOT $2)
+		  AND (nombre ILIKE $3 OR referencia ILIKE $3 OR marca ILIKE $3 OR referencia_oem ILIKE $3)
+		  AND ($5 = '' OR categoria = $5)
+		ORDER BY nombre LIMIT $4`, tallerID, onlyActive, pat, limit, category))
 }
 
 func (Repository) Get(ctx context.Context, tallerID, id shared.ID) (domain.Part, error) {
@@ -64,8 +88,9 @@ func (Repository) GetMany(ctx context.Context, tallerID shared.ID, ids []shared.
 }
 
 func (Repository) Insert(ctx context.Context, p domain.Part) error {
-	_, err := db.Exec(ctx, `INSERT INTO inventory.articulo (id, taller_id, referencia, nombre, tipo_vehiculo, costo, precio_venta, minimo)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, p.ID, p.TallerID, p.Ref, p.Name, p.Kind, p.Cost, p.Price, p.Min)
+	_, err := db.Exec(ctx, `INSERT INTO inventory.articulo (id, taller_id, referencia, nombre, tipo_vehiculo, costo, precio_venta, minimo,
+		marca, categoria, ubicacion, referencia_oem) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+		p.ID, p.TallerID, p.Ref, p.Name, p.Kind, p.Cost, p.Price, p.Min, null(p.Brand), null(p.Category), null(p.Location), null(p.OEM))
 	if db.IsUniqueViolation(err, "articulo_referencia_unica") {
 		return domain.ErrRefTaken
 	}
@@ -74,8 +99,9 @@ func (Repository) Insert(ctx context.Context, p domain.Part) error {
 
 func (Repository) Update(ctx context.Context, p domain.Part, prev int) error {
 	n, err := db.Exec(ctx, `UPDATE inventory.articulo SET nombre = $3, tipo_vehiculo = $4, costo = $5, precio_venta = $6,
-		minimo = $7, activo = $8, version = version + 1, updated_at = now() WHERE taller_id = $1 AND id = $2 AND version = $9`,
-		p.TallerID, p.ID, p.Name, p.Kind, p.Cost, p.Price, p.Min, p.Active, prev)
+		minimo = $7, activo = $8, marca = $10, categoria = $11, ubicacion = $12, referencia_oem = $13,
+		version = version + 1, updated_at = now() WHERE taller_id = $1 AND id = $2 AND version = $9`,
+		p.TallerID, p.ID, p.Name, p.Kind, p.Cost, p.Price, p.Min, p.Active, prev, null(p.Brand), null(p.Category), null(p.Location), null(p.OEM))
 	if err == nil && n == 0 {
 		return shared.ErrVersionConflict
 	}
@@ -119,4 +145,61 @@ func (Repository) Returnable(ctx context.Context, tallerID, partID, orderID shar
 func (Repository) Low(ctx context.Context, tallerID shared.ID) ([]domain.Part, error) {
 	return list(db.Many[row](ctx, `SELECT `+cols+` FROM inventory.articulo WHERE taller_id = $1 AND activo AND existencia <= minimo
 		ORDER BY nombre`, tallerID))
+}
+
+type movementRow struct {
+	ID        shared.ID  `db:"id"`
+	Cantidad  int        `db:"cantidad"`
+	Motivo    string     `db:"motivo"`
+	OrdenID   *shared.ID `db:"orden_id"`
+	UsuarioID *shared.ID `db:"usuario_id"`
+	CreatedAt time.Time  `db:"created_at"`
+}
+
+// Movements devuelve el libro del repuesto, lo más reciente primero (HU-35, HU-38).
+func (Repository) Movements(ctx context.Context, tallerID, partID shared.ID, limit int) ([]domain.Movement, error) {
+	rows, err := db.Many[movementRow](ctx, `SELECT id, cantidad, motivo, orden_id, usuario_id, created_at FROM inventory.movimiento
+		WHERE taller_id = $1 AND articulo_id = $2 ORDER BY created_at DESC, id LIMIT $3`, tallerID, partID, limit)
+	out := make([]domain.Movement, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, domain.Movement{ID: r.ID, Qty: r.Cantidad, Reason: r.Motivo, OrderID: r.OrdenID, UserID: r.UsuarioID, CreatedAt: r.CreatedAt})
+	}
+	return out, err
+}
+
+// ExistingRefs dice cuáles de las referencias ya están en el taller (importación, HU-37).
+func (Repository) ExistingRefs(ctx context.Context, tallerID shared.ID, refs []string) (map[string]bool, error) {
+	found, err := db.Many[struct {
+		Ref string `db:"referencia"`
+	}](ctx, `SELECT referencia FROM inventory.articulo WHERE taller_id = $1 AND referencia = ANY($2)`, tallerID, refs)
+	out := map[string]bool{}
+	for _, f := range found {
+		out[f.Ref] = true
+	}
+	return out, err
+}
+
+type orderPartRow struct {
+	ID         shared.ID `db:"id"`
+	Referencia string    `db:"referencia"`
+	Nombre     string    `db:"nombre"`
+	Descontado int       `db:"descontado"`
+	Devuelto   int       `db:"devuelto"`
+	Pendiente  int       `db:"pendiente"`
+}
+
+// OrderParts suma el libro de inventario de una orden por repuesto.
+func (Repository) OrderParts(ctx context.Context, tallerID, orderID shared.ID) ([]domain.OrderPart, error) {
+	rows, err := db.Many[orderPartRow](ctx, `SELECT a.id, a.referencia, a.nombre,
+			COALESCE(-SUM(m.cantidad) FILTER (WHERE m.motivo = 'salida_orden'), 0)::int AS descontado,
+			COALESCE(SUM(m.cantidad) FILTER (WHERE m.motivo = 'devolucion'), 0)::int AS devuelto,
+			COALESCE(-SUM(m.cantidad) FILTER (WHERE m.motivo = 'pendiente_orden'), 0)::int AS pendiente
+		FROM inventory.movimiento m JOIN inventory.articulo a ON a.id = m.articulo_id AND a.taller_id = m.taller_id
+		WHERE m.taller_id = $1 AND m.orden_id = $2
+		GROUP BY a.id, a.referencia, a.nombre ORDER BY a.nombre`, tallerID, orderID)
+	out := make([]domain.OrderPart, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, domain.OrderPart{PartID: r.ID, Ref: r.Referencia, Name: r.Nombre, Discounted: r.Descontado, Returned: r.Devuelto, Pending: r.Pendiente})
+	}
+	return out, err
 }

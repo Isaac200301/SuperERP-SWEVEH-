@@ -245,7 +245,7 @@ func (s *Service) Runs(ctx context.Context, tallerID shared.ID) ([]Run, error) {
 }
 
 var stateWords = map[string]string{"por_recibir": "por recibir", "recibido": "recibido", "en_diagnostico": "en diagnóstico",
-	"esperando_aprobacion": "esperando tu aprobación", "en_reparacion": "en reparación", "listo": "listo", "entregado": "entregado", "cancelada": "cancelada"}
+	"esperando_aprobacion": "esperando tu aprobación", "en_reparacion": "en reparación", "esperando_repuesto": "esperando un repuesto", "control_calidad": "en control de calidad", "listo": "listo", "entregado": "entregado", "cancelada": "cancelada"}
 
 // Money da el formato COP sin decimales: $1.250.000 (docs/08 §4).
 func Money(v int64) string {
