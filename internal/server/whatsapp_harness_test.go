@@ -4,11 +4,11 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"sweveh/internal/assistant/adapters/out/llm/rules"
-	assistantapp "sweveh/internal/assistant/app"
 	"testing"
 	"time"
 
+	"sweveh/internal/assistant/adapters/out/llm/rules"
+	assistantapp "sweveh/internal/assistant/app"
 	messagingapp "sweveh/internal/messaging/app"
 	"sweveh/internal/outbox"
 	"sweveh/internal/platform/config"
