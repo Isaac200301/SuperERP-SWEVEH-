@@ -46,6 +46,7 @@ describe('DiagnosisPanel (HU-103 propuesta)', () => {
     expect(await screen.findByText('Pastillas al 10 %')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Quitar' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Agregar hallazgo' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cotizar esto' })).not.toBeInTheDocument();
   });
 
   it('guarda la mano de obra, "Cotizar esto" la pasa a la cotización y sube fotos del hallazgo', async () => {

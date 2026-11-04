@@ -27,6 +27,8 @@ const select = 'min-h-[52px] rounded-btn border-[1.5px] border-line bg-white px-
 // Igual que orders/domain.Order.CanAddFindings y CanRemoveFindings.
 const agregaEn = ['recibido', 'en_diagnostico', 'en_reparacion'];
 const borraEn = ['recibido', 'en_diagnostico'];
+// Se cotiza en diagnóstico o, como adicional, en reparación (quotes/app.draft).
+const cotizable = ['en_diagnostico', 'en_reparacion'];
 
 /**
  * Diagnóstico en la orden (HU-103 propuesta): hallazgos por sistema con gravedad y códigos del escáner.
@@ -127,9 +129,11 @@ export function DiagnosisPanel({ orden }: { orden: Orden }) {
                 />
               </label>
             ) : null}
-            <button type="button" className="min-h-[44px] px-2 font-bold text-primary" onClick={() => cotizar(h)}>
-              Cotizar esto
-            </button>
+            {cotizable.includes(orden.estado) ? (
+              <button type="button" className="min-h-[44px] px-2 font-bold text-primary" onClick={() => cotizar(h)}>
+                Cotizar esto
+              </button>
+            ) : null}
             {puede && borraEn.includes(orden.estado) ? (
               <button type="button" className="min-h-[44px] px-2 font-bold text-err-ink" onClick={() => remove.mutate(h.id)}>
                 Quitar

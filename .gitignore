@@ -26,3 +26,6 @@ web/test-results/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Fotos y archivos del almacenamiento local de desarrollo (make dev, e2e)
+.data/
