@@ -145,8 +145,16 @@ func TestSettings_RealQuoteWithVATHoursDiscountValidity(t *testing.T) {
 	if r := c.do("PATCH", q+"/lines/"+ls[0]["id"].(string), map[string]any{"precioUnitario": 1}); r.status < 400 {
 		t.Fatalf("la mano de obra por horas no se edita a mano: %d", r.status)
 	}
+	labor := ls[0]["id"].(string)
+	is4xx(t, "cambiar a horas fuera de cuartos", c.do("PATCH", q+"/lines/"+labor, map[string]any{"horas": 1.3}))
+	ls = lines(c.must(http.StatusOK, c.do("PATCH", q+"/lines/"+labor, map[string]any{"horas": 2})))
+	if ls[0]["precioUnitario"] != float64(160000) || ls[0]["horas"] != float64(2) {
+		t.Fatalf("2 h × 80.000: %v", ls[0])
+	}
+	c.must(http.StatusOK, c.do("PATCH", q+"/lines/"+labor, map[string]any{"horas": 1.5}))
 	ls = lines(c.must(http.StatusOK, c.do("POST", q+"/lines", map[string]any{"tipo": "repuesto", "refId": pid, "cantidad": 2})))
 	part := ls[1]["id"].(string)
+	is4xx(t, "horas en un repuesto", c.do("PATCH", q+"/lines/"+part, map[string]any{"horas": 1}))
 	is4xx(t, "descuento sobre el máximo", c.do("PATCH", q+"/lines/"+part, map[string]any{"descuentoPct": 11}))
 	r := cot(c.must(http.StatusOK, c.do("PATCH", q+"/lines/"+part, map[string]any{"descuentoPct": 10})))
 	// 120.000 + 130.000 − 13.000 = 237.000; IVA 19 % = 45.030; total 282.030.
@@ -176,4 +184,17 @@ func TestSettings_RealQuoteWithVATHoursDiscountValidity(t *testing.T) {
 	if r := cot(c.must(http.StatusOK, c.do("POST", q+"/renew", nil))); r.body["ivaPct"] != float64(19) || r.body["venceEn"] == nil {
 		t.Fatalf("renovada conserva su IVA: %v", r.body)
 	}
+}
+
+// Sin cotización no se envía, no se renueva, no se responde ni se cambia un ítem.
+func TestSettings_QuoteActionsWithoutQuote(t *testing.T) {
+	e := newEnv(t)
+	c := e.register("3105550370", "Pablo Rodríguez")
+	id, _ := orderInDiagnosis(t, c, "SIN370", 1)
+	q := "/api/v1/orders/" + id + "/quote"
+	is4xx(t, "enviar sin cotización", c.do("POST", q+"/send", nil))
+	is4xx(t, "renovar sin cotización", c.do("POST", q+"/renew", nil))
+	is4xx(t, "responder sin cotización", c.do("POST", q+"/response", map[string]any{"decision": "aprobada", "canal": "telefono"}))
+	is4xx(t, "cambiar un ítem sin cotización", c.do("PATCH", q+"/lines/00000000-0000-0000-0000-000000000000", map[string]any{"cantidad": 2}))
+	is4xx(t, "quitar un ítem sin cotización", c.do("DELETE", q+"/lines/00000000-0000-0000-0000-000000000000", nil))
 }

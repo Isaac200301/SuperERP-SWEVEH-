@@ -238,7 +238,7 @@ func (h *Handler) importCSV(r *http.Request, p reqctx.Principal) (int, any, erro
 	if err != nil {
 		return 0, nil, domain.ErrImportFormat
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	data, err := io.ReadAll(io.LimitReader(file, domain.MaxImportBytes+1))
 	if err != nil {
 		return 0, nil, domain.ErrImportFormat

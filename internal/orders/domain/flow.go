@@ -53,7 +53,6 @@ func ParseState(s string) (State, error) {
 	return "", ErrStateUnknown
 }
 
-
 // TransitionInput son los hechos que la regla necesita, reunidos por el caso de uso.
 type TransitionInput struct {
 	To                State

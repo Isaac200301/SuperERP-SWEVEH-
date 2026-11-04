@@ -40,17 +40,17 @@ func (h *Handler) Routes(r chi.Router) {
 }
 
 type vehicleDTO struct {
-	ID             string    `json:"id"`
-	ClienteID      string    `json:"clienteId"`
-	Tipo           string    `json:"tipo"`
-	Placa          string    `json:"placa"`
-	FormatoPlaca   string    `json:"formatoPlaca"`
-	Marca          *string   `json:"marca"`
-	Linea          *string   `json:"linea"`
-	ModeloAnio     *int      `json:"modeloAnio"`
-	Kilometraje    *int      `json:"kilometraje"`
-	CilindrajeCc   *int      `json:"cilindrajeCc"`
-	Turbo          *bool     `json:"turbo"`
+	ID           string  `json:"id"`
+	ClienteID    string  `json:"clienteId"`
+	Tipo         string  `json:"tipo"`
+	Placa        string  `json:"placa"`
+	FormatoPlaca string  `json:"formatoPlaca"`
+	Marca        *string `json:"marca"`
+	Linea        *string `json:"linea"`
+	ModeloAnio   *int    `json:"modeloAnio"`
+	Kilometraje  *int    `json:"kilometraje"`
+	CilindrajeCc *int    `json:"cilindrajeCc"`
+	Turbo        *bool   `json:"turbo"`
 	ficha
 	MotorPendiente bool      `json:"motorPendiente"`
 	Version        int       `json:"version"`
@@ -151,7 +151,7 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		ConfirmSpecial: req.ConfirmarEspecial, CustomerID: customerID,
 		Details: domain.Details{Brand: req.Marca, Line: req.Linea, Year: req.ModeloAnio, Mileage: req.Kilometraje,
 			Color: req.Color, Body: req.Carroceria, Tire: req.Llanta},
-		Engine:  engine,
+		Engine: engine,
 	})
 	if err != nil {
 		httpx.WriteError(w, r, h.log, err)

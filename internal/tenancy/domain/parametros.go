@@ -17,19 +17,19 @@ type ChecklistItem struct {
 // Parametros son las reglas de trabajo que cada taller ajusta (decisión de Pablo, 3-nov-2026). Lo que ya se
 // cotizó o recibió no cambia si el taller cambia un parámetro: la cotización y el checklist guardan su copia.
 type Parametros struct {
-	UseAwaitingParts bool // estado opcional "Esperando repuesto"
-	UseQualityCheck  bool // estado opcional "Control de calidad"
-	MinPhotos        int
-	MileageRequired  bool
-	CarItems         []ChecklistItem
-	MotoItems        []ChecklistItem
-	VATPct           int  // IVA; por defecto 19, a confirmar con un contador (docs/07)
-	PricesIncludeVAT bool // los precios de lista ya traen IVA
-	HourlyRate       *int64
-	MaxDiscountPct   int
+	UseAwaitingParts  bool // estado opcional "Esperando repuesto"
+	UseQualityCheck   bool // estado opcional "Control de calidad"
+	MinPhotos         int
+	MileageRequired   bool
+	CarItems          []ChecklistItem
+	MotoItems         []ChecklistItem
+	VATPct            int  // IVA; por defecto 19, a confirmar con un contador (docs/07)
+	PricesIncludeVAT  bool // los precios de lista ya traen IVA
+	HourlyRate        *int64
+	MaxDiscountPct    int
 	ReceptionDiscount bool // recepción puede dar descuentos (el dueño siempre puede)
-	ValidityDays     int
-	Version          int
+	ValidityDays      int
+	Version           int
 }
 
 // Precarga sugerida de la recepción (provisional, Q-02): el taller la edita en Mi taller → Parámetros.
