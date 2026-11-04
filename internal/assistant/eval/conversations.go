@@ -339,6 +339,8 @@ func (f *fakeTaller) mark(when *time.Time) {
 	}
 }
 
-func (f *fakeTaller) LastClientPhoto(context.Context, shared.ID, shared.ID) (string, error) { return "", nil }
+func (f *fakeTaller) LastClientPhoto(context.Context, shared.ID, shared.ID) (string, error) {
+	return "", nil
+}
 
 func (f *fakeTaller) SetMode(context.Context, shared.ID, shared.ID, string, bool) error { return nil }

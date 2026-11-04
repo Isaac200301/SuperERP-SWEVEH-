@@ -20,8 +20,8 @@ type Definition struct {
 	// OutsideWindow: el aviso suele salir fuera de la ventana de 24 h (programado), así que en producción el texto
 	// es una plantilla aprobada por Meta: cambiarlo pide una aprobación nueva (HU-42, criterio 3; Q-17).
 	OutsideWindow bool
-	DefaultText  string
-	Placeholders []string
+	DefaultText   string
+	Placeholders  []string
 }
 
 // Catalog: 5 encendidas, 3 apagadas y AU-09 "próximamente" (escena 10; Q-25). En los textos, {vehiculo} es el tipo
@@ -42,12 +42,12 @@ var Catalog = []Definition{
 		Placeholders: []string{"cliente", "modelo", "vehiculo", "placa", "estado", "prometida", "taller"}},
 	{Code: "AU-06", Name: "Recordatorio de la cita", Trigger: "Orden Por recibir con fecha de hoy (en la mañana)", SendsMessage: true, Editable: true,
 		OutsideWindow: true,
-		DefaultText:  "Hola {cliente}, te esperamos hoy en {taller} con tu {vehiculo} {placa}. Horario: {horario}.",
-		Placeholders: []string{"cliente", "modelo", "taller", "vehiculo", "placa", "horario"}},
+		DefaultText:   "Hola {cliente}, te esperamos hoy en {taller} con tu {vehiculo} {placa}. Horario: {horario}.",
+		Placeholders:  []string{"cliente", "modelo", "taller", "vehiculo", "placa", "horario"}},
 	{Code: "AU-07", Name: "Vehículo sin recoger", Trigger: "Orden en Listo hace 3 días", SendsMessage: true, Editable: true,
 		OutsideWindow: true,
-		DefaultText:  "Hola {cliente}, tu {vehiculo} {placa} está listo desde hace {dias} días. Te esperamos en {taller}, {horario}.",
-		Placeholders: []string{"cliente", "modelo", "vehiculo", "placa", "dias", "taller", "horario"}},
+		DefaultText:   "Hola {cliente}, tu {vehiculo} {placa} está listo desde hace {dias} días. Te esperamos en {taller}, {horario}.",
+		Placeholders:  []string{"cliente", "modelo", "vehiculo", "placa", "dias", "taller", "horario"}},
 	{Code: "AU-08", Name: "Repuesto bajo el mínimo", Trigger: "El inventario baja del mínimo (aviso dentro de la app)"},
 	{Code: "AU-09", Name: "Seguimiento de garantía", Trigger: "N días después de Entregado", ComingSoon: true},
 }
