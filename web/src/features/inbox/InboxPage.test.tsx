@@ -20,6 +20,7 @@ describe('InboxPage (HU-62, HU-63, HU-64)', () => {
       'GET /me': owner,
       'GET /inbox': { borradores: [borrador] },
       'GET /inbox/stats': { enviados: 0, editados: 0, porcentajeEditados: 0 },
+      'GET /assistant/settings': { autoEnvio: false },
       'POST /inbox/{id}': { ok: true },
     });
     renderPage(<InboxPage />);
@@ -33,5 +34,39 @@ describe('InboxPage (HU-62, HU-63, HU-64)', () => {
     await userEvent.type(caja, 'Cuesta $45.000 con filtro.');
     await userEvent.click(screen.getByRole('button', { name: 'Enviar' }));
     await waitFor(() => expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ decision: 'enviar', texto: 'Cuesta $45.000 con filtro.' }));
+  });
+
+  it('ADR-0028: el dueño ve las respuestas automáticas y puede apagar el asistente', async () => {
+    const auto = { ...borrador, id: 'b2', estado: 'auto_enviado', final: 'El cambio de aceite cuesta $45.000.' };
+    const calls = mockApi({
+      'GET /me': { ...owner, permisos: [...owner.permisos, 'automation:manage'] },
+      'GET /inbox': (req: Request) => ({ status: 200, body: { borradores: new URL(req.url).search ? [auto] : [] } }),
+      'GET /inbox/stats': { enviados: 0, editados: 0, porcentajeEditados: 0 },
+      'GET /assistant/settings': { autoEnvio: true },
+      'PUT /assistant/settings': { autoEnvio: false },
+    });
+    renderPage(<InboxPage />);
+    const sw = await screen.findByRole('switch', { name: 'El asistente responde solo' });
+    expect(sw).toBeChecked();
+    await waitFor(() => expect(sw).toBeEnabled());
+    expect(screen.getByText(/salen sin tu revisión/)).toBeInTheDocument();
+    await userEvent.click(await screen.findByText('Últimas respuestas automáticas'));
+    expect(screen.getByText(/cuesta \$45\.000\./)).toBeInTheDocument();
+
+    await userEvent.click(sw);
+    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ autoEnvio: false }));
+    expect(await screen.findByText(/cada respuesta espera aquí/)).toBeInTheDocument();
+  });
+
+  it('recepción ve el interruptor sin poder cambiarlo', async () => {
+    mockApi({
+      'GET /me': { ...owner, roles: ['recepcion'], permisos: ['order:read', 'inbox:manage'] },
+      'GET /inbox': { borradores: [] },
+      'GET /inbox/stats': { enviados: 0, editados: 0, porcentajeEditados: 0 },
+      'GET /assistant/settings': { autoEnvio: true },
+    });
+    renderPage(<InboxPage />);
+    expect(await screen.findByRole('switch', { name: 'El asistente responde solo' })).toBeDisabled();
+    expect(screen.getByText(/Solo el dueño lo cambia/)).toBeInTheDocument();
   });
 });
