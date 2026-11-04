@@ -36,16 +36,16 @@ func (f *fakeWAHA) handler(t *testing.T) http.HandlerFunc {
 		}
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		switch {
-		case r.URL.Path == "/api/sendText":
+		switch r.URL.Path {
+		case "/api/sendText":
 			var b map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&b)
 			f.sent = append(f.sent, b)
 			f.n++
 			_, _ = fmt.Fprintf(w, `{"id":"true_%s_OUT%d"}`, b["chatId"], f.n)
-		case r.URL.Path == "/api/sessions/default":
+		case "/api/sessions/default":
 			_, _ = fmt.Fprintf(w, `{"name":"default","status":%q}`, f.status)
-		case r.URL.Path == "/api/default/auth/qr":
+		case "/api/default/auth/qr":
 			_, _ = io.WriteString(w, `{"mimetype":"image/png","data":"`+base64.StdEncoding.EncodeToString([]byte("png"))+`"}`)
 		default:
 			_, _ = io.WriteString(w, `{}`)

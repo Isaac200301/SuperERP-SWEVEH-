@@ -101,7 +101,9 @@ func (Parser) Parse(body []byte) ([]app.Inbound, []app.Status, error) {
 	return nil, nil, nil
 }
 
-func direct(from string) bool { return strings.HasSuffix(from, "@c.us") || strings.HasSuffix(from, "@lid") }
+func direct(from string) bool {
+	return strings.HasSuffix(from, "@c.us") || strings.HasSuffix(from, "@lid")
+}
 
 // phone: "573001234567@c.us" → "+573001234567". Un "@lid" (WhatsApp oculta el número) queda como id del chat,
 // y ChatID lo usa tal cual para responder.
