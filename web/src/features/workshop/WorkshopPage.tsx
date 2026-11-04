@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { api, unwrap } from '../../shared/api/client';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
+import { WahaCard } from '../messaging/WahaCard';
 import { card, ProfileForm, type Taller } from './ProfileForm';
 import { SettingsForm } from './SettingsForm';
 
@@ -69,6 +70,7 @@ export function WorkshopPage() {
       <ProfileForm t={q.data} />
       <Schedule t={q.data} />
       <SettingsForm />
+      <WahaCard />
     </>
   );
 }
