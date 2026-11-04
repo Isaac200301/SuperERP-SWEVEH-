@@ -61,6 +61,22 @@ Qué hace `agendar` según la placa:
 | Del cliente, con una orden abierta | Devuelve esa orden |
 | Nueva | Crea la orden "Por recibir". Ya no usa `ConfirmDuplicate` |
 
+### Agendar: qué pide el asesor y dónde queda la cita
+- **Datos que reúne, uno por mensaje y sin repetir lo que ya sabe:**
+  1. qué necesita (servicio o síntoma);
+  2. la placa;
+  3. qué día y a qué hora trae el vehículo;
+  4. el nombre, solo si el que tiene es de relleno.
+- **No pide el celular:** llega con el mensaje de WhatsApp y se guarda al autorizar los datos (HU-85).
+- **Antes de agendar confirma un resumen**, y solo llama a `agendar` cuando el cliente dice que sí. El prompt lleva la fecha y la hora de hoy en Colombia, para entender "mañana", "el sábado" o "a las 3".
+- **`agendar(placa, sintoma, fecha, hora, nombre?)` valida en código:**
+  - que la placa la haya escrito el cliente (HU-55);
+  - que la fecha no esté en el pasado ni a más de 30 días;
+  - que el taller atienda a esa hora según su horario (HU-08). Si no, responde `fuera_de_horario` con el horario de ese día para que el asesor ofrezca otro.
+- **La cita queda en la `fecha_prometida`** de la orden "Por recibir". Ahí la busca **AU-06 "Recordatorio de la cita"**, que se la recuerda al cliente ese día; no hizo falta un campo nuevo. Si la placa ya tiene una orden "Por recibir", se reagenda esa misma (`orders.Flow.SetPromise`, auditoría `orden.reagendar`) en vez de crear otra.
+- **El nombre que da el cliente** reemplaza solo uno de relleno ("Cliente de prueba", "Cliente WhatsApp", una letra o números), con `customers` `FillName` y auditoría `cliente.nombre`. Un nombre real no se cambia.
+- **Límite conocido:** el recordatorio AU-06 sale solo si la ventana de 24 h está abierta (HU-47). Una cita agendada con días de anticipación necesita la plantilla de recordatorio aprobada por Meta (Q-07) para que el aviso llegue sin que el cliente haya escrito ese día. Mientras tanto, la ejecución queda como `omitido` con el motivo.
+
 ### Guardias sobre el texto (`domain.Guard` y `domain.Tidy`)
 - Cada `$` del texto debe ser un precio que trajo una tool en esta respuesta. Si no, el modelo tiene **una ronda para corregir**; si vuelve a fallar, no sale nada y queda la tarjeta "Responde tú" para el dueño.
 - Máximo 600 caracteres y sin enlaces.
