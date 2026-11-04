@@ -1,54 +1,21 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { expect, test } from '@playwright/test';
 
-import { expect, test, type Page } from '@playwright/test';
+import { registerWorkshop, shot } from './helpers';
 
 /**
  * La orden de punta a punta como la usa un taller real (lo que Pablo probó a mano el 3-nov-2026): registro →
  * parámetros → repuesto → orden con ficha → recepción con ítems y fotos → diagnóstico con mano de obra y fotos →
- * cotización con servicio sin precio, repuesto × 2 y horas → aprobar → devolver → esperando repuesto → listo.
+ * cotización con servicio sin precio, repuesto × 2 y horas → aprobar → devolver → esperando repuesto → listo → entrega.
  * Datos Ficticio. Deja capturas en SWEVEH_E2E_OUT para revisarlas.
  */
-const out = process.env.SWEVEH_E2E_OUT ?? 'test-results';
-const apiLog = process.env.SWEVEH_API_LOG ?? '';
 const uniq = Date.now().toString().slice(-6);
 const celular = `310${uniq}1`;
 const placa = `E${String.fromCharCode(65 + (Number(uniq) % 26))}T${uniq.slice(-3)}`;
 const jpg = { name: 'foto.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0]) };
 
-async function shot(page: Page, name: string) {
-  await page.screenshot({ path: join(out, `${name}.png`), fullPage: true });
-}
-
-/** El api local escribe el código en consola (OTP_SENDER=consola): se toma el último para ese celular. */
-async function lastCode(): Promise<string> {
-  const tail = celular.slice(-4);
-  for (let i = 0; i < 40; i++) {
-    const matches = [...readFileSync(apiLog, 'utf8').matchAll(/Código SWEVEH para (\S+[^:]*): (\d{6})/g)].filter((m) => (m[1] ?? '').includes(tail));
-    const last = matches.at(-1);
-    if (last?.[2]) return last[2];
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error('No apareció el código en el log del api: ¿SWEVEH_API_LOG apunta al log de `go run ./cmd/api`?');
-}
-
 test('orden de punta a punta en un taller real', async ({ page }) => {
-  test.skip(!apiLog, 'Define SWEVEH_API_LOG con la ruta del log del api local.');
-
   // 1. Registro y arranque.
-  await page.goto('/registro');
-  await page.getByLabel('Tu nombre').fill('Pablo Prueba');
-  await page.getByLabel('Tu celular').fill(celular);
-  await page.getByRole('checkbox').check();
-  await page.getByRole('button', { name: 'Recibir código' }).click();
-  await page.getByLabel('Código').fill(await lastCode());
-  await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.getByText('PASO 2 DE 3')).toBeVisible();
-  await page.getByRole('radio', { name: 'Carros' }).click();
-  await page.getByLabel(/Frenos y suspensión/).check();
-  await page.getByLabel(/Acepto el contrato/).check();
-  await page.getByRole('button', { name: 'Armar mi taller' }).click();
-  await expect(page.getByText('Tu taller ya está armado')).toBeVisible();
+  await registerWorkshop(page, celular);
   await shot(page, '01-arranque');
 
   // 2. Parámetros: Esperando repuesto, IVA aparte y tarifa por hora.
@@ -138,4 +105,14 @@ test('orden de punta a punta en un taller real', async ({ page }) => {
   await page.getByRole('button', { name: 'Pasar a Listo' }).click();
   await expect(page.locator('header').getByText('Listo')).toBeVisible();
   await shot(page, '06-listo');
+
+  // 10. Entrega (HU-25): quién recoge y confirmar que revisó lo que dejó (va en las notas); la orden se cierra.
+  const entregar = page.getByRole('button', { name: /Pasar a Entregado/ });
+  await expect(entregar).toBeDisabled();
+  await page.getByLabel('¿Quién recoge?').fill('Laura Cliente');
+  await page.getByLabel(/Revisé con el cliente lo que dejó/).check();
+  await entregar.click();
+  await expect(page.locator('header').getByText('Entregado')).toBeVisible();
+  await expect(page.getByText('Mover la orden')).toHaveCount(0);
+  await shot(page, '07-entregado');
 });

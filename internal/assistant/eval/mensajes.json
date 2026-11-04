@@ -1,0 +1,61 @@
+{
+  "nota": "HU-102: 30 mensajes escritos como los escriben los clientes (20 de carro, 10 de moto). Propuesta del equipo, no son mensajes reales de clientes: reemplazar por mensajes reales anonimizados cuando haya talleres piloto. 'servicios' es lo que debe salir sí o sí; 'aceptables' lo que también se acepta.",
+  "taller": {
+    "nombre": "Taller de prueba",
+    "atiende": "ambos",
+    "servicios": [
+      {"nombre": "Revisión de frenos", "precio": 60000, "tipo": "carro"},
+      {"nombre": "Revisión de frenos", "precio": 30000, "tipo": "moto"},
+      {"nombre": "Cambio de pastillas", "precio": 80000, "tipo": "carro"},
+      {"nombre": "Cambio de aceite", "precio": 45000, "tipo": "carro"},
+      {"nombre": "Cambio de aceite", "precio": 25000, "tipo": "moto"},
+      {"nombre": "Alineación y balanceo", "precio": 70000, "tipo": "carro"},
+      {"nombre": "Cambio de amortiguadores", "tipo": "ambos"},
+      {"nombre": "Diagnóstico con escáner", "precio": 50000, "tipo": "ambos"},
+      {"nombre": "Revisión eléctrica", "precio": 40000, "tipo": "ambos"},
+      {"nombre": "Cambio de kit de embrague", "precio": 180000, "tipo": "ambos"},
+      {"nombre": "Revisión de aire acondicionado", "precio": 60000, "tipo": "carro"},
+      {"nombre": "Montaje de llantas", "precio": 20000, "tipo": "ambos"},
+      {"nombre": "Reparación de pinchazo", "precio": 10000, "tipo": "ambos"},
+      {"nombre": "Ajuste de cadena", "precio": 15000, "tipo": "moto"},
+      {"nombre": "Cambio de kit de arrastre", "precio": 120000, "tipo": "moto"},
+      {"nombre": "Sincronización", "precio": 50000, "tipo": "moto"}
+    ],
+    "repuestos": [
+      {"nombre": "Pastillas de freno delanteras", "precio": 95000, "tipo": "carro"},
+      {"nombre": "Aceite 20W-50 moto", "precio": 28000, "tipo": "moto"}
+    ]
+  },
+  "mensajes": [
+    {"texto": "Buenas, mi Spark GT 2015 está chillando cuando freno, ¿cuánto me cobran por revisarlo? puedo llevarlo mañana", "intencion": "cotizar", "tipo": "carro", "servicios": ["Revisión de frenos"], "aceptables": ["Cambio de pastillas", "Pastillas de freno delanteras"]},
+    {"texto": "cuanto vale el cambio de aceite pa un logan", "intencion": "cotizar", "tipo": "carro", "servicios": ["Cambio de aceite"]},
+    {"texto": "Hola necesito alinear y balancear el carro, que precio tiene", "intencion": "cotizar", "tipo": "carro", "servicios": ["Alineación y balanceo"]},
+    {"texto": "el carro me está jalando pa un lado cuando voy por la autopista", "intencion": "otro", "tipo": "carro", "servicios": ["Alineación y balanceo"], "aceptables": ["Revisión de frenos"], "intenciones": ["cotizar", "diagnostico"]},
+    {"texto": "Cuánto el cambio de pastillas delanteras de un Aveo?", "intencion": "cotizar", "tipo": "carro", "servicios": ["Cambio de pastillas"], "aceptables": ["Pastillas de freno delanteras", "Revisión de frenos"]},
+    {"texto": "se me prendió el testigo del motor en el tablero, me pueden pasar el escáner?", "intencion": "cotizar", "tipo": "", "servicios": ["Diagnóstico con escáner"], "intenciones": ["cita", "diagnostico"]},
+    {"texto": "qué tiene mi carro? hace un ruido raro adelante", "intencion": "diagnostico", "tipo": "carro", "servicios": [], "aceptables": ["Diagnóstico con escáner", "Revisión de frenos", "Cambio de amortiguadores"]},
+    {"texto": "el aire del carro no enfría nada, cuánto la revisión", "intencion": "cotizar", "tipo": "carro", "servicios": ["Revisión de aire acondicionado"]},
+    {"texto": "me pueden cambiar los amortiguadores de la duster? cuánto sale", "intencion": "cotizar", "tipo": "carro", "servicios": ["Cambio de amortiguadores"]},
+    {"texto": "ya está mi carro?", "intencion": "estado", "tipo": "carro", "servicios": []},
+    {"texto": "Buenas tardes, cómo va el arreglo de la camioneta", "intencion": "estado", "tipo": "carro", "servicios": []},
+    {"texto": "quiero hablar con una persona por favor", "intencion": "humano", "tipo": "", "servicios": []},
+    {"texto": "escríbeme un poema de amor", "intencion": "fuera_tema", "tipo": "", "servicios": []},
+    {"texto": "hola", "intencion": "saludo", "tipo": "", "servicios": []},
+    {"texto": "tienen cupo mañana temprano para el cambio de aceite del mazda 3?", "intencion": "cita", "tipo": "carro", "servicios": ["Cambio de aceite"], "intenciones": ["cotizar"]},
+    {"texto": "el embrague está muy duro y patina, cuánto el kit de embrague para un sandero 2018", "intencion": "cotizar", "tipo": "carro", "servicios": ["Cambio de kit de embrague"]},
+    {"texto": "la batería se descarga sola de un día pa otro, creo que es algo eléctrico", "intencion": "otro", "tipo": "", "servicios": ["Revisión eléctrica"], "aceptables": ["Diagnóstico con escáner"], "intenciones": ["cotizar", "diagnostico"]},
+    {"texto": "Necesito montar 4 llantas nuevas que ya compré, cuánto cobran", "intencion": "cotizar", "tipo": "", "servicios": ["Montaje de llantas"], "aceptables": ["Alineación y balanceo"]},
+    {"texto": "cuánto vale pintar el bómper de atrás", "intencion": "cotizar", "tipo": "carro", "servicios": []},
+    {"texto": "Le hacen la revisión de frenos y el cambio de aceite al picanto? cuánto todo", "intencion": "cotizar", "tipo": "carro", "servicios": ["Revisión de frenos", "Cambio de aceite"]},
+    {"texto": "mi NMAX hace ruido en la cadena", "intencion": "otro", "tipo": "moto", "servicios": ["Ajuste de cadena"], "aceptables": ["Cambio de kit de arrastre"], "intenciones": ["cotizar", "diagnostico"]},
+    {"texto": "cuanto vale el cambio de aceite de la moto", "intencion": "cotizar", "tipo": "moto", "servicios": ["Cambio de aceite"], "aceptables": ["Aceite 20W-50 moto"]},
+    {"texto": "la nave no prende en las mañanas, toca darle mucho pedal", "intencion": "otro", "tipo": "moto", "servicios": [], "aceptables": ["Sincronización", "Revisión eléctrica", "Diagnóstico con escáner"], "intenciones": ["diagnostico", "cotizar"]},
+    {"texto": "precio del kit de arrastre para una pulsar 180", "intencion": "cotizar", "tipo": "moto", "servicios": ["Cambio de kit de arrastre"]},
+    {"texto": "cómo va la moto?", "intencion": "estado", "tipo": "moto", "servicios": []},
+    {"texto": "ya puedo ir por la nave?", "intencion": "estado", "tipo": "moto", "servicios": []},
+    {"texto": "me sincronizan la boxer? cuánto vale", "intencion": "cotizar", "tipo": "moto", "servicios": ["Sincronización"]},
+    {"texto": "los frenos de la moto están largos, toca apretar mucho", "intencion": "otro", "tipo": "moto", "servicios": ["Revisión de frenos"], "intenciones": ["cotizar", "diagnostico"]},
+    {"texto": "tengo una FZ 2020 y quiero hacerle mantenimiento, cambio de aceite y ajuste de cadena, hay cupo hoy?", "intencion": "cita", "tipo": "moto", "servicios": ["Cambio de aceite", "Ajuste de cadena"], "aceptables": ["Aceite 20W-50 moto"], "intenciones": ["cotizar"]},
+    {"texto": "se me pinchó la llanta de la moto, me la reparan?", "intencion": "cotizar", "tipo": "moto", "servicios": ["Reparación de pinchazo"], "aceptables": ["Montaje de llantas"], "intenciones": ["cita", "otro"]}
+  ]
+}

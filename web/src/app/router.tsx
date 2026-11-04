@@ -15,6 +15,9 @@ const NewOrderPage = page(() => import('../features/orders/NewOrderPage'), 'NewO
 const OrderDetailPage = page(() => import('../features/orders/OrderDetailPage'), 'OrderDetailPage');
 const FloorPage = page(() => import('../features/orders/FloorPage'), 'FloorPage');
 const InboxPage = page(() => import('../features/inbox/InboxPage'), 'InboxPage');
+const ConversationsPage = page(() => import('../features/messaging/ConversationsPage'), 'ConversationsPage');
+const ConversationPage = page(() => import('../features/messaging/ConversationsPage'), 'ConversationPage');
+const SimulatorPage = page(() => import('../features/messaging/SimulatorPage'), 'SimulatorPage');
 const AutomationsPage = page(() => import('../features/automations/AutomationsPage'), 'AutomationsPage');
 const DashboardPage = page(() => import('../features/dashboard/DashboardPage'), 'DashboardPage');
 const ServicesPage = page(() => import('../features/catalog/ServicesPage'), 'ServicesPage');
@@ -52,6 +55,8 @@ export const router = createBrowserRouter([
       { path: 'ordenes/:id', element: <Lazy Page={OrderDetailPage} /> },
       { path: 'piso', element: <Lazy Page={FloorPage} /> },
       { path: 'por-revisar', element: <Lazy Page={InboxPage} /> },
+      { path: 'conversaciones', element: <Lazy Page={ConversationsPage} /> },
+      { path: 'conversaciones/:id', element: <Lazy Page={ConversationPage} /> },
       { path: 'automatizaciones', element: <Lazy Page={AutomationsPage} /> },
       { path: 'tablero', element: <Lazy Page={DashboardPage} /> },
       { path: 'servicios', element: <Lazy Page={ServicesPage} /> },
@@ -59,6 +64,7 @@ export const router = createBrowserRouter([
       { path: 'catalogo', element: <Navigate to="/panel/repuestos" replace /> },
       { path: 'equipo', element: <Lazy Page={TeamPage} /> },
       { path: 'taller', element: <Lazy Page={WorkshopPage} /> },
+      { path: 'whatsapp-prueba', element: <Lazy Page={SimulatorPage} /> },
       { path: 'arranque', element: <Lazy Page={OnboardingPage} /> },
     ],
   },

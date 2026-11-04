@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router';
 import type { Sesion } from '../../shared/api/client';
 import { roles } from '../../shared/i18n/es-CO';
 import { Brand } from '../../shared/ui/Logo';
-import { IconCar, IconCheck, IconClock, IconLogout, IconOrders, IconPlus, IconTeam, IconTool, IconWarn } from '../../shared/ui/icons';
+import { IconCar, IconChat, IconCheck, IconClock, IconLogout, IconOrders, IconPlus, IconTeam, IconTool, IconWarn } from '../../shared/ui/icons';
 import { can, useLogout } from '../auth/api';
 
 /**
@@ -15,6 +15,7 @@ const nav = [
   { to: '/panel/piso', label: 'Piso', icon: IconClock, perm: 'order:read' },
   { to: '/panel/ordenes', label: 'Órdenes', icon: IconOrders, perm: 'order:read' },
   { to: '/panel/por-revisar', label: 'Por revisar', icon: IconWarn, perm: 'inbox:manage' },
+  { to: '/panel/conversaciones', label: 'Conversaciones', icon: IconChat, perm: 'conversation:read' },
   { to: '/panel/automatizaciones', label: 'Automatizaciones', icon: IconPlus, perm: 'order:read' },
   { to: '/panel/servicios', label: 'Servicios', icon: IconTool, perm: 'service:manage' },
   { to: '/panel/repuestos', label: 'Repuestos', icon: IconOrders, perm: 'part:manage' },

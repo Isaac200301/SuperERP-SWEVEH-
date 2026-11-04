@@ -42,6 +42,7 @@ type AssistantLlamadaIum struct {
 	LatenciaMs    int32
 	Resultado     string
 	CreatedAt     time.Time
+	MensajeID     *uuid.UUID
 }
 
 type AuditEvento struct {
@@ -322,25 +323,27 @@ type OrdersHallazgo struct {
 }
 
 type OrdersOrden struct {
-	ID                uuid.UUID
-	TallerID          uuid.UUID
-	Numero            int32
-	VehiculoID        uuid.UUID
-	ClienteID         uuid.UUID
-	Placa             string
-	TipoVehiculo      string
-	Estado            string
-	Sintoma           string
-	Version           int32
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	CreatedBy         *uuid.UUID
-	MecanicoID        *uuid.UUID
-	FechaPrometida    *time.Time
-	Ejemplo           bool
-	EntregadoA        *string
-	MotivoCancelacion *string
-	CerradaEn         *time.Time
+	ID                 uuid.UUID
+	TallerID           uuid.UUID
+	Numero             int32
+	VehiculoID         uuid.UUID
+	ClienteID          uuid.UUID
+	Placa              string
+	TipoVehiculo       string
+	Estado             string
+	Sintoma            string
+	Version            int32
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	CreatedBy          *uuid.UUID
+	MecanicoID         *uuid.UUID
+	FechaPrometida     *time.Time
+	Ejemplo            bool
+	EntregadoA         *string
+	MotivoCancelacion  *string
+	CerradaEn          *time.Time
+	ReciboRespuesta    *string
+	ReciboRespondidoEn *time.Time
 }
 
 type OutboxEvento struct {

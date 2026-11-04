@@ -5,18 +5,13 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
 	"sweveh/internal/messaging/domain"
 	"sweveh/internal/shared"
 )
-
-// Channel es el puerto CanalMensajeria (RNF-07): cambiar del número de prueba al del taller no toca el resto.
-type Channel interface {
-	SendText(ctx context.Context, phoneNumberID, to, text string) (string, error)
-	SendButtons(ctx context.Context, phoneNumberID, to, text string, buttons []domain.Button) (string, error)
-}
 
 // Conversation es una conversación con un celular.
 type Conversation struct {
@@ -78,7 +73,7 @@ type Repository interface {
 	ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error)
 }
 
-// WebhookEvent es un cuerpo crudo recibido de Meta.
+// WebhookEvent es un cuerpo crudo recibido del proveedor de WhatsApp.
 type WebhookEvent struct {
 	ID   shared.ID
 	Body json.RawMessage
@@ -106,12 +101,13 @@ type Service struct {
 	tx      TxRunner
 	repo    Repository
 	channel Channel
+	parser  InboundParser
 	events  EventPublisher
 	clock   Clock
 }
 
-func NewService(tx TxRunner, r Repository, ch Channel, e EventPublisher, c Clock) *Service {
-	return &Service{tx: tx, repo: r, channel: ch, events: e, clock: c}
+func NewService(tx TxRunner, r Repository, ch Channel, p InboundParser, e EventPublisher, c Clock) *Service {
+	return &Service{tx: tx, repo: r, channel: ch, parser: p, events: e, clock: c}
 }
 
 // ReceiveWebhook guarda el cuerpo crudo y responde rápido; el worker lo procesa después (R-09).
@@ -142,7 +138,7 @@ func (s *Service) ProcessWebhooks(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	for _, ev := range evs {
-		ins, statuses, perr := ParseMeta(ev.Body)
+		ins, statuses, perr := s.parser.Parse(ev.Body)
 		var msg *string
 		if perr == nil {
 			for _, in := range ins {
@@ -269,8 +265,16 @@ func (s *Service) Enqueue(ctx context.Context, o Outgoing) (Message, error) {
 	return out, err
 }
 
+// MaxDeliveryAttempts es cuántas veces se intenta un envío con fallas pasajeras (límite de tasa, caída de Meta,
+// red) antes de darlo por fallido. Con el retroceso del outbox (1 s, 2 s, 4 s, 8 s…) son unos 15 s en total.
+const MaxDeliveryAttempts = 5
+
 // Deliver envía un mensaje pendiente por el canal (lo llama el worker, fuera de la transacción del cambio).
-func (s *Service) Deliver(ctx context.Context, tallerID, msgID shared.ID) error {
+// attempt es el número de intento (0 = primero). Una falla pasajera deja el mensaje pendiente y devuelve el
+// error para que el outbox reintente. Una falla definitiva (o agotar los intentos) lo marca fallido y publica
+// "messaging.envio_fallido" en la misma transacción, para que la automatización quede fallida y el dueño lo vea
+// (HU-46); la orden no se entera (RNF-13).
+func (s *Service) Deliver(ctx context.Context, tallerID, msgID shared.ID, attempt int) error {
 	var (
 		m    Message
 		conv Conversation
@@ -291,14 +295,10 @@ func (s *Service) Deliver(ctx context.Context, tallerID, msgID shared.ID) error 
 		return err
 	}
 	if m.State != "pendiente" {
-		return nil // idempotente: ya se envió
+		return nil // idempotente: ya se envió o ya se dio por fallido
 	}
-	now := s.clock.Now()
 	if !ok {
-		e := "el taller no tiene número de WhatsApp conectado"
-		return s.tx.Do(ctx, func(ctx context.Context) error {
-			return s.repo.UpdateDelivery(ctx, tallerID, msgID, "fallido", nil, &e, now)
-		})
+		return s.failed(ctx, m, errors.New("el taller no tiene número de WhatsApp conectado"))
 	}
 	var p struct {
 		Buttons []domain.Button `json:"botones"`
@@ -311,21 +311,35 @@ func (s *Service) Deliver(ctx context.Context, tallerID, msgID shared.ID) error 
 	} else {
 		wamid, err = s.channel.SendText(ctx, ch.PhoneNumberID, conv.Phone, m.Body)
 	}
-	state, errMsg := "enviado", (*string)(nil)
 	if err != nil {
-		e := err.Error()
-		state, errMsg = "fallido", &e
+		if IsRetryable(err) && attempt+1 < MaxDeliveryAttempts {
+			return err // sigue pendiente; el outbox reintenta con retroceso
+		}
+		return s.failed(ctx, m, err)
 	}
-	var w *string
-	if wamid != "" {
-		w = &wamid
-	}
-	if uerr := s.tx.Do(ctx, func(ctx context.Context) error {
-		return s.repo.UpdateDelivery(ctx, tallerID, msgID, state, w, errMsg, now)
-	}); uerr != nil {
-		return uerr
-	}
-	return err // el worker reintenta con retroceso si falló el canal
+	return s.tx.Do(ctx, func(ctx context.Context) error {
+		return s.repo.UpdateDelivery(ctx, tallerID, msgID, "enviado", &wamid, nil, s.clock.Now())
+	})
+}
+
+// failed marca el mensaje fallido y avisa, en una sola transacción. El texto del error es el del adaptador, que
+// no trae datos personales (ADR-0025).
+func (s *Service) failed(ctx context.Context, m Message, cause error) error {
+	e := cause.Error()
+	now := s.clock.Now()
+	return s.tx.Do(ctx, func(ctx context.Context) error {
+		if err := s.repo.UpdateDelivery(ctx, m.TallerID, m.ID, "fallido", nil, &e, now); err != nil {
+			return err
+		}
+		payload := map[string]any{"mensaje_id": m.ID.String(), "error": e}
+		if m.Automation != nil {
+			payload["automatizacion"] = *m.Automation
+		}
+		if m.OrderID != nil {
+			payload["orden_id"] = m.OrderID.String()
+		}
+		return s.events.Publish(ctx, m.TallerID, shared.Event{Type: "messaging.envio_fallido", AggregateID: m.ID, OccurredAt: now, Payload: payload})
+	})
 }
 
 // EnsureLocalChannel conecta el canal de prueba local al taller si no tiene número (demo sin cuenta de Meta).

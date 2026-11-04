@@ -164,7 +164,7 @@ Son 15 módulos y un núcleo. No hace falta construirlos todos como paquetes gra
 | Puerto | Quién lo usa | Primer adaptador | Requisito |
 | --- | --- | --- | --- |
 | `MessagingChannel` | `messaging` | API de WhatsApp Cloud con el número de prueba de Meta | RNF-07 |
-| `LLMProvider` | `assistant` | El proveedor que salga de D-08 | RNF-06 |
+| `LLMProvider` (`assistant/app.Interpreter`, ADR-0026) | `assistant` | Reglas locales; OpenRouter para la demo; el definitivo sale de D-08 | RNF-05, RNF-06 |
 | `OTPSender` | `identity` | Por decidir (AQ-01) | HU-01 |
 | `ObjectStorage` | `workorders`, `migration` | Supabase Storage, bucket privado | RNF-10 |
 | `TxManager` y `Outbox` | Todos | Postgres con pgx | RNF-13 |

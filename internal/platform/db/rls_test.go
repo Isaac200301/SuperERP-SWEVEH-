@@ -120,6 +120,40 @@ func TestAPIRoleHasNoBypassAndOwnsNothing(t *testing.T) {
 	}
 }
 
+// Meta-prueba: el worker procesa WhatsApp con los mismos casos de uso que el api (aprobar la cotización desde
+// el botón, recibir con los parámetros del taller), así que en las tablas de negocio necesita sus mismos
+// privilegios. Una tabla nueva sin GRANT al worker rompe el circuito en producción sin que nada falle aquí
+// (pasó con quotes.linea y tenancy.parametros: migración 00019). tenancy.taller queda de solo lectura a propósito.
+func TestWorkerHasAPIPrivileges(t *testing.T) {
+	d := testdb.New(t)
+	rows, err := d.API.Query(context.Background(), `
+		SELECT n.nspname || '.' || c.relname || ' ' || p.priv
+		FROM pg_class c
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		CROSS JOIN unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']) AS p(priv)
+		WHERE c.relkind = 'r'
+		  AND n.nspname IN ('orders', 'customers', 'vehicles', 'quotes', 'inventory', 'catalog', 'tenancy')
+		  AND NOT (n.nspname = 'tenancy' AND c.relname = 'taller')
+		  AND has_table_privilege('sweveh_api', c.oid, p.priv)
+		  AND NOT has_table_privilege('sweveh_worker', c.oid, p.priv)
+		ORDER BY 1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var missing []string
+	for rows.Next() {
+		var s string
+		if err := rows.Scan(&s); err != nil {
+			t.Fatal(err)
+		}
+		missing = append(missing, s)
+	}
+	if len(missing) > 0 {
+		t.Fatalf("el api puede y el worker no (falta un GRANT en la migración): %s", strings.Join(missing, ", "))
+	}
+}
+
 // Meta-prueba: toda tabla con columna taller_id (y el propio taller) tiene RLS habilitado y forzado
 // con al menos una política. Si alguien agrega una tabla sin RLS, esta prueba falla (R-06).
 func TestEveryTenantTableHasForcedRLS(t *testing.T) {

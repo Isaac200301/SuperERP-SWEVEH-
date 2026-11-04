@@ -1217,6 +1217,11 @@ export interface components {
             detalle: string;
             /** Format: uuid */
             ordenId?: string;
+            /**
+             * Format: uuid
+             * @description Conversación que espera a una persona (HU-59)
+             */
+            conversacionId?: string;
             /** @enum {string} */
             tono: "err" | "warn" | "info";
         };
@@ -1244,8 +1249,14 @@ export interface components {
             /** @description Texto que propone la IA o la plantilla; no sale sin aprobación (RF-18) */
             propuesto: string;
             final?: string | null;
-            /** @description De dónde salió cada dato (HU-64) */
-            fuentes?: string[] | null;
+            /** @description De dónde salió cada dato de la respuesta (HU-64) */
+            fuentes?: {
+                /** @description precio, horario… */
+                campo: string;
+                valor: string;
+                /** @description Servicio: Cambio de aceite, Horario del taller… */
+                origen: string;
+            }[] | null;
             /** @description Acción propuesta (p. ej. crear la orden con la placa, HU-55) */
             accion?: Record<string, never> | null;
             estado: string;
@@ -1276,7 +1287,15 @@ export interface components {
             direccion: string;
             tipo: string;
             cuerpo: string;
-            payload?: Record<string, never> | null;
+            /** @description Botones de respuesta rápida (máx. 3, DR-08); en un mensaje del cliente, el botón que pulsó */
+            payload?: {
+                botones?: {
+                    id: string;
+                    titulo: string;
+                }[];
+                boton?: string;
+                nombre?: string;
+            } | null;
             estado: string;
             origen: string;
             /** Format: uuid */
@@ -1625,6 +1644,13 @@ export interface components {
             motivoCancelacion?: string;
             /** Format: date-time */
             cerradaEn?: string | null;
+            /**
+             * @description Respuesta del cliente a la constancia de recibo por WhatsApp (HU-19)
+             * @enum {string|null}
+             */
+            constancia?: "conforme" | "observado" | null;
+            /** Format: date-time */
+            constanciaEn?: string | null;
             vehiculo?: {
                 /** Format: uuid */
                 id: string;

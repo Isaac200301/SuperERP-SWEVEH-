@@ -62,7 +62,7 @@ export function OrderActions({ orden }: { orden: Orden }) {
   const puedeAnular = usePermission('order:override_approval');
   const [motivo, setMotivo] = useState('');
   const [recogido, setRecogido] = useState('');
-  const [accesorios, setAccesorios] = useState(false);
+  const [revisado, setRevisado] = useState(false);
   const [falta, setFalta] = useState('');
   const settings = useSettings().data;
   const flujo = flujoFor(settings);
@@ -77,6 +77,10 @@ export function OrderActions({ orden }: { orden: Orden }) {
   const sinAprobacion = siguiente === 'en_reparacion' && orden.estado !== 'esperando_repuesto';
   const entrega = siguiente === 'entregado';
   const puedeEsperar = orden.estado === 'en_reparacion' && settings?.usarEsperandoRepuesto === true;
+  // Lo que dejó el cliente quedó como nota con foto en la recepción (decisión de Pablo, 3-nov).
+  let faltaEntrega: string | undefined;
+  if (entrega && !recogido.trim()) faltaEntrega = 'Escribe quién recoge.';
+  else if (entrega && !revisado) faltaEntrega = 'Confirma que revisaste lo que dejó.';
 
   return (
     <section className={card} aria-labelledby="acciones">
@@ -95,8 +99,8 @@ export function OrderActions({ orden }: { orden: Orden }) {
         <>
           <Field label="¿Quién recoge?" value={recogido} onChange={(e) => setRecogido(e.target.value)} />
           <label className="flex min-h-[44px] items-center gap-2">
-            <input type="checkbox" checked={accesorios} onChange={(e) => setAccesorios(e.target.checked)} />
-            Revisé con el cliente los accesorios del checklist
+            <input type="checkbox" checked={revisado} onChange={(e) => setRevisado(e.target.checked)} />
+            Revisé con el cliente lo que dejó (notas de la recepción)
           </label>
         </>
       ) : null}
@@ -105,12 +109,13 @@ export function OrderActions({ orden }: { orden: Orden }) {
         {siguiente ? (
           <Button
             busy={mover.isPending}
+            missing={faltaEntrega}
             onClick={() =>
               mover.mutate({
                 estado: siguiente,
                 version: orden.version,
                 ...(motivo ? { motivo } : {}),
-                ...(entrega ? { recogidoPor: recogido, accesoriosConfirmados: accesorios } : {}),
+                ...(entrega ? { recogidoPor: recogido.trim(), accesoriosConfirmados: revisado } : {}),
               })
             }
           >
@@ -150,7 +155,6 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
   const subir = useAddEvidence(orden.id);
   const [km, setKm] = useState('');
   const [fuel, setFuel] = useState('');
-  const [acc, setAcc] = useState('');
   const [nota, setNota] = useState('');
   const [fotos, setFotos] = useState<File[]>([]);
   const [items, setItems] = useState<ItemRevisado[] | null>(null);
@@ -163,13 +167,13 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
   const marcar = (clave: string, cambio: Partial<ItemRevisado>) =>
     setItems(revisados.map((it) => (it.clave === clave ? { ...it, ...cambio } : it)));
   const abierta = orden.estado !== 'entregado' && orden.estado !== 'cancelada';
+  const moto = c.tipo === 'moto';
 
   const onSave = (e: FormEvent) => {
     e.preventDefault();
     guardar.mutate({
       kilometraje: km === '' ? (c.kilometraje ?? null) : Number(km),
       combustible: fuel === '' ? (c.combustible ?? null) : fuel,
-      accesorios: acc === '' ? c.accesorios : acc.split(',').map((s) => s.trim()).filter(Boolean),
       items: revisados,
     });
   };
@@ -199,19 +203,15 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
             </label>
             <select id="combustible" className={select} value={fuel || c.combustible || ''} onChange={(e) => setFuel(e.target.value)}>
               <option value="">Elige…</option>
-              {Object.entries(combustibles).map(([v, t]) => (
-                <option key={v} value={v}>
-                  {t}
-                </option>
-              ))}
+              {Object.entries(combustibles)
+                .filter(([v]) => moto || v !== 'no_aplica')
+                .map(([v, t]) => (
+                  <option key={v} value={v}>
+                    {t}
+                  </option>
+                ))}
             </select>
           </div>
-          <Field
-            label="Accesorios (separados por coma)"
-            placeholder={c.accesorios.join(', ') || 'gato, llanta de repuesto'}
-            value={acc}
-            onChange={(e) => setAcc(e.target.value)}
-          />
           {revisados.length ? (
             <fieldset className="flex flex-col gap-2 sm:col-span-3">
               <legend className="mb-1 text-[15px] font-extrabold">Revisión al recibir</legend>
@@ -292,7 +292,13 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
           }}
         >
           <div className="min-w-[240px] flex-1">
-            <Field label="Nota (lo que encontraste o cambiaste)" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Rayón en la puerta trasera" />
+            <Field
+              label="Nota (lo que encontraste o cambiaste)"
+              hint="¿Dejó algo (casco, documentos, gato)? Anótalo aquí con foto para devolverlo al entregar."
+              value={nota}
+              onChange={(e) => setNota(e.target.value)}
+              placeholder="Rayón en la puerta trasera"
+            />
           </div>
           <label className="inline-flex min-h-[52px] cursor-pointer items-center rounded-btn border-[1.5px] border-line px-4 font-bold text-primary">
             {fotos.length ? `${fotos.length} foto${fotos.length > 1 ? 's' : ''}` : 'Agregar fotos'}

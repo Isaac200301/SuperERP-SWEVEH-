@@ -5,7 +5,8 @@ name: ci
 on:
   pull_request:
   push:
-    branches: [main, developer]
+    # dev/** = ramas de trabajo de cada uno (dev/pablo…): las pruebas corren en cada push, sin esperar al PR.
+    branches: [main, developer, 'dev/**']
 
 permissions:
   contents: read
@@ -108,6 +109,57 @@ jobs:
             exit 0
           fi
           npx --yes snyk@1.1308.3 test --all-projects --severity-threshold=high
+
+  # La orden de punta a punta en Chromium contra el api sirviendo la SPA (scripts/e2e.sh, igual que `make e2e`).
+  e2e:
+    runs-on: ubuntu-24.04
+    needs: [backend, frontend]
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ci_only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+    env:
+      ADMIN_URL: postgres://postgres:ci_only@localhost:5432/postgres?sslmode=disable
+      MIGRATIONS_DATABASE_URL: postgres://sweveh_migrator:ci_only_roles@localhost:5432/sweveh?sslmode=disable
+      DATABASE_URL: postgres://sweveh_api:ci_only_roles@localhost:5432/sweveh?sslmode=disable
+      WORKER_DATABASE_URL: postgres://sweveh_worker:ci_only_roles@localhost:5432/sweveh?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Roles y base (db/bootstrap/roles.sql, como en local)
+        run: |
+          psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -v migrator_pw=ci_only_roles -v api_pw=ci_only_roles -v worker_pw=ci_only_roles -f db/bootstrap/roles.sql
+          psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE DATABASE sweveh OWNER sweveh_migrator" \
+            -c "REVOKE ALL ON DATABASE sweveh FROM PUBLIC" -c "GRANT CONNECT ON DATABASE sweveh TO sweveh_api, sweveh_worker"
+      - run: go run ./cmd/migrate up
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Recorrido en navegador (Playwright)
+        run: sh scripts/e2e.sh
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e
+          path: |
+            .cache/e2e
+            .cache/e2e-api/api.log
+            .cache/e2e-api/worker.log
+          retention-days: 7
 
   sonar:
     runs-on: ubuntu-24.04

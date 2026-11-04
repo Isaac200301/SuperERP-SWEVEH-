@@ -31,6 +31,7 @@ export const IconOrders = (p: IconProps) => <Base {...p}><path d="M8 4h8l1 3H7z"
 export const IconPlus = (p: IconProps) => <Base {...p}><path d="M12 5v14M5 12h14" /></Base>;
 export const IconLogout = (p: IconProps) => <Base {...p}><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10" /></Base>;
 export const IconCar = (p: IconProps) => <Base {...p}><path d="M4 17v-4l2-5h12l2 5v4" /><path d="M4 13h16" /><circle cx="7.5" cy="17" r="1.8" /><circle cx="16.5" cy="17" r="1.8" /></Base>;
+export const IconChat = (p: IconProps) => <Base {...p}><path d="M4 5h16v11H9l-5 4z" /></Base>;
 export const IconBack = (p: IconProps) => <Base {...p}><path d="M15 6l-6 6 6 6" /></Base>;
 export const IconX = (p: IconProps) => <Base {...p}><path d="M6 6l12 12M18 6L6 18" /></Base>;
 export const IconTool = (p: IconProps) => <Base {...p}><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" /></Base>;

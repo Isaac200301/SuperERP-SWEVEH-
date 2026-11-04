@@ -209,6 +209,32 @@ func (f *Flow) Assign(ctx context.Context, tallerID, orderID shared.ID, actor sh
 	return out, err
 }
 
+// AnswerReceipt guarda la respuesta del cliente a la constancia de recibo (HU-19), con bitácora y evento en la
+// misma transacción. Devuelve false si ya había una respuesta (el cliente pulsó otra vez): no cambia nada.
+func (f *Flow) AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, actor shared.Actor, ok bool, ref string) (bool, error) {
+	var changed bool
+	err := f.uow.Do(ctx, func(ctx context.Context) error {
+		o, err := f.repo.Load(ctx, tallerID, orderID)
+		if err != nil {
+			return err
+		}
+		now := f.clock.Now()
+		if changed, err = o.AnswerReceipt(ok, now); err != nil || !changed {
+			return err
+		}
+		if err := f.repo.SaveReceipt(ctx, o); err != nil {
+			return err
+		}
+		if err := f.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "orden.constancia", Entity: "orden", EntityID: o.ID,
+			After: map[string]any{"respuesta": o.ReceiptAnswer, "ref": ref}, OccurredAt: now}); err != nil {
+			return err
+		}
+		return f.events.Publish(ctx, tallerID, shared.Event{Type: "orders.constancia_respondida", AggregateID: o.ID, OccurredAt: now,
+			Payload: map[string]any{"respuesta": o.ReceiptAnswer, "placa": o.Plate, "numero": o.Number}})
+	})
+	return changed, err
+}
+
 // ChecklistView es el checklist con lo que falta.
 type ChecklistView struct {
 	Checklist       domain.Checklist

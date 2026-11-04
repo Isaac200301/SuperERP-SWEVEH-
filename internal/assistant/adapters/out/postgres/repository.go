@@ -93,8 +93,8 @@ func (Repository) Resolve(ctx context.Context, tallerID, id shared.ID, state str
 
 func (Repository) LogCall(ctx context.Context, tallerID shared.ID, c app.AICall) error {
 	_, err := db.Exec(ctx, `INSERT INTO assistant.llamada_ia (id, taller_id, proveedor, modelo, proposito, tokens_entrada, tokens_salida,
-		costo_micro_usd, latencia_ms, resultado) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		shared.NewID(), tallerID, c.Provider, c.Model, c.Purpose, c.TokensIn, c.TokensOut, c.CostMicroUSD, c.LatencyMs, c.Result)
+		costo_micro_usd, latencia_ms, resultado, mensaje_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		shared.NewID(), tallerID, c.Provider, c.Model, c.Purpose, c.TokensIn, c.TokensOut, c.CostMicroUSD, c.LatencyMs, c.Result, c.MessageID)
 	return err
 }
 

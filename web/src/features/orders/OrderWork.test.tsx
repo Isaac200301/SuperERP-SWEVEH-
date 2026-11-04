@@ -48,13 +48,17 @@ describe('OrderActions (HU-20, HU-25)', () => {
     expect(screen.getAllByLabelText(/Motivo si el cliente aprobó/)).toHaveLength(1);
   });
 
-  it('para entregar pide quién recoge y los accesorios; entregada no muestra acciones', async () => {
+  it('para entregar pide quién recoge y confirmar que revisó lo que dejó; entregada no muestra acciones', async () => {
     const calls = mockApi({ 'GET /me': owner, 'POST /orders/{id}/transition': orden() });
     const { unmount } = renderPage(<OrderActions orden={o({ estado: 'listo' })} />);
-    await userEvent.type(screen.getByLabelText('¿Quién recoge?'), 'Laura');
-    await userEvent.click(screen.getByLabelText(/Revisé con el cliente/));
-    await userEvent.click(screen.getByRole('button', { name: 'Pasar a Entregado' }));
-    await waitFor(() => expect(calls.at(-1)?.body).toMatchObject({ recogidoPor: 'Laura', accesoriosConfirmados: true }));
+    const entregar = () => screen.getByRole('button', { name: /Pasar a Entregado/ });
+    expect(screen.getByText('Escribe quién recoge.')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('¿Quién recoge?'), ' Laura ');
+    expect(screen.getByText('Confirma que revisaste lo que dejó.')).toBeInTheDocument();
+    expect(entregar()).toBeDisabled();
+    await userEvent.click(screen.getByLabelText(/Revisé con el cliente lo que dejó/));
+    await userEvent.click(entregar());
+    await waitFor(() => expect(calls.find((c) => c.method === 'POST')?.body).toMatchObject({ recogidoPor: 'Laura', accesoriosConfirmados: true }));
     unmount();
     renderPage(<OrderActions orden={o({ estado: 'entregado' })} />);
     expect(screen.queryByText('Mover la orden')).not.toBeInTheDocument();
@@ -101,7 +105,6 @@ describe('ReceptionPanel (HU-17, HU-21)', () => {
 
     await userEvent.type(screen.getByLabelText('Kilometraje'), '45a000');
     await userEvent.selectOptions(screen.getByLabelText('Combustible'), '1/2');
-    await userEvent.type(screen.getByLabelText(/Accesorios/), 'gato, llanta');
     // Ítems del taller: luces mal con nota, gato bien.
     const luces = screen.getByRole('radiogroup', { name: 'Luces' });
     await userEvent.click(within(luces).getByRole('radio', { name: 'Mal' }));
@@ -109,7 +112,7 @@ describe('ReceptionPanel (HU-17, HU-21)', () => {
     await userEvent.click(within(screen.getByRole('radiogroup', { name: 'Gato y herramienta' })).getByRole('radio', { name: 'Bien' }));
     await userEvent.click(screen.getByRole('button', { name: 'Guardar checklist' }));
     await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({
-      kilometraje: 45000, combustible: '1/2', accesorios: ['gato', 'llanta'],
+      kilometraje: 45000, combustible: '1/2',
       items: [{ clave: 'luces', nombre: 'Luces', estado: 'mal', nota: 'Stop derecho fundido' }, { clave: 'gato', nombre: 'Gato y herramienta', estado: 'bien' }],
     }));
 
@@ -126,6 +129,24 @@ describe('ReceptionPanel (HU-17, HU-21)', () => {
     const nota = String(calls.filter((c) => c.method === 'POST')[1]?.body);
     expect(nota.match(/name="foto"/g)).toHaveLength(3);
     expect(nota).toContain('Rayón en la puerta');
+  });
+
+  it('en moto ofrece "no aplica" y lo que deja el cliente va como nota con foto (HU-18)', async () => {
+    const moto = { ...checklist, tipo: 'moto', items: [] };
+    const calls = mockApi({ 'GET /orders/{id}/checklist': moto, 'PUT /orders/{id}/checklist': moto, 'GET /orders/{id}/evidence': { evidencias: [] } });
+    renderPage(<ReceptionPanel orden={o({ estado: 'por_recibir' })} />);
+    await userEvent.selectOptions(await screen.findByLabelText('Combustible'), 'no_aplica');
+    expect(screen.queryByLabelText(/Accesorios/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Dejó algo \(casco, documentos, gato\)\? Anótalo aquí con foto/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar checklist' }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ kilometraje: null, combustible: 'no_aplica', items: [] }));
+  });
+
+  it('en carro no ofrece "no aplica"', async () => {
+    mockApi({ 'GET /orders/{id}/checklist': checklist, 'GET /orders/{id}/evidence': { evidencias: [] } });
+    renderPage(<ReceptionPanel orden={o({ estado: 'por_recibir' })} />);
+    expect(await screen.findByLabelText('Combustible')).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'No aplica (moto)' })).not.toBeInTheDocument();
   });
 
   it('una orden cerrada no se edita', async () => {

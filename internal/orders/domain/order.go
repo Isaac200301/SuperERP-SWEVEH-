@@ -73,6 +73,10 @@ type Order struct {
 	PickedUpBy   string
 	CancelReason string
 	ClosedAt     *time.Time
+
+	// Respuesta del cliente a la constancia de recibo (HU-19): "" sin respuesta, conforme u observado.
+	ReceiptAnswer     string
+	ReceiptAnsweredAt *time.Time
 }
 
 // NewOrderInput es lo que llega para abrir una orden (HU-16).

@@ -8,9 +8,49 @@ import (
 
 // Priced es un servicio o repuesto del taller con su precio (nil = sin precio cargado).
 type Priced struct {
-	Name  string
-	Price *int64
-	Kind  string // servicio | repuesto
+	Name    string
+	Price   *int64
+	Kind    string // servicio | repuesto
+	Vehicle string // carro | moto | ambos ("" = ambos)
+}
+
+// CatalogItem es lo que ve el intérprete de la lista del taller: nombre y tipo de vehículo, sin precios (la IA
+// nunca los necesita: el precio lo pone el código, HU-53).
+type CatalogItem struct {
+	Name    string `json:"nombre"`
+	Vehicle string `json:"tipo"`
+}
+
+// Items junta servicios y repuestos sin repetir nombres; un nombre de carro y de moto queda como "ambos".
+func Items(lists ...[]Priced) []CatalogItem {
+	var out []CatalogItem
+	idx := map[string]int{}
+	for _, l := range lists {
+		for _, p := range l {
+			v := p.Vehicle
+			if v == "" {
+				v = "ambos"
+			}
+			if i, ok := idx[p.Name]; ok {
+				if out[i].Vehicle != v {
+					out[i].Vehicle = "ambos"
+				}
+				continue
+			}
+			idx[p.Name] = len(out)
+			out = append(out, CatalogItem{Name: p.Name, Vehicle: v})
+		}
+	}
+	return out
+}
+
+// Names son los nombres de la lista cerrada (enum del esquema y validación).
+func Names(items []CatalogItem) []string {
+	out := make([]string, 0, len(items))
+	for _, i := range items {
+		out = append(out, i.Name)
+	}
+	return out
 }
 
 // Source dice de dónde salió cada dato del borrador (HU-64, RF-19).
@@ -29,6 +69,7 @@ type DraftInput struct {
 	Parts        []Priced
 	NextOpening  string // "mañana a las 7:30 a. m." según el horario (HU-08)
 	HasPlate     bool
+	Attends      string // carro | moto | ambos: lo que atiende el taller (perfil, HU-03)
 }
 
 // Draft es la propuesta para el dueño.
@@ -50,39 +91,71 @@ func Money(v int64) string {
 	return "$" + b.String()
 }
 
-// BuildDraft arma el borrador SOLO con precios, servicios y horario cargados por el taller.
-// Si un servicio no tiene precio dice "el taller te confirma el valor" (HU-07, criterio 2). Nunca inventa.
+// BuildDraft arma el borrador SOLO con precios, servicios y horario cargados por el taller (HU-53).
+// Si un servicio no tiene precio dice "el taller te confirma el valor" (HU-07, criterio 2). Nunca inventa: lo que
+// el cliente pidió y no está en la lista queda como "otro" en las fuentes para el dueño (HU-52, criterio 4).
 func BuildDraft(in DraftInput) Draft {
 	var parts []string
 	var src []Source
 	greet := "¡Hola!"
-	if in.CustomerName != "" {
-		greet = "¡Hola " + strings.Fields(in.CustomerName)[0] + "!"
+	if f := strings.Fields(in.CustomerName); len(f) > 0 {
+		greet = "¡Hola " + f[0] + "!"
+	}
+	vt := in.Intent.Vehicle.Type
+	if vt != "" && (in.Attends == "carro" || in.Attends == "moto") && in.Attends != vt { // HU-52, criterio 3
+		return Draft{Text: fmt.Sprintf("%s Gracias por escribirnos. Por ahora el taller solo atiende %ss, así que no podemos ayudarte con tu %s.",
+			greet, in.Attends, vt), Sources: []Source{{Field: "atiende", Value: in.Attends + "s", Origin: "Perfil del taller"}}}
+	}
+	fits := func(p Priced) bool { return vt == "" || p.Vehicle == "" || p.Vehicle == "ambos" || p.Vehicle == vt }
+	label := func(p Priced) string {
+		if vt == "" && (p.Vehicle == "carro" || p.Vehicle == "moto") {
+			return p.Name + " (" + p.Vehicle + ")"
+		}
+		return p.Name
+	}
+	wanted := map[string]bool{}
+	for _, n := range in.Intent.Services {
+		wanted[Normalize(n)] = true
+	}
+	if in.Intent.Kind == "diagnostico" { // HU-58, criterio 2: no se diagnostica; se ofrece la revisión de lista
+		offer := "Sin revisar el vehículo no te podemos decir qué tiene; el taller te confirma el valor de la revisión."
+		for _, s := range in.Services {
+			n := Normalize(s.Name)
+			if fits(s) && (strings.Contains(n, "revis") || strings.Contains(n, "diagn") || strings.Contains(n, "escan")) {
+				wanted[n] = true
+				offer = "Sin revisar el vehículo no te podemos decir qué tiene; te ofrecemos la revisión."
+				break
+			}
+		}
+		parts = append(parts, offer)
 	}
 	var matched []string
 	for _, s := range in.Services {
-		if !Matches(s.Name, in.Intent.Wants) {
+		if !fits(s) || !wanted[Normalize(s.Name)] {
 			continue
 		}
 		if s.Price != nil {
-			matched = append(matched, fmt.Sprintf("%s cuesta %s de mano de obra", Lower(s.Name), Money(*s.Price)))
-			src = append(src, Source{Field: "precio", Value: Money(*s.Price), Origin: "Servicio: " + s.Name})
+			matched = append(matched, fmt.Sprintf("%s cuesta %s de mano de obra", Lower(label(s)), Money(*s.Price)))
+			src = append(src, Source{Field: "precio", Value: Money(*s.Price), Origin: "Servicio: " + label(s)})
 		} else {
-			matched = append(matched, fmt.Sprintf("para %s el taller te confirma el valor", Lower(s.Name)))
-			src = append(src, Source{Field: "precio", Value: "sin precio", Origin: "Servicio: " + s.Name})
+			matched = append(matched, fmt.Sprintf("para %s el taller te confirma el valor", Lower(label(s))))
+			src = append(src, Source{Field: "precio", Value: "sin precio", Origin: "Servicio: " + label(s)})
 		}
 	}
 	for _, p := range in.Parts {
-		if !Matches(p.Name, in.Intent.Wants) || p.Price == nil {
+		if !fits(p) || !wanted[Normalize(p.Name)] || p.Price == nil {
 			continue
 		}
 		matched = append(matched, fmt.Sprintf("el repuesto %s vale %s", p.Name, Money(*p.Price)))
 		src = append(src, Source{Field: "precio", Value: Money(*p.Price), Origin: "Inventario: " + p.Name})
-		break
 	}
 	if len(matched) > 0 {
 		parts = append(parts, Capitalize(strings.Join(matched, "; "))+".")
-	} else if in.Intent.Kind == "cotizar" {
+	}
+	for _, o := range in.Intent.Others {
+		src = append(src, Source{Field: "otro", Value: o, Origin: "No está en la lista del taller"})
+	}
+	if len(in.Intent.Others) > 0 || (len(matched) == 0 && in.Intent.Kind == "cotizar") {
 		parts = append(parts, "Para darte el valor exacto el taller necesita revisar el vehículo; el taller te confirma el valor.")
 	}
 	if (in.Intent.ForDate != "" || in.Intent.Kind == "cita") && in.NextOpening != "" {

@@ -7,6 +7,7 @@ import (
 	"context"
 	"io/fs"
 	"log/slog"
+	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -133,6 +134,8 @@ var errRouteNotFound = shared.NotFound("ruta_no_encontrada", "Esa ruta no existe
 // spa sirve el frontend compilado y devuelve index.html para las rutas del cliente (mismo origen, ADR-18).
 // os.DirFS tiene raíz en dir y rechaza nombres con "..": no se puede salir de la carpeta.
 func spa(dir string) http.HandlerFunc {
+	// El manifest de la PWA (HU-23): Go no conoce la extensión y lo serviría como texto.
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 	root := os.DirFS(dir)
 	files := http.FileServerFS(root)
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -141,10 +144,14 @@ func spa(dir string) http.HandlerFunc {
 			return
 		}
 		name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+		// Los archivos con hash (assets/) no cambian nunca; lo de nombre fijo (index.html, sw.js, manifest)
+		// se revalida para que la PWA del piso tome la versión nueva.
+		cache := "no-cache"
+		if strings.HasPrefix(name, "assets/") {
+			cache = "public, max-age=31536000, immutable"
+		}
 		if st, err := fs.Stat(root, name); err == nil && !st.IsDir() {
-			if strings.HasPrefix(name, "assets/") {
-				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-			}
+			w.Header().Set("Cache-Control", cache)
 			files.ServeHTTP(w, r)
 			return
 		}

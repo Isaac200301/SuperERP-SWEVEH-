@@ -75,7 +75,10 @@ func firstName(n string) string {
 }
 
 // OnStateChanged reacciona al cambio de estado de la orden: AU-01 (Recibido) y AU-03 (Listo) (HU-48).
-func (s *Service) OnStateChanged(ctx context.Context, tallerID, orderID shared.ID, to, eventKey string) error {
+// Cada aviso sale una sola vez por orden: si la orden se devuelve y vuelve a pasar por Listo, no se repite
+// (HU-48, criterio 2). La clave no es el id del evento, que cambia en cada paso.
+func (s *Service) OnStateChanged(ctx context.Context, tallerID, orderID shared.ID, to string) error {
+	key := "orden:" + orderID.String()
 	var o OrderInfo
 	if err := s.uow.Do(ctx, func(ctx context.Context) error {
 		var err error
@@ -86,7 +89,7 @@ func (s *Service) OnStateChanged(ctx context.Context, tallerID, orderID shared.I
 	}
 	switch to {
 	case "recibido":
-		return s.fire(ctx, tallerID, "AU-01", eventKey, o, func(w Workshop, c Customer, t string) (string, []Button, error) {
+		return s.fire(ctx, tallerID, "AU-01", key, o, func(w Workshop, c Customer, t string) (string, []Button, error) {
 			d := s.base(w, c, o)
 			d["km"] = "sin registrar"
 			if o.Km != nil {
@@ -95,10 +98,12 @@ func (s *Service) OnStateChanged(ctx context.Context, tallerID, orderID shared.I
 			if len(o.Exceptions) > 0 {
 				d["salvedades"] = "Anotamos: " + strings.Join(o.Exceptions, "; ") + ". "
 			}
-			return domain.Render(t, d), nil, nil
+			// HU-19: el cliente confirma la constancia o avisa que algo no cuadra (máx. 20 caracteres, DR-08).
+			id := orderID.String()
+			return domain.Render(t, d), []Button{{ID: "recibo:ok:" + id, Title: "Está bien"}, {ID: "recibo:revisar:" + id, Title: "Algo no cuadra"}}, nil
 		})
 	case "listo":
-		return s.fire(ctx, tallerID, "AU-03", eventKey, o, func(w Workshop, c Customer, t string) (string, []Button, error) {
+		return s.fire(ctx, tallerID, "AU-03", key, o, func(w Workshop, c Customer, t string) (string, []Button, error) {
 			d := s.base(w, c, o)
 			d["horario"] = s.ScheduleText(w, s.clock.Now())
 			d["total"] = "por confirmar"
@@ -116,8 +121,10 @@ func (s *Service) OnStateChanged(ctx context.Context, tallerID, orderID shared.I
 	return nil
 }
 
-// OnQuoteSent envía la cotización con botones Aprobar / Tengo dudas (AU-02, HU-28).
-func (s *Service) OnQuoteSent(ctx context.Context, tallerID, orderID shared.ID, eventKey string) error {
+// OnQuoteSent envía la cotización con botones Aprobar / Tengo dudas (AU-02, HU-28). Una vez por cotización
+// (número): reintentar el evento no la repite, pero una cotización nueva de la misma orden sí se avisa.
+func (s *Service) OnQuoteSent(ctx context.Context, tallerID, orderID shared.ID, quoteNumber int) error {
+	key := "cotizacion:" + orderID.String() + ":" + itoa(quoteNumber)
 	var o OrderInfo
 	if err := s.uow.Do(ctx, func(ctx context.Context) error {
 		var err error
@@ -126,7 +133,7 @@ func (s *Service) OnQuoteSent(ctx context.Context, tallerID, orderID shared.ID, 
 	}); err != nil {
 		return err
 	}
-	return s.fire(ctx, tallerID, "AU-02", eventKey, o, func(w Workshop, c Customer, t string) (string, []Button, error) {
+	return s.fire(ctx, tallerID, "AU-02", key, o, func(w Workshop, c Customer, t string) (string, []Button, error) {
 		q, err := s.quotes.ForOrder(ctx, tallerID, orderID)
 		if err != nil {
 			return "", nil, err

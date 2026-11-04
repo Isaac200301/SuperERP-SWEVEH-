@@ -15,6 +15,8 @@ type FlowRepository interface {
 	Load(ctx context.Context, tallerID, id shared.ID) (domain.Order, error)
 	SaveState(ctx context.Context, o domain.Order, prevVersion int) error
 	SaveAssignment(ctx context.Context, o domain.Order) error
+	// SaveReceipt guarda la respuesta a la constancia solo si no había una (la primera manda, HU-19).
+	SaveReceipt(ctx context.Context, o domain.Order) error
 	MarkExample(ctx context.Context, tallerID, id shared.ID) error
 	InsertHistory(ctx context.Context, tallerID, orderID shared.ID, from *domain.State, to domain.State, by *shared.ID, reason string, at time.Time) error
 	List(ctx context.Context, f ListFilter) ([]domain.Order, error)

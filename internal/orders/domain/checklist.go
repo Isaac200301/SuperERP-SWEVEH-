@@ -14,8 +14,6 @@ var (
 	CarSides  = []string{"frente", "trasera", "izquierdo", "derecho"}
 	MotoSides = []string{"frente", "trasera", "izquierdo", "derecho", "tablero"}
 	Fuels     = []string{"vacio", "1/4", "1/2", "3/4", "lleno", "no_aplica"}
-	// Accesorios entregados en moto (HU-18); en carro se anotan como objetos.
-	MotoAccessories = []string{"casco", "baul", "maletas", "documentos"}
 )
 
 // MinPhotos es el mínimo por defecto; cada taller lo ajusta en sus parámetros (ReceptionRules).

@@ -33,10 +33,13 @@ type orderRow struct {
 	EntregadoA *string    `db:"entregado_a"`
 	MotivoCanc *string    `db:"motivo_cancelacion"`
 	CerradaEn  *time.Time `db:"cerrada_en"`
+	Recibo     *string    `db:"recibo_respuesta"`
+	ReciboEn   *time.Time `db:"recibo_respondido_en"`
 }
 
 const orderCols = `id, taller_id, numero, vehiculo_id, cliente_id, placa, tipo_vehiculo, estado, sintoma, version, created_at,
-	created_by, mecanico_id, fecha_prometida, ejemplo, entregado_a, motivo_cancelacion, cerrada_en`
+	created_by, mecanico_id, fecha_prometida, ejemplo, entregado_a, motivo_cancelacion, cerrada_en, recibo_respuesta,
+	recibo_respondido_en`
 
 func (r orderRow) domain() domain.Order {
 	o := domain.Order{ID: r.ID, TallerID: r.TallerID, Number: r.Numero, VehicleID: r.VehiculoID, CustomerID: r.ClienteID,
@@ -50,6 +53,9 @@ func (r orderRow) domain() domain.Order {
 	}
 	if r.MotivoCanc != nil {
 		o.CancelReason = *r.MotivoCanc
+	}
+	if r.Recibo != nil {
+		o.ReceiptAnswer, o.ReceiptAnsweredAt = *r.Recibo, r.ReciboEn
 	}
 	return o
 }
@@ -73,6 +79,13 @@ func (Flow) SaveState(ctx context.Context, o domain.Order, prev int) error {
 	if err == nil && n == 0 {
 		return shared.ErrVersionConflict
 	}
+	return err
+}
+
+func (Flow) SaveReceipt(ctx context.Context, o domain.Order) error {
+	_, err := db.Exec(ctx, `UPDATE orders.orden SET recibo_respuesta = $3, recibo_respondido_en = $4, updated_at = now()
+		WHERE taller_id = $1 AND id = $2 AND recibo_respuesta IS NULL`,
+		o.TallerID, o.ID, o.ReceiptAnswer, o.ReceiptAnsweredAt)
 	return err
 }
 

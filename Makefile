@@ -9,7 +9,7 @@ GITLEAKS_IMAGE  := zricethezav/gitleaks:v8.30.1
 -include .env
 export
 
-.PHONY: help up down dev dev-api dev-worker dev-web migrate migrate-down gen gen-check lint test test-go test-web cover vuln secrets ci build image e2e seed-demo reset-demo
+.PHONY: help up down dev dev-api dev-worker dev-web agent-eval migrate migrate-down gen gen-check lint test test-go test-web cover vuln secrets ci build image e2e seed-demo reset-demo
 
 help: ## Lista los comandos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -40,6 +40,9 @@ dev-worker: ## Corre el worker en local
 
 dev-web: ## Corre el frontend con Vite
 	npm --prefix web run dev
+
+agent-eval: ## Mide el intérprete configurado (AI_PROVIDER) con los 30 mensajes de HU-102
+	go run ./cmd/agent-eval
 
 gen: ## Regenera sqlc y los tipos TypeScript del contrato OpenAPI
 	docker run --rm -v "$(CURDIR):/src" -w /src $(SQLC_IMAGE) generate
@@ -80,8 +83,8 @@ build: ## Compila los binarios y el frontend
 image: ## Construye la imagen de contenedor
 	docker build -f deploy/Dockerfile -t sweveh:local .
 
-e2e: ## Playwright (pendiente: llega con el recorrido de la demo, T5)
-	@echo "make e2e todavía no existe: las pruebas Playwright llegan con el guion de la demo (docs/05, T5)." >&2; exit 1
+e2e: migrate ## Playwright: la orden de punta a punta con el api sirviendo la SPA (scripts/e2e.sh)
+	sh scripts/e2e.sh
 
 seed-demo: ## Taller ficticio (pendiente: HU-97/HU-98)
 	@echo "make seed-demo todavía no existe: llega con HU-97 y HU-98 (T5)." >&2; exit 1

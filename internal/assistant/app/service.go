@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -30,10 +31,13 @@ type Taller interface {
 	StatusReply(ctx context.Context, tallerID shared.ID, o Order, c Customer) (string, bool, error) // texto, AU-05 encendida
 	AgentOn(ctx context.Context, tallerID shared.ID) (bool, error)
 	RespondQuote(ctx context.Context, tallerID, orderID shared.ID, decision, ref string) error
+	// AnswerReceipt guarda "Está bien" (ok) o "Algo no cuadra" de la constancia; false si ya había respuesta.
+	AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, ok bool, ref string) (bool, error)
 	CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string) (string, error)
 
 	Catalog(ctx context.Context, tallerID shared.ID) ([]domain.Priced, []domain.Priced, error) // servicios, repuestos
 	Workshop(ctx context.Context, tallerID shared.ID) (name string, open bool, nextOpening string, err error)
+	Attends(ctx context.Context, tallerID shared.ID) (string, error) // carro | moto | ambos
 }
 
 type Inbound struct {
@@ -93,12 +97,37 @@ type Action struct {
 	} `json:"crearOrden,omitempty"`
 }
 
-// AICall es el registro de cada llamada al clasificador (HU-99).
+// AICall es el registro de cada llamada al intérprete (HU-99), ligada al mensaje que la originó.
 type AICall struct {
+	MessageID                        *shared.ID
 	Provider, Model, Purpose, Result string
 	TokensIn, TokensOut, LatencyMs   int
 	CostMicroUSD                     int64
 }
+
+// Interpreter es el puerto LLMProvider (docs/06 §5, ADR-0026): una llamada por mensaje que devuelve el JSON crudo
+// de domain.Understanding. El código lo valida antes de usarlo; el adaptador no decide nada (RNF-05, RNF-06).
+type Interpreter interface {
+	Interpret(ctx context.Context, r InterpretRequest) (InterpretResult, error)
+}
+
+// InterpretRequest es lo que ve la IA: el texto del cliente y la lista cerrada de servicios del taller.
+// Sin datos personales del cliente (nombre, celular): no hacen falta para interpretar (AQ-10).
+type InterpretRequest struct {
+	Text, Workshop, Attends string
+	Catalog                 []domain.CatalogItem
+}
+
+// InterpretResult es la salida cruda con su costo.
+type InterpretResult struct {
+	Raw                 []byte
+	Provider, Model     string
+	TokensIn, TokensOut int
+	CostMicroUSD        int64
+}
+
+// AITimeout es lo máximo que se espera a la IA (HU-54, criterio 2).
+const AITimeout = 30 * time.Second
 
 type Repository interface {
 	InsertDraft(ctx context.Context, d DraftRecord) error
@@ -124,11 +153,13 @@ type Service struct {
 	taller Taller
 	audit  AuditLog
 	clock  Clock
+	ai     Interpreter
+	free   Interpreter // reglas: respaldo sin costo cuando se agota el tope mensual
 	capUSD int64
 }
 
-func NewService(u UnitOfWork, r Repository, t Taller, a AuditLog, c Clock, monthlyCapMicroUSD int64) *Service {
-	return &Service{uow: u, repo: r, taller: t, audit: a, clock: c, capUSD: monthlyCapMicroUSD}
+func NewService(u UnitOfWork, r Repository, t Taller, a AuditLog, c Clock, ai, free Interpreter, monthlyCapMicroUSD int64) *Service {
+	return &Service{uow: u, repo: r, taller: t, audit: a, clock: c, ai: ai, free: free, capUSD: monthlyCapMicroUSD}
 }
 
 // Textos de plantilla (llenos con datos; no son redacción de IA, por eso pueden salir solos, RF-18).
@@ -142,6 +173,9 @@ const (
 	quoteOK     = "¡Listo! Quedó aprobada la cotización. Empezamos con tu vehículo y te avisamos cuando esté."
 	quoteAsk    = "Claro, una persona del taller te escribe para resolver tus dudas sobre la cotización."
 	whichText   = "¿Sobre cuál vehículo me preguntas?"
+	receiptOK   = "¡Gracias! Quedó registrado que el recibo está bien. Te avisamos cada avance."
+	receiptAsk  = "Gracias por avisarnos. Una persona del taller te escribe para revisarlo contigo."
+	cantAnswer  = "No pudimos armar una respuesta segura. Responde tú."
 )
 
 // HandleInbound procesa un mensaje entrante (lo llama el worker al recibir "messaging.mensaje_recibido").
@@ -235,6 +269,8 @@ func (s *Service) button(ctx context.Context, tallerID shared.ID, in Inbound, c 
 		}
 		_, err = s.taller.Send(ctx, tallerID, in.Phone, reply, nil, "AU-02", &oid)
 		return err
+	case strings.HasPrefix(in.ButtonID, "recibo:ok:") || strings.HasPrefix(in.ButtonID, "recibo:revisar:"):
+		return s.receipt(ctx, tallerID, in, c)
 	case strings.HasPrefix(in.ButtonID, "estado:"):
 		oid, err := shared.ParseID(strings.TrimPrefix(in.ButtonID, "estado:"))
 		if err != nil || c == nil {
@@ -249,6 +285,29 @@ func (s *Service) button(ctx context.Context, tallerID shared.ID, in Inbound, c 
 		return s.human(ctx, tallerID, in)
 	}
 	return nil
+}
+
+// receipt registra la respuesta a la constancia (HU-19). "Algo no cuadra" pasa la conversación a una persona y la
+// orden queda marcada para el dueño. Si el cliente ya había respondido, no se repite nada.
+func (s *Service) receipt(ctx context.Context, tallerID shared.ID, in Inbound, c *Customer) error {
+	ok := strings.HasPrefix(in.ButtonID, "recibo:ok:")
+	oid, err := shared.ParseID(in.ButtonID[strings.LastIndex(in.ButtonID, ":")+1:])
+	if err != nil || c == nil {
+		return nil
+	}
+	changed, err := s.taller.AnswerReceipt(ctx, tallerID, oid, ok, in.ID.String())
+	if err != nil || !changed {
+		return err
+	}
+	reply := receiptOK
+	if !ok {
+		reply = receiptAsk
+		if err := s.taller.SetMode(ctx, tallerID, in.ConversationID, "humano", true); err != nil {
+			return err
+		}
+	}
+	_, err = s.taller.Send(ctx, tallerID, in.Phone, reply, nil, "AU-01", &oid)
+	return err
 }
 
 func (s *Service) human(ctx context.Context, tallerID shared.ID, in Inbound) error {
@@ -288,11 +347,23 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 	if in.Kind != "texto" {
 		return nil
 	}
-	start := s.clock.Now()
-	intent, err := s.classify(ctx, tallerID, in.Text, start)
+	services, parts, err := s.taller.Catalog(ctx, tallerID)
 	if err != nil {
 		return err
 	}
+	attends, err := s.taller.Attends(ctx, tallerID)
+	if err != nil {
+		return err
+	}
+	u, ok, err := s.interpret(ctx, tallerID, in, InterpretRequest{Text: in.Text, Workshop: name, Attends: attends,
+		Catalog: domain.Items(services, parts)})
+	if err != nil {
+		return err
+	}
+	if !ok { // salida inválida, error o tiempo vencido: no sale nada de la IA (HU-54)
+		return s.saveDraft(ctx, tallerID, in, "otro", cantAnswer, nil, nil, "plantilla")
+	}
+	intent := u.ToIntent(in.Text)
 	if !open { // HU-61: aviso de fuera de horario (una vez por mensaje) y se sigue con el borrador
 		if _, err := s.taller.Send(ctx, tallerID, in.Phone, sprintf(closedTxt, nextOpening), nil, "AU-04", nil); err != nil {
 			return err
@@ -301,9 +372,8 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 	switch intent.Kind {
 	case "humano":
 		return s.human(ctx, tallerID, in)
-	case "fuera_tema":
-		_, err := s.taller.Send(ctx, tallerID, in.Phone, sprintf(offTopicTxt, name), nil, "AU-04", nil)
-		return err
+	case "fuera_tema": // HU-58: borrador de plantilla; el dueño decide si lo envía
+		return s.saveDraft(ctx, tallerID, in, "fuera_tema", sprintf(offTopicTxt, name), nil, nil, "plantilla")
 	case "estado":
 		orders, err := s.taller.OpenOrders(ctx, tallerID, c.ID)
 		if err != nil {
@@ -319,10 +389,10 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 		switch {
 		case len(orders) == 1:
 			return s.status(ctx, tallerID, in, c, orders[0])
-		case len(orders) > 1: // HU-57
+		case len(orders) > 1: // HU-57: botones con las placas; de 4 en adelante el canal manda una lista
 			var btns []Button
 			for i, o := range orders {
-				if i == 3 {
+				if i == 10 {
 					break
 				}
 				btns = append(btns, Button{ID: "estado:" + o.ID.String(), Title: o.Plate})
@@ -330,10 +400,6 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 			_, err := s.taller.Send(ctx, tallerID, in.Phone, whichText, btns, "AU-05", nil)
 			return err
 		}
-	}
-	services, parts, err := s.taller.Catalog(ctx, tallerID)
-	if err != nil {
-		return err
 	}
 	var action *Action
 	if intent.Plate != "" { // HU-55: la placa crea la orden "Por recibir" cuando el dueño envía
@@ -356,7 +422,7 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 				Symptom string `json:"sintoma"`
 			}{Plate: intent.Plate, Symptom: sym}}
 			// La placa sola no repite la cotización: se confirma la recepción.
-			if len(intent.Wants) <= 1 {
+			if len(intent.Services)+len(intent.Others) == 0 {
 				d := domain.Draft{Text: "¡Gracias " + firstName(c.Name) + "! Te dejamos registrada la placa " + intent.Plate + ". Te esperamos " +
 					strings.TrimSuffix(nextOpening, ".") + "."}
 				return s.saveDraft(ctx, tallerID, in, "placa", d.Text, d.Sources, action, "ia")
@@ -364,10 +430,10 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 		}
 	}
 	d := domain.BuildDraft(domain.DraftInput{CustomerName: c.Name, Workshop: name, Intent: intent, Services: services, Parts: parts,
-		NextOpening: nextOpening, HasPlate: intent.Plate != ""})
+		NextOpening: nextOpening, HasPlate: intent.Plate != "", Attends: attends})
 	if err := domain.Validate(d.Text, append(services, parts...)); err != nil {
 		// Lo que no valida no sale: pasa a "Lo contesto yo" (RF-17).
-		return s.saveDraft(ctx, tallerID, in, intent.Kind, "No pudimos armar una respuesta segura. Responde tú.", nil, nil, "plantilla")
+		return s.saveDraft(ctx, tallerID, in, intent.Kind, cantAnswer, nil, nil, "plantilla")
 	}
 	return s.saveDraft(ctx, tallerID, in, intent.Kind, d.Text, d.Sources, action, "ia")
 }
@@ -379,23 +445,54 @@ func firstName(n string) string {
 	return n
 }
 
-// classify registra la llamada (HU-99) y respeta el tope mensual por taller (R-08).
-func (s *Service) classify(ctx context.Context, tallerID shared.ID, text string, start time.Time) (domain.Intent, error) {
-	var intent domain.Intent
-	err := s.uow.Do(ctx, func(ctx context.Context) error {
-		spent, err := s.repo.MonthCost(ctx, tallerID, monthStart(start))
-		if err != nil {
-			return err
+// interpret hace la única llamada al intérprete (RNF-05) fuera de la transacción, con límite de 30 s, y la
+// registra (HU-99). Con el tope mensual del taller agotado usa las reglas (sin costo). ok=false si la salida no
+// cumple el esquema o la IA falló: el llamador deja la tarjeta para el dueño (HU-54).
+func (s *Service) interpret(ctx context.Context, tallerID shared.ID, in Inbound, req InterpretRequest) (domain.Understanding, bool, error) {
+	var spent int64
+	if err := s.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		spent, err = s.repo.MonthCost(ctx, tallerID, monthStart(s.clock.Now()))
+		return err
+	}); err != nil {
+		return domain.Understanding{}, false, err
+	}
+	ai, result := s.ai, "ok"
+	if spent >= s.capUSD {
+		ai, result = s.free, "tope"
+	}
+	start := time.Now()
+	cctx, cancel := context.WithTimeout(ctx, AITimeout)
+	r, err := ai.Interpret(cctx, req)
+	cancel()
+	latency := int(time.Since(start).Milliseconds())
+	var u domain.Understanding
+	switch {
+	case err != nil && errors.Is(err, domain.ErrInvalidOutput):
+		result = "invalido"
+	case err != nil:
+		result = "error"
+	default:
+		if u, err = domain.ParseUnderstanding(r.Raw, req.Text, domain.Names(req.Catalog)); err != nil {
+			result = "invalido"
 		}
-		result := "ok"
-		if spent >= s.capUSD {
-			result = "tope"
-		}
-		intent = domain.Classify(text)
-		return s.repo.LogCall(ctx, tallerID, AICall{Provider: "reglas", Model: "reglas-v1", Purpose: "clasificar", Result: result,
-			LatencyMs: int(s.clock.Now().Sub(start).Milliseconds())})
-	})
-	return intent, err
+	}
+	if r.Provider == "" {
+		r.Provider = "desconocido"
+	}
+	if r.Model == "" {
+		r.Model = "desconocido"
+	}
+	id := in.ID
+	call := AICall{MessageID: &id, Provider: r.Provider, Model: r.Model, Purpose: "interpretar", Result: result, TokensIn: r.TokensIn,
+		TokensOut: r.TokensOut, LatencyMs: latency, CostMicroUSD: r.CostMicroUSD}
+	if lerr := s.uow.Do(ctx, func(ctx context.Context) error { return s.repo.LogCall(ctx, tallerID, call) }); lerr != nil {
+		return u, false, lerr
+	}
+	if ctx.Err() != nil { // el worker se está cerrando: se reintenta después
+		return u, false, ctx.Err()
+	}
+	return u, result == "ok" || result == "tope", nil
 }
 
 func monthStart(t time.Time) time.Time {

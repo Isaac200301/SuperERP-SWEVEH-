@@ -32,6 +32,11 @@ export function DashboardPage() {
                     Ver orden
                   </Link>
                 ) : null}
+                {p.conversacionId ? (
+                  <Link className="font-bold underline" to={`/panel/conversaciones/${p.conversacionId}`}>
+                    Atender
+                  </Link>
+                ) : null}
                 {p.tipo === 'inventario' ? (
                   <Link className="font-bold underline" to="/panel/repuestos?bajo=1">
                     Ver repuestos

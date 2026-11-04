@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	assistantapp "sweveh/internal/assistant/app"
@@ -47,14 +48,34 @@ func (t *taller) PreviousText(ctx context.Context, tallerID, convID shared.ID, b
 	if err != nil {
 		return nil, err
 	}
-	for i := len(msgs) - 1; i >= 0; i-- {
-		m := msgs[i]
-		if m.Direction == "entrante" && m.Kind == "texto" && m.CreatedAt.Before(before) {
-			in, err := t.Message(ctx, tallerID, m.ID)
-			return &in, err
+	// Lo que el cliente escribió mientras esperaba la autorización: los textos desde la última respuesta a una
+	// autorización anterior (gracias / sin autorización) hasta ahora. Se procesan juntos y en orden, para no
+	// perder la pregunta original (HU-85) ni crear un borrador por cada "¿hola?".
+	var since time.Time
+	for _, m := range msgs {
+		if m.Direction == "saliente" && m.Automation != nil && *m.Automation == "consentimiento" && m.Kind == "texto" && m.CreatedAt.Before(before) {
+			since = m.CreatedAt
 		}
 	}
-	return nil, nil
+	var first *assistantapp.Inbound
+	var texts []string
+	for _, m := range msgs {
+		if m.Direction != "entrante" || m.Kind != "texto" || !m.CreatedAt.After(since) || !m.CreatedAt.Before(before) {
+			continue
+		}
+		if first == nil {
+			in, err := t.Message(ctx, tallerID, m.ID)
+			if err != nil {
+				return nil, err
+			}
+			first = &in
+		}
+		texts = append(texts, m.Body)
+	}
+	if first != nil {
+		first.Text = strings.Join(texts, "\n")
+	}
+	return first, nil
 }
 
 func (t *taller) ConsentAsked(ctx context.Context, tallerID, convID shared.ID) (bool, error) {
@@ -161,6 +182,10 @@ func (t *taller) RespondQuote(ctx context.Context, tallerID, orderID shared.ID, 
 	return t.s.M.QuotesF.Respond(ctx, tallerID, orderID, decision, "whatsapp", ref, agent)
 }
 
+func (t *taller) AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, ok bool, ref string) (bool, error) {
+	return t.s.M.OrdersF.AnswerReceipt(ctx, tallerID, orderID, agent, ok, ref)
+}
+
 // CreateOrderFromPlate crea vehículo (motor pendiente) y orden "Por recibir" (HU-55, HU-91).
 func (t *taller) CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string) (string, error) {
 	var code string
@@ -184,14 +209,23 @@ func (t *taller) Catalog(ctx context.Context, tallerID shared.ID) ([]domain.Pric
 		return nil, nil, err
 	}
 	for _, i := range items {
-		sv = append(sv, domain.Priced{Name: i.Name, Price: i.Price, Kind: "servicio"})
+		sv = append(sv, domain.Priced{Name: i.Name, Price: i.Price, Kind: "servicio", Vehicle: i.Kind})
 	}
 	parts, err := t.s.M.Inventory.Search(ctx, tallerID, "", false, "")
 	for _, p := range parts {
 		price := p.Price
-		pt = append(pt, domain.Priced{Name: p.Name, Price: &price, Kind: "repuesto"})
+		pt = append(pt, domain.Priced{Name: p.Name, Price: &price, Kind: "repuesto", Vehicle: p.Kind})
 	}
 	return sv, pt, err
+}
+
+// Attends es lo que atiende el taller según su perfil (carro, moto o ambos; vacío = ambos).
+func (t *taller) Attends(ctx context.Context, tallerID shared.ID) (string, error) {
+	st, err := t.s.M.Admin.Get(ctx, tallerID)
+	if err != nil || st.Profile.Attends == "" {
+		return "ambos", err
+	}
+	return st.Profile.Attends, nil
 }
 
 var dayKeys = []string{"dom", "lun", "mar", "mie", "jue", "vie", "sab"}

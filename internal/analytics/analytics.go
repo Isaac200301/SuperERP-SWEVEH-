@@ -32,6 +32,24 @@ type Extra interface {
 	PendingDrafts(ctx context.Context, tallerID shared.ID) (int, error)
 	LowStock(ctx context.Context, tallerID shared.ID) ([]inventory.Part, error)
 	CustomerNames(ctx context.Context, tallerID shared.ID, ids []shared.ID) (map[shared.ID]string, error)
+	// FailedNotices son los avisos automáticos que WhatsApp no entregó desde since (HU-46).
+	FailedNotices(ctx context.Context, tallerID shared.ID, since time.Time) ([]FailedNotice, error)
+	// HumanRequests son las conversaciones en las que el cliente pidió una persona y nadie la ha cerrado (HU-59).
+	HumanRequests(ctx context.Context, tallerID shared.ID) ([]HumanRequest, error)
+}
+
+// HumanRequest es una conversación esperando a una persona del taller.
+type HumanRequest struct {
+	ConversationID shared.ID
+	Phone          string
+}
+
+// FailedNotice es un aviso que no salió: qué automatización, de qué orden y por qué.
+type FailedNotice struct {
+	Name    string
+	OrderID *shared.ID
+	Detail  string
+	At      time.Time
 }
 
 type Handler struct {
@@ -186,6 +204,7 @@ type Pending struct {
 	Title   string  `json:"titulo"`
 	Detail  string  `json:"detalle"`
 	OrderID *string `json:"ordenId,omitempty"`
+	ConvID  *string `json:"conversacionId,omitempty"`
 	Tone    string  `json:"tono"` // err | warn | info
 }
 
@@ -236,6 +255,37 @@ func (h *Handler) today(r *http.Request, p reqctx.Principal) (int, any, error) {
 			if n > 0 {
 				out = append(out, Pending{Kind: "borradores", Title: fmt.Sprintf("%d borradores por revisar", n), Detail: "Respuestas del agente esperando tu revisión", Tone: "info"})
 			}
+		}
+		observed, err := h.orders.ObservedReceipts(ctx, p.TallerID)
+		if err != nil {
+			return err
+		}
+		for _, o := range observed {
+			id := o.ID.String()
+			out = append(out, Pending{Kind: "constancia_observada", Title: fmt.Sprintf("%s: el cliente dice que algo no cuadra", o.Plate),
+				Detail: fmt.Sprintf("%s · revisa el recibo con el cliente", o.Code), OrderID: &id, Tone: "err"})
+		}
+		humans, err := h.extra.HumanRequests(ctx, p.TallerID)
+		if err != nil {
+			return err
+		}
+		for _, hr := range humans {
+			id := hr.ConversationID.String()
+			out = append(out, Pending{Kind: "pide_humano", Title: fmt.Sprintf("%s pidió hablar con una persona", shared.NationalNumber(hr.Phone)),
+				Detail: "El asistente no le responde hasta que lo devuelvas.", ConvID: &id, Tone: "err"})
+		}
+		failed, err := h.extra.FailedNotices(ctx, p.TallerID, now.AddDate(0, 0, -7))
+		if err != nil {
+			return err
+		}
+		for _, f := range failed {
+			pend := Pending{Kind: "aviso_fallido", Title: fmt.Sprintf("No salió el aviso «%s»", f.Name),
+				Detail: "WhatsApp no lo entregó. Escríbele al cliente por otro medio.", Tone: "err"}
+			if f.OrderID != nil {
+				id := f.OrderID.String()
+				pend.OrderID = &id
+			}
+			out = append(out, pend)
 		}
 		low, err := h.extra.LowStock(ctx, p.TallerID)
 		if err != nil {
