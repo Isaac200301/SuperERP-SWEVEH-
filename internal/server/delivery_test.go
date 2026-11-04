@@ -9,9 +9,10 @@ import (
 	"sweveh/internal/platform/testdb"
 )
 
-// HU-25: entregar pide quién recoge y la confirmación de accesorios; la orden se cierra, sale de las abiertas,
-// entra al cálculo de ticket y tiempo, y la bitácora guarda quién recogió y qué se devolvió.
-func TestDelivery_PickupAccessoriesAndClose(t *testing.T) {
+// HU-25: entregar pide quién recoge y la confirmación de que se revisó lo que dejó el cliente (va en las notas de la
+// recepción, decisión de Pablo 3-nov); la orden se cierra, sale de las abiertas, entra al cálculo de ticket y tiempo,
+// y la bitácora guarda quién recogió.
+func TestDelivery_PickupConfirmationAndClose(t *testing.T) {
 	e := newEnv(t)
 	c := e.register("3105550380", "Pablo Rodríguez")
 	id, _ := orderInDiagnosis(t, c, "ENT381", 1)
@@ -20,7 +21,6 @@ func TestDelivery_PickupAccessoriesAndClose(t *testing.T) {
 		body["version"] = r2v(c, id)
 		return c.do("POST", base+"/transition", body)
 	}
-	c.must(http.StatusOK, c.do("PUT", base+"/checklist", map[string]any{"accesorios": []string{"Gato", "Documentos"}}))
 	q := base + "/quote"
 	c.must(http.StatusOK, c.do("POST", q+"/lines", map[string]any{"tipo": "servicio", "descripcion": "Mano de obra", "cantidad": 1, "precioUnitario": 50000}))
 	c.must(http.StatusOK, c.do("POST", q+"/send", nil))
@@ -49,7 +49,7 @@ func TestDelivery_PickupAccessoriesAndClose(t *testing.T) {
 	}
 	// Ya cerrada no vuelve a moverse ni acepta cambios en el checklist.
 	is4xx(t, "mover una entregada", tr(map[string]any{"estado": "listo"}))
-	is4xx(t, "checklist de una entregada", c.do("PUT", base+"/checklist", map[string]any{"accesorios": []string{"Gato"}}))
+	is4xx(t, "checklist de una entregada", c.do("PUT", base+"/checklist", map[string]any{"kilometraje": 1000}))
 
 	// Entra al cálculo de ticket y tiempo (las consultas de los KPIs leen estado y cerrada_en) y queda en la bitácora.
 	var cerradas int
@@ -66,7 +66,7 @@ func TestDelivery_PickupAccessoriesAndClose(t *testing.T) {
 	if cerradas != 1 {
 		t.Fatalf("órdenes cerradas para los KPIs: %d", cerradas)
 	}
-	if !strings.Contains(despues, "Laura Gómez") || !strings.Contains(despues, `"accesorios_devueltos": ["gato", "documentos"]`) {
+	if !strings.Contains(despues, "Laura Gómez") || !strings.Contains(despues, `"estado": "entregado"`) {
 		t.Fatalf("bitácora de la entrega: %s", despues)
 	}
 }

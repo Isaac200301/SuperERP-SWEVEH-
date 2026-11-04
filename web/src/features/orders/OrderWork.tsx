@@ -46,10 +46,6 @@ const combustibles: Record<string, string> = {
   lleno: 'Lleno',
   no_aplica: 'No aplica (moto)',
 };
-/** Lo que más dejan en una moto (HU-18, igual que MotoAccessories del dominio); lo demás va en "Otros". */
-const accesoriosMoto: [string, string][] = [['casco', 'Casco'], ['baul', 'Baúl'], ['maletas', 'Maletas'], ['documentos', 'Documentos']];
-const esRapido = (a: string) => accesoriosMoto.some(([v]) => v === a);
-const separar = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 
 function errorText(e: unknown): string | undefined {
   if (!e) return undefined;
@@ -66,12 +62,9 @@ export function OrderActions({ orden }: { orden: Orden }) {
   const puedeAnular = usePermission('order:override_approval');
   const [motivo, setMotivo] = useState('');
   const [recogido, setRecogido] = useState('');
-  const [devueltos, setDevueltos] = useState<string[]>([]);
-  const [sinAccesorios, setSinAccesorios] = useState(false);
+  const [revisado, setRevisado] = useState(false);
   const [falta, setFalta] = useState('');
   const settings = useSettings().data;
-  // Lo que el cliente dejó al recibir es lo que se devuelve al entregar (HU-25; casco en motos, HU-18).
-  const cl = useChecklist(orden.id, orden.estado === 'listo');
   const flujo = flujoFor(settings);
   const i = flujo.indexOf(orden.estado);
   if (orden.estado === 'entregado' || orden.estado === 'cancelada') return null;
@@ -84,15 +77,10 @@ export function OrderActions({ orden }: { orden: Orden }) {
   const sinAprobacion = siguiente === 'en_reparacion' && orden.estado !== 'esperando_repuesto';
   const entrega = siguiente === 'entregado';
   const puedeEsperar = orden.estado === 'en_reparacion' && settings?.usarEsperandoRepuesto === true;
-  const dejados = cl.data?.accesorios ?? [];
-  const accesoriosOK = dejados.length > 0 ? dejados.every((a) => devueltos.includes(a)) : sinAccesorios;
+  // Lo que dejó el cliente quedó como nota con foto en la recepción (decisión de Pablo, 3-nov).
   let faltaEntrega: string | undefined;
-  if (entrega) {
-    if (cl.isPending) faltaEntrega = 'Cargando los accesorios del checklist…';
-    else if (!recogido.trim()) faltaEntrega = 'Escribe quién recoge.';
-    else if (!accesoriosOK) faltaEntrega = dejados.length > 0 ? 'Marca cada accesorio que devolviste.' : 'Confirma que no dejó accesorios.';
-  }
-  const marcarDevuelto = (a: string, si: boolean) => setDevueltos(si ? [...devueltos, a] : devueltos.filter((x) => x !== a));
+  if (entrega && !recogido.trim()) faltaEntrega = 'Escribe quién recoge.';
+  else if (entrega && !revisado) faltaEntrega = 'Confirma que revisaste lo que dejó.';
 
   return (
     <section className={card} aria-labelledby="acciones">
@@ -110,22 +98,10 @@ export function OrderActions({ orden }: { orden: Orden }) {
       {entrega ? (
         <>
           <Field label="¿Quién recoge?" value={recogido} onChange={(e) => setRecogido(e.target.value)} />
-          {dejados.length > 0 ? (
-            <fieldset className="flex flex-col gap-1">
-              <legend className="font-bold">Devuelve lo que dejó al recibir</legend>
-              {dejados.map((a) => (
-                <label key={a} className="flex min-h-[44px] items-center gap-2">
-                  <input type="checkbox" checked={devueltos.includes(a)} onChange={(e) => marcarDevuelto(a, e.target.checked)} />
-                  {a.charAt(0).toUpperCase() + a.slice(1)}
-                </label>
-              ))}
-            </fieldset>
-          ) : cl.isSuccess ? (
-            <label className="flex min-h-[44px] items-center gap-2">
-              <input type="checkbox" checked={sinAccesorios} onChange={(e) => setSinAccesorios(e.target.checked)} />
-              No dejó accesorios
-            </label>
-          ) : null}
+          <label className="flex min-h-[44px] items-center gap-2">
+            <input type="checkbox" checked={revisado} onChange={(e) => setRevisado(e.target.checked)} />
+            Revisé con el cliente lo que dejó (notas de la recepción)
+          </label>
         </>
       ) : null}
       {mover.isError ? <Alert>{errorText(mover.error)}</Alert> : null}
@@ -139,7 +115,7 @@ export function OrderActions({ orden }: { orden: Orden }) {
                 estado: siguiente,
                 version: orden.version,
                 ...(motivo ? { motivo } : {}),
-                ...(entrega ? { recogidoPor: recogido.trim(), accesoriosConfirmados: accesoriosOK } : {}),
+                ...(entrega ? { recogidoPor: recogido.trim(), accesoriosConfirmados: revisado } : {}),
               })
             }
           >
@@ -179,8 +155,6 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
   const subir = useAddEvidence(orden.id);
   const [km, setKm] = useState('');
   const [fuel, setFuel] = useState('');
-  const [acc, setAcc] = useState('');
-  const [rapidos, setRapidos] = useState<string[] | null>(null);
   const [nota, setNota] = useState('');
   const [fotos, setFotos] = useState<File[]>([]);
   const [items, setItems] = useState<ItemRevisado[] | null>(null);
@@ -194,17 +168,12 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
     setItems(revisados.map((it) => (it.clave === clave ? { ...it, ...cambio } : it)));
   const abierta = orden.estado !== 'entregado' && orden.estado !== 'cancelada';
   const moto = c.tipo === 'moto';
-  const marcados = rapidos ?? c.accesorios.filter(esRapido);
-  const otrosGuardados = moto ? c.accesorios.filter((a) => !esRapido(a)) : c.accesorios;
-  const otros = acc === '' ? otrosGuardados : separar(acc);
-  const alternar = (a: string) => setRapidos(marcados.includes(a) ? marcados.filter((x) => x !== a) : [...marcados, a]);
 
   const onSave = (e: FormEvent) => {
     e.preventDefault();
     guardar.mutate({
       kilometraje: km === '' ? (c.kilometraje ?? null) : Number(km),
       combustible: fuel === '' ? (c.combustible ?? null) : fuel,
-      accesorios: moto ? [...marcados, ...otros] : otros,
       items: revisados,
     });
   };
@@ -243,30 +212,6 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
                 ))}
             </select>
           </div>
-          {moto ? (
-            <fieldset className="flex flex-col gap-1.5 sm:col-span-3">
-              <legend className="mb-1 text-[15px] font-extrabold">Lo que deja con la moto</legend>
-              <div className="flex flex-wrap gap-2">
-                {accesoriosMoto.map(([v, t]) => (
-                  <button
-                    key={v}
-                    type="button"
-                    aria-pressed={marcados.includes(v)}
-                    onClick={() => alternar(v)}
-                    className={`min-h-[44px] rounded-full px-4 text-sm font-bold ${marcados.includes(v) ? 'bg-ink text-white' : 'bg-surface'}`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-          ) : null}
-          <Field
-            label={moto ? 'Otros accesorios (separados por coma)' : 'Accesorios (separados por coma)'}
-            placeholder={otrosGuardados.join(', ') || (moto ? 'impermeable, candado' : 'gato, llanta de repuesto')}
-            value={acc}
-            onChange={(e) => setAcc(e.target.value)}
-          />
           {revisados.length ? (
             <fieldset className="flex flex-col gap-2 sm:col-span-3">
               <legend className="mb-1 text-[15px] font-extrabold">Revisión al recibir</legend>
@@ -347,7 +292,13 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
           }}
         >
           <div className="min-w-[240px] flex-1">
-            <Field label="Nota (lo que encontraste o cambiaste)" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Rayón en la puerta trasera" />
+            <Field
+              label="Nota (lo que encontraste o cambiaste)"
+              hint="¿Dejó algo (casco, documentos, gato)? Anótalo aquí con foto para devolverlo al entregar."
+              value={nota}
+              onChange={(e) => setNota(e.target.value)}
+              placeholder="Rayón en la puerta trasera"
+            />
           </div>
           <label className="inline-flex min-h-[52px] cursor-pointer items-center rounded-btn border-[1.5px] border-line px-4 font-bold text-primary">
             {fotos.length ? `${fotos.length} foto${fotos.length > 1 ? 's' : ''}` : 'Agregar fotos'}

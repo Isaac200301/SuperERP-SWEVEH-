@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-// HU-18: la moto pide sus 5 lados (con tablero, mínimo 4 fotos), acepta "no aplica" en combustible
-// y guarda el casco y los demás accesorios para devolverlos al entregar (HU-25).
-func TestMotoReception_SidesFuelNotApplicableAndHelmet(t *testing.T) {
+// HU-18: la moto pide sus 5 lados (con tablero, mínimo 4 fotos) y acepta "no aplica" en combustible.
+// Lo que deja el cliente (casco, documentos) va como nota con foto (decisión de Pablo, 3-nov).
+func TestMotoReception_SidesAndFuelNotApplicable(t *testing.T) {
 	e := newEnv(t)
 	c := e.register("3105550390", "Pablo Rodríguez")
 	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550390", "nombre": "Andrés Moto"}))
@@ -28,15 +28,14 @@ func TestMotoReception_SidesFuelNotApplicableAndHelmet(t *testing.T) {
 		c.must(http.StatusCreated, c.upload(base+"/evidence", map[string]string{"lado": lado}, jpg))
 	}
 	c.must(http.StatusOK, c.do("PUT", base+"/checklist", map[string]any{
-		"kilometraje": 18000, "combustible": "no_aplica", "accesorios": []string{"Casco", "Documentos"},
+		"kilometraje": 18000, "combustible": "no_aplica",
 	}))
 	is4xx(t, "moto con 3 fotos", c.do("POST", base+"/transition", map[string]any{"estado": "recibido", "version": r2v(c, id)}))
 	c.must(http.StatusCreated, c.upload(base+"/evidence", map[string]string{"lado": "trasera"}, jpg))
 	c.must(http.StatusOK, c.do("POST", base+"/transition", map[string]any{"estado": "recibido", "version": r2v(c, id)}))
 
 	cl = c.must(http.StatusOK, c.do("GET", base+"/checklist", nil)).body
-	acc, _ := cl["accesorios"].([]any)
-	if cl["combustible"] != "no_aplica" || !slices.Contains(acc, any("casco")) || cl["completadoEn"] == nil {
+	if cl["combustible"] != "no_aplica" || cl["completadoEn"] == nil {
 		t.Fatalf("recepción de la moto: %v", cl)
 	}
 }

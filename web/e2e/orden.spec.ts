@@ -140,11 +140,11 @@ test('orden de punta a punta en un taller real', async ({ page }) => {
   await expect(page.locator('header').getByText('Listo')).toBeVisible();
   await shot(page, '06-listo');
 
-  // 10. Entrega (HU-25): quién recoge y confirmar que no dejó accesorios; la orden se cierra.
+  // 10. Entrega (HU-25): quién recoge y confirmar que revisó lo que dejó (va en las notas); la orden se cierra.
   const entregar = page.getByRole('button', { name: /Pasar a Entregado/ });
   await expect(entregar).toBeDisabled();
   await page.getByLabel('¿Quién recoge?').fill('Laura Cliente');
-  await page.getByLabel('No dejó accesorios').check();
+  await page.getByLabel(/Revisé con el cliente lo que dejó/).check();
   await entregar.click();
   await expect(page.locator('header').getByText('Entregado')).toBeVisible();
   await expect(page.getByText('Mover la orden')).toHaveCount(0);

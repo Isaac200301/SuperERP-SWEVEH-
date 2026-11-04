@@ -46,11 +46,10 @@ export function useMyOrders() {
   });
 }
 
-export function useChecklist(id: string, enabled = true) {
+export function useChecklist(id: string) {
   return useQuery({
     queryKey: keys.checklist(id),
     queryFn: async () => unwrap(await api.GET('/orders/{id}/checklist', { params: { path: { id } } })),
-    enabled,
   });
 }
 
