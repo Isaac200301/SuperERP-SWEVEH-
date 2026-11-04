@@ -148,6 +148,29 @@ describe('ReceptionPanel (HU-17, HU-21)', () => {
     expect(nota).toContain('Rayón en la puerta');
   });
 
+  it('en moto marca casco y demás con un toque, deja escribir otros y ofrece "no aplica" (HU-18)', async () => {
+    const moto = { ...checklist, tipo: 'moto', accesorios: ['documentos', 'impermeable'], items: [] };
+    const calls = mockApi({ 'GET /orders/{id}/checklist': moto, 'PUT /orders/{id}/checklist': moto, 'GET /orders/{id}/evidence': { evidencias: [] } });
+    renderPage(<ReceptionPanel orden={o({ estado: 'por_recibir' })} />);
+    const casco = await screen.findByRole('button', { name: 'Casco' });
+    expect(screen.getByRole('button', { name: 'Documentos' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('option', { name: 'No aplica (moto)' })).toBeInTheDocument();
+    await userEvent.click(casco);
+    expect(casco).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Documentos' }));
+    await userEvent.selectOptions(screen.getByLabelText('Combustible'), 'no_aplica');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar checklist' }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toMatchObject({ combustible: 'no_aplica', accesorios: ['casco', 'impermeable'] }));
+  });
+
+  it('en carro no ofrece "no aplica" ni los botones de moto', async () => {
+    mockApi({ 'GET /orders/{id}/checklist': checklist, 'GET /orders/{id}/evidence': { evidencias: [] } });
+    renderPage(<ReceptionPanel orden={o({ estado: 'por_recibir' })} />);
+    expect(await screen.findByLabelText('Combustible')).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'No aplica (moto)' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Casco' })).not.toBeInTheDocument();
+  });
+
   it('una orden cerrada no se edita', async () => {
     mockApi({ 'GET /orders/{id}/checklist': { ...checklist, falta: [], completadoEn: '2026-11-02T15:00:00Z' }, 'GET /orders/{id}/evidence': { evidencias: [] } });
     renderPage(<ReceptionPanel orden={o({ estado: 'entregado' })} />);

@@ -46,6 +46,10 @@ const combustibles: Record<string, string> = {
   lleno: 'Lleno',
   no_aplica: 'No aplica (moto)',
 };
+/** Lo que más dejan en una moto (HU-18, igual que MotoAccessories del dominio); lo demás va en "Otros". */
+const accesoriosMoto: [string, string][] = [['casco', 'Casco'], ['baul', 'Baúl'], ['maletas', 'Maletas'], ['documentos', 'Documentos']];
+const esRapido = (a: string) => accesoriosMoto.some(([v]) => v === a);
+const separar = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 
 function errorText(e: unknown): string | undefined {
   if (!e) return undefined;
@@ -176,6 +180,7 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
   const [km, setKm] = useState('');
   const [fuel, setFuel] = useState('');
   const [acc, setAcc] = useState('');
+  const [rapidos, setRapidos] = useState<string[] | null>(null);
   const [nota, setNota] = useState('');
   const [fotos, setFotos] = useState<File[]>([]);
   const [items, setItems] = useState<ItemRevisado[] | null>(null);
@@ -188,13 +193,18 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
   const marcar = (clave: string, cambio: Partial<ItemRevisado>) =>
     setItems(revisados.map((it) => (it.clave === clave ? { ...it, ...cambio } : it)));
   const abierta = orden.estado !== 'entregado' && orden.estado !== 'cancelada';
+  const moto = c.tipo === 'moto';
+  const marcados = rapidos ?? c.accesorios.filter(esRapido);
+  const otrosGuardados = moto ? c.accesorios.filter((a) => !esRapido(a)) : c.accesorios;
+  const otros = acc === '' ? otrosGuardados : separar(acc);
+  const alternar = (a: string) => setRapidos(marcados.includes(a) ? marcados.filter((x) => x !== a) : [...marcados, a]);
 
   const onSave = (e: FormEvent) => {
     e.preventDefault();
     guardar.mutate({
       kilometraje: km === '' ? (c.kilometraje ?? null) : Number(km),
       combustible: fuel === '' ? (c.combustible ?? null) : fuel,
-      accesorios: acc === '' ? c.accesorios : acc.split(',').map((s) => s.trim()).filter(Boolean),
+      accesorios: moto ? [...marcados, ...otros] : otros,
       items: revisados,
     });
   };
@@ -224,16 +234,36 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
             </label>
             <select id="combustible" className={select} value={fuel || c.combustible || ''} onChange={(e) => setFuel(e.target.value)}>
               <option value="">Elige…</option>
-              {Object.entries(combustibles).map(([v, t]) => (
-                <option key={v} value={v}>
-                  {t}
-                </option>
-              ))}
+              {Object.entries(combustibles)
+                .filter(([v]) => moto || v !== 'no_aplica')
+                .map(([v, t]) => (
+                  <option key={v} value={v}>
+                    {t}
+                  </option>
+                ))}
             </select>
           </div>
+          {moto ? (
+            <fieldset className="flex flex-col gap-1.5 sm:col-span-3">
+              <legend className="mb-1 text-[15px] font-extrabold">Lo que deja con la moto</legend>
+              <div className="flex flex-wrap gap-2">
+                {accesoriosMoto.map(([v, t]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    aria-pressed={marcados.includes(v)}
+                    onClick={() => alternar(v)}
+                    className={`min-h-[44px] rounded-full px-4 text-sm font-bold ${marcados.includes(v) ? 'bg-ink text-white' : 'bg-surface'}`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
           <Field
-            label="Accesorios (separados por coma)"
-            placeholder={c.accesorios.join(', ') || 'gato, llanta de repuesto'}
+            label={moto ? 'Otros accesorios (separados por coma)' : 'Accesorios (separados por coma)'}
+            placeholder={otrosGuardados.join(', ') || (moto ? 'impermeable, candado' : 'gato, llanta de repuesto')}
             value={acc}
             onChange={(e) => setAcc(e.target.value)}
           />
