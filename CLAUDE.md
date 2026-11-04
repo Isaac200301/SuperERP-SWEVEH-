@@ -131,7 +131,7 @@ Claude Code las carga solas según su descripción; también puedes invocarlas p
 
 ## 7. Comandos objetivo (se crean en el Sprint 0; `docs/05`, sección 8)
 
-`make dev` · `make test` · `make lint` · `make gen` · `make migrate` · `make cover` · `make ci` · `make image` existen desde el Sprint 0 (`make help` los lista; en Windows, desde Git Bash). `make e2e`, `make seed-demo` y `make reset-demo` **todavía no existen**: fallan a propósito con un mensaje hasta que lleguen T5, HU-97 y HU-98.
+`make dev` · `make test` · `make lint` · `make gen` · `make migrate` · `make cover` · `make ci` · `make image` existen desde el Sprint 0 (`make help` los lista; en Windows, desde Git Bash). `make e2e` corre el recorrido de la orden en Chromium con el api sirviendo la SPA (`scripts/e2e.sh`, lo mismo que el job `e2e` del CI). `make seed-demo` y `make reset-demo` **todavía no existen**: fallan a propósito con un mensaje hasta que lleguen HU-97 y HU-98 (T5).
 
 ## 8. Dónde estamos y qué sigue
 

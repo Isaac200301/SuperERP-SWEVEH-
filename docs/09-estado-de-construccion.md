@@ -7,19 +7,19 @@
 
 | Dato | Valor |
 |---|---|
-| Fecha de la última actualización | 2026-11-02 |
+| Fecha de la última actualización | 2026-11-03 |
 | Tramo actual | T0 (Sprint 0) — **en curso**: pasos 1, 2, 4 y 6 hechos; CI corriendo en GitHub (PR #1, `developer` → `main`); 3 y 5 esperan cuentas de GCP y Supabase |
 | HU terminadas | 0 de 101 (ninguna cumple aún la definición de R-03: falta staging y pantallas). Hay código para ~80 HU; 21 con prueba |
 | Bloqueos ⛔ abiertos | Solo AQ-10 (asesoría jurídica; necesaria antes de datos reales). AQ-01 (Cloud Run, ADR-0022), AQ-02 (`sa-east-1`) y AQ-04 (auth propia) decididas el 2026-11-01; AQ-12 provisional (ver `docs/07-preguntas-abiertas.md`) |
 | Repositorio | Monolito Go (`cmd/`, `internal/` con identity, tenancy, customers, vehicles, orders, audit, outbox), migraciones, contrato OpenAPI, frontend React en `web/`, `Makefile`, `deploy/Dockerfile` |
-| Pipeline | GitHub Actions en `developer` y PR a `main`, con Snyk y Sonar configurados (2026-11-02). Ramas: se trabaja en `developer` y se integra a `main` por PR |
+| Pipeline | GitHub Actions en `developer` y PR a `main`: backend, frontend, security y **e2e** (Playwright, desde 2026-11-03). Sonar y Snyk se saltan con aviso mientras no existan sus cuentas. Ramas: se trabaja en `developer`/`dev/pablo` y se integra a `main` por PR |
 
 ## Qué sigue (lo escribe el agente al cerrar cada sesión)
 
-1. Isaac/Pablo: revisar y hacer merge del PR #1 cuando el CI esté en verde.
-2. Pruebas de los módulos sin cobertura vigilada: cotización (HU-27…29), inventario (HU-32…38), servicios (HU-07), mensajería/agente/automatizaciones y KPIs; sumar esos paquetes a `scripts/coverage.sh`.
-3. Montar en el router de pruebas las rutas de `wire` y `analytics` y documentarlas en OpenAPI.
-4. Pantallas que faltan para la demo (piso del mecánico, cotización, Por revisar, automatizaciones, KPIs).
+1. Isaac/Pablo: revisar y hacer merge del PR #8 (`dev/pablo`) con el CI en verde, incluido el job `e2e` nuevo.
+2. **T1 quedó completo en código** (falta staging para "Terminada"). Siguiente tramo: **T2, avisos por WhatsApp**, en este orden por dependencias: HU-85 (autorización) → HU-47 (ventana de 24 h) → HU-48 (aviso al cambiar el estado; incluye probar "Te devolvemos: casco" de AU-03) → HU-28 (aprobar por botón) → HU-19 (constancia con fotos y accesorios) → HU-24 (conversación en la orden) → HU-43.
+3. Isaac/Pablo, antes del T2: **número de prueba de Meta** y una URL pública para el webhook (staging).
+4. Decidir Q-33 (¿devolver al inventario después de entregar?) y validar el checklist de moto con 2 talleres (Q-02).
 5. Isaac/Pablo: cuentas de GCP y Supabase staging; repetir `rls_test.go` contra el pooler; AQ-10 antes de datos reales.
 
 ## Estado por historia
@@ -28,6 +28,7 @@
 
 | HU | Título | Tramo | Demo | Estado | PR | Notas |
 |---|---|---|---|---|---|---|
+| 2026-11-03 | Claude (rama `dev/pablo`) | **Cierre del T1.** CI del PR #8 en verde (modelos sqlc al día, gofmt, errcheck, cobertura de `quotes/app` 84 %). **HU-25:** la entrega lista los accesorios del checklist y pide marcar cada uno; bitácora con `accesorios_devueltos`; prueba HTTP nueva. **HU-18:** accesorios de moto de un toque y "no aplica" solo en moto; prueba HTTP de la recepción de moto. **HU-91:** verificada sin código nuevo. **E2E en CI:** `scripts/e2e.sh` (api sirviendo la SPA, OTP del log) en el job `e2e` y en `make e2e`; el recorrido termina entregando. **HU-23:** PWA con `vite-plugin-pwa` 1.3.0; el api sirve el manifest como `application/manifest+json` y revalida `sw.js`. `npm audit`: 0 altas; 20 moderadas y 2 bajas (antes 13 moderadas), las nuevas son de `workbox-build`, solo en build. **Verde:** `go test ./...` y cobertura ≥ 80 % (sin `-race`: sin gcc local), golangci-lint (solo avisos CRLF locales), Vitest 54, `tsc`, ESLint, build, e2e | T2 (WhatsApp); Q-33 |
 | 2026-11-03 | Claude (rama `dev/pablo`) | **Fase 7: recorrido real en navegador** con Playwright 1.64.1 (`npm run e2e`, `web/e2e/orden.spec.ts`): registro → parámetros → repuesto → orden con ficha → recepción con ítems y fotos → diagnóstico con mano de obra → cotización (servicio sin precio, repuesto × 2, horas, IVA aparte) → aprobar → devolver → esperando repuesto → listo. **Pasa** contra api y web locales; capturas revisadas. Encontró que "Cotizar esto" seguía visible en Listo (corregido). No corre en CI todavía (necesita api con OTP en consola) | Llevar el e2e al CI con Postgres y el api en el job; Bloque 3 restante (HU-18 checklist de moto completo, HU-25 entrega, PWA) |
 | 2026-11-03 | Claude (rama `dev/pablo`) | **Fase 6: cotización real.** Migración 00018: IVA y precios con IVA copiados al crear la cotización (las viejas quedan en 0 %), desglose guardado (subtotal, descuento, IVA, total), vigencia al enviar y `POST /orders/{id}/quote/renew`; vencida no admite aprobación. Descuento por línea con tope del taller y permiso `quote:discount` (dueño; recepción si el parámetro lo permite). Mano de obra por horas × tarifa en cuartos de hora. El total que ven el cliente y los avisos ya incluye IVA. **Verde:** `go test ./...`, Vitest 51, `tsc`, ESLint, build | Fase 7: e2e con Playwright |
 | 2026-11-03 | Claude (rama `dev/pablo`) | **Fase 5: estados opcionales** (Pablo, amplía Q-04). Migración 00017: `esperando_repuesto` (desvío desde En reparación, con motivo, solo vuelve a En reparación) y `control_calidad` (entre En reparación y Listo); apagados por defecto. Si el taller los apaga con órdenes adentro, esas órdenes pueden salir. Acciones, stepper y tablero siguen los parámetros; `Transition` dividida para bajar la complejidad. **Verde:** `go test ./...`, Vitest 49, `tsc`, ESLint, build | Fase 6: IVA, tarifa, descuentos y vigencia |
@@ -55,14 +56,14 @@
 | HU-15 | Unir clientes o vehículos repetidos | T6 | no | ⬜ Pendiente | | |
 | HU-16 | Abrir una orden desde la placa | T1 | sí | 🟦 En curso | | Los 2 criterios con prueba; números consecutivos probados con 25 órdenes simultáneas |
 | HU-17 | Hacer el checklist de recepción en el celular (carro) | T1 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
-| HU-18 | Hacer el checklist de recepción de una moto | T1 | sí | ⬜ Pendiente | | |
+| HU-18 | Hacer el checklist de recepción de una moto | T1 | sí | 🟦 En curso | #8 | Criterios 1 y 2 con prueba HTTP (`moto_reception_test.go`: 5 lados con tablero, mínimo 4 fotos, combustible "no aplica") y Vitest (accesorios de un toque, "no aplica" solo en moto). Criterio 3: el casco sale en la entrega (HU-25) y en el texto de AU-03; la constancia es HU-19 (T2). Contenido provisional (Q-02). Falta: staging |
 | HU-19 | Recibir la constancia con fotos y confirmarla | T2 | sí | ⬜ Pendiente | | |
 | HU-20 | Mover la orden por sus estados | T1 | sí | 🟦 En curso | | Código ya existe (dominio, caso de uso, HTTP). Criterios 1–4 con prueba: dominio (`orders/domain/flow_test.go`) y HTTP (`server/flow_test.go`: saltos, 409 por versión, falta de cotización, historial con usuario y hora). 2026-11-02: corregido que devolverse a Recibido pedía el checklist. Falta: prueba del permiso del mecánico (sin anulación del dueño) y pantalla del piso |
 | HU-21 | Agregar fotos y notas en cualquier momento | T1 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-22 | Asignar mecánico y fecha prometida | T6 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
-| HU-23 | Ver mis órdenes en el celular | T1 | sí | 🟦 En curso | | Criterios 1 y 2 con prueba HTTP; vista "Piso" en el panel (2026-11-02). Falta PWA instalable |
+| HU-23 | Ver mis órdenes en el celular | T1 | sí | 🟦 En curso | #8 | Criterios 1 y 2 con prueba HTTP; vista "Piso". **Instalable (PWA)** desde 2026-11-03: manifest que abre en `/panel/piso`, service worker solo con el build (nunca `/api`); probado en Chromium (registrado, sin errores de CSP). Sin conexión todavía no (AQ-05). Falta: staging y probar la instalación en un celular real |
 | HU-24 | Ver la conversación de WhatsApp dentro de la orden | T2 | sí | ⬜ Pendiente | | |
-| HU-25 | Entregar el vehículo | T1 | sí | ⬜ Pendiente | | |
+| HU-25 | Entregar el vehículo | T1 | sí | 🟦 En curso | #8 | Criterios 1 y 2 con prueba HTTP (`delivery_test.go`: quién recoge y confirmación obligatorios, sale de abiertas, `cerrada_en` para los KPIs, bitácora con `accesorios_devueltos`), Vitest (una casilla por accesorio) y e2e (termina entregando). Falta: staging |
 | HU-26 | Cancelar una orden que no siguió | T6 | no | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-27 | Armar la cotización con servicios y repuestos | T1 | sí | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
 | HU-28 | Aprobar la cotización desde WhatsApp | T2 | sí | ⬜ Pendiente | | |
@@ -128,7 +129,7 @@
 | HU-88 | Ver quién cambió qué | T0 | no | 🟦 En curso | | Bitácora solo-inserción escrita en la misma transacción (taller, usuario, cliente, vehículo, motor, orden). Falta la pantalla con filtros (criterio 2) y la cadena de hashes (ADR-17) |
 | HU-89 | Aceptar el contrato de transmisión con SWEVEH | T0 | no | ⬜ Pendiente | | |
 | HU-90 | Publicar la política de tratamiento de datos | T0 | sí | 🟦 En curso | | `/politica-de-datos` muestra versión (`borrador-sin-validar-2026-11-01`, igual a `PolicyVersionDraft`) y fecha. El texto legal sigue en borrador: depende de AQ-10 |
-| HU-91 | Llenar el sistema mientras trabajo | T1 | no | ⬜ Pendiente | | |
+| HU-91 | Llenar el sistema mientras trabajo | T1 | no | 🟦 En curso | | Verificado 2026-11-03: la nueva orden crea cliente y vehículo desde la misma pantalla cuando placa y celular son nuevos (e2e `orden.spec.ts` y Vitest de la primera orden). Son tres llamadas desde el cliente, no una transacción: si falla la orden, cliente y vehículo quedan y se reutilizan al reintentar (HU-09, HU-10). Falta: staging |
 | HU-92 | Subir mis clientes y vehículos con una plantilla | T6 | no | ⬜ Pendiente | | |
 | HU-93 | Pasar mi lista de precios con una foto | T6 | sí | ⬜ Pendiente | | |
 | HU-94 | Subir mi propio Excel con mapeo de columnas | T7 | no | ⬜ Pendiente | | |
