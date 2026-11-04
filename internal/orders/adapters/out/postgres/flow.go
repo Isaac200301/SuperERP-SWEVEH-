@@ -135,13 +135,14 @@ type checklistRow struct {
 	Combustible *string         `db:"combustible"`
 	Accesorios  []string        `db:"accesorios"`
 	Salvedades  json.RawMessage `db:"salvedades"`
+	Items       json.RawMessage `db:"items"`
 	Por         *shared.ID      `db:"completado_por"`
 	En          *time.Time      `db:"completado_en"`
 	Version     int             `db:"version"`
 }
 
 func (Flow) GetChecklist(ctx context.Context, tallerID, orderID shared.ID) (domain.Checklist, bool, error) {
-	rows, err := db.Many[checklistRow](ctx, `SELECT tipo, kilometraje, combustible, accesorios, salvedades, completado_por, completado_en, version
+	rows, err := db.Many[checklistRow](ctx, `SELECT tipo, kilometraje, combustible, accesorios, salvedades, items, completado_por, completado_en, version
 		FROM orders.checklist WHERE taller_id = $1 AND orden_id = $2`, tallerID, orderID)
 	if err != nil || len(rows) == 0 {
 		return domain.Checklist{OrderID: orderID, Accessories: []string{}}, false, err
@@ -150,6 +151,9 @@ func (Flow) GetChecklist(ctx context.Context, tallerID, orderID shared.ID) (doma
 	c := domain.Checklist{OrderID: orderID, Kind: r.Tipo, Km: r.Km, Fuel: r.Combustible, Accessories: r.Accesorios,
 		DoneBy: r.Por, DoneAt: r.En, Version: r.Version}
 	if err := json.Unmarshal(r.Salvedades, &c.Exceptions); err != nil {
+		return c, true, err
+	}
+	if err := json.Unmarshal(r.Items, &c.Items); err != nil {
 		return c, true, err
 	}
 	return c, true, nil
@@ -166,12 +170,19 @@ func (Flow) SaveChecklist(ctx context.Context, tallerID shared.ID, c domain.Chec
 	if c.Accessories == nil {
 		c.Accessories = []string{}
 	}
+	items, err := json.Marshal(c.Items)
+	if err != nil {
+		return err
+	}
+	if c.Items == nil {
+		items = []byte("[]")
+	}
 	_, err = db.Exec(ctx, `INSERT INTO orders.checklist (orden_id, taller_id, tipo, kilometraje, combustible, accesorios, salvedades,
-		completado_por, completado_en) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		completado_por, completado_en, items) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (orden_id) DO UPDATE SET kilometraje = EXCLUDED.kilometraje, combustible = EXCLUDED.combustible,
 		accesorios = EXCLUDED.accesorios, salvedades = EXCLUDED.salvedades, completado_por = EXCLUDED.completado_por,
-		completado_en = EXCLUDED.completado_en, version = orders.checklist.version + 1, updated_at = now()`,
-		c.OrderID, tallerID, c.Kind, c.Km, c.Fuel, c.Accessories, exc, c.DoneBy, c.DoneAt)
+		completado_en = EXCLUDED.completado_en, items = EXCLUDED.items, version = orders.checklist.version + 1, updated_at = now()`,
+		c.OrderID, tallerID, c.Kind, c.Km, c.Fuel, c.Accessories, exc, c.DoneBy, c.DoneAt, items)
 	return err
 }
 

@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,6 +13,7 @@ const o = (over: Record<string, unknown> = {}) => orden(over) as unknown as Orde
 const checklist = {
   tipo: 'carro', kilometraje: null, combustible: null, accesorios: [], salvedades: [],
   ladosConFoto: ['frente'], ladosPedidos: ['frente', 'trasera', 'izquierdo', 'derecho'], falta: ['fotos: trasera', 'kilometraje'], completadoEn: null,
+  items: [{ clave: 'luces', nombre: 'Luces', estado: '' }, { clave: 'gato', nombre: 'Gato y herramienta', estado: '' }], fotosMinimas: 4, kmObligatorio: true,
 };
 const cotizacion = (over: Record<string, unknown> = {}) => ({
   cotizacion: {
@@ -81,8 +82,16 @@ describe('ReceptionPanel (HU-17, HU-21)', () => {
     await userEvent.type(screen.getByLabelText('Kilometraje'), '45a000');
     await userEvent.selectOptions(screen.getByLabelText('Combustible'), '1/2');
     await userEvent.type(screen.getByLabelText(/Accesorios/), 'gato, llanta');
+    // Ítems del taller: luces mal con nota, gato bien.
+    const luces = screen.getByRole('radiogroup', { name: 'Luces' });
+    await userEvent.click(within(luces).getByRole('radio', { name: 'Mal' }));
+    await userEvent.type(screen.getByLabelText('Qué tiene Luces'), 'Stop derecho fundido');
+    await userEvent.click(within(screen.getByRole('radiogroup', { name: 'Gato y herramienta' })).getByRole('radio', { name: 'Bien' }));
     await userEvent.click(screen.getByRole('button', { name: 'Guardar checklist' }));
-    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ kilometraje: 45000, combustible: '1/2', accesorios: ['gato', 'llanta'] }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({
+      kilometraje: 45000, combustible: '1/2', accesorios: ['gato', 'llanta'],
+      items: [{ clave: 'luces', nombre: 'Luces', estado: 'mal', nota: 'Stop derecho fundido' }, { clave: 'gato', nombre: 'Gato y herramienta', estado: 'bien' }],
+    }));
 
     const foto = new File([new Uint8Array([0xff, 0xd8, 0xff])], 'f.jpg', { type: 'image/jpeg' });
     const inputs = document.querySelectorAll<HTMLInputElement>('input[type=file]');

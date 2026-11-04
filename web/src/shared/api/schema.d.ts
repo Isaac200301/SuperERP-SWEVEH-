@@ -1276,6 +1276,16 @@ export interface components {
             /** Format: date-time */
             hora?: string;
         };
+        ItemRevisado: {
+            clave: string;
+            nombre: string;
+            /**
+             * @description Vacío = sin revisar
+             * @enum {string}
+             */
+            estado: "bien" | "mal" | "no_tiene" | "";
+            nota?: string;
+        };
         Checklist: {
             /** @enum {string} */
             tipo: "carro" | "moto";
@@ -1288,6 +1298,10 @@ export interface components {
             falta: string[];
             /** Format: date-time */
             completadoEn?: string | null;
+            items?: components["schemas"]["ItemRevisado"][];
+            /** @description Parámetro del taller */
+            fotosMinimas?: number;
+            kmObligatorio?: boolean;
         };
         Evidencia: {
             /** Format: uuid */
@@ -2393,6 +2407,8 @@ export interface operations {
                     combustible?: string | null;
                     accesorios?: string[];
                     salvedades?: components["schemas"]["Salvedad"][];
+                    /** @description Solo clave, estado y nota; los nombres los pone el taller */
+                    items?: components["schemas"]["ItemRevisado"][];
                 };
             };
         };

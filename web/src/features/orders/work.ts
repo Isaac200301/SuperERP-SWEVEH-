@@ -53,7 +53,8 @@ export function useChecklist(id: string) {
   });
 }
 
-export type ChecklistInput = { kilometraje?: number | null; combustible?: string | null; accesorios?: string[] };
+export type ItemRevisado = Schemas['ItemRevisado'];
+export type ChecklistInput = { kilometraje?: number | null; combustible?: string | null; accesorios?: string[]; items?: ItemRevisado[] };
 
 export function useSaveChecklist(id: string) {
   const invalidate = useInvalidateOrder(id);

@@ -455,6 +455,7 @@ paths:
                 combustible: { type: string, nullable: true }
                 accesorios: { type: array, items: { type: string } }
                 salvedades: { type: array, items: { $ref: '#/components/schemas/Salvedad' } }
+                items: { type: array, items: { $ref: '#/components/schemas/ItemRevisado' }, description: 'Solo clave, estado y nota; los nombres los pone el taller' }
       responses:
         '200': { $ref: '#/components/responses/Checklist' }
         '400': { $ref: '#/components/responses/Problem' }
@@ -1795,6 +1796,14 @@ components:
         fotoId: { type: string, format: uuid }
         hora: { type: string, format: date-time }
 
+    ItemRevisado:
+      type: object
+      required: [clave, nombre, estado]
+      properties:
+        clave: { type: string }
+        nombre: { type: string }
+        estado: { type: string, enum: [bien, mal, no_tiene, ''], description: 'Vacío = sin revisar' }
+        nota: { type: string, maxLength: 300 }
     Checklist:
       type: object
       required: [tipo, accesorios, salvedades, ladosConFoto, ladosPedidos, falta]
@@ -1808,6 +1817,9 @@ components:
         ladosPedidos: { type: array, items: { type: string } }
         falta: { type: array, items: { type: string } }
         completadoEn: { type: string, format: date-time, nullable: true }
+        items: { type: array, items: { $ref: '#/components/schemas/ItemRevisado' } }
+        fotosMinimas: { type: integer, description: 'Parámetro del taller' }
+        kmObligatorio: { type: boolean }
 
     Evidencia:
       type: object

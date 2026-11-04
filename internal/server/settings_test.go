@@ -48,3 +48,36 @@ func TestSettings_DefaultsSaveVersionPermissionsIsolation(t *testing.T) {
 		t.Fatalf("aislamiento: %v", r.body)
 	}
 }
+
+// La recepción usa los parámetros: ítems del taller con su estado, mínimo de fotos y kilometraje opcional.
+func TestSettings_ReceptionUsesWorkshopRules(t *testing.T) {
+	e := newEnv(t)
+	c := e.register("3105550340", "Pablo Rodríguez")
+	s := c.must(http.StatusOK, c.do("GET", "/api/v1/workshop/settings", nil)).body
+	s["fotosMinimas"], s["kmObligatorio"] = 1, false
+	s["itemsCarro"] = []map[string]any{{"clave": "", "nombre": "Luces"}, {"clave": "", "nombre": "Extintor"}}
+	c.must(http.StatusOK, c.do("PUT", "/api/v1/workshop/settings", s))
+
+	_, _, id := seedOrder(t, c, "3005550341", "CHK341")
+	base := "/api/v1/orders/" + id
+	r := c.must(http.StatusOK, c.do("GET", base+"/checklist", nil))
+	its := r.body["items"].([]any)
+	if len(its) != 2 || its[1].(map[string]any)["clave"] != "extintor" || r.body["fotosMinimas"] != float64(1) {
+		t.Fatalf("checklist con los ítems del taller: %v", r.body)
+	}
+	c.must(http.StatusOK, c.do("PUT", base+"/checklist", map[string]any{"combustible": "1/2",
+		"items": []map[string]any{{"clave": "luces", "estado": "mal", "nota": "stop fundido"}, {"clave": "inventado", "estado": "bien"}}}))
+	c.must(http.StatusCreated, c.upload(base+"/evidence", map[string]string{"lado": "frente"}, jpg))
+	// Una foto y sin kilometraje alcanza para recibir en este taller.
+	c.must(http.StatusOK, c.do("POST", base+"/transition", map[string]any{"estado": "recibido", "version": r2v(c, id)}))
+
+	// Cambiar la lista del taller después no altera la recepción hecha.
+	s = c.must(http.StatusOK, c.do("GET", "/api/v1/workshop/settings", nil)).body
+	s["itemsCarro"] = []map[string]any{{"clave": "", "nombre": "Solo radio"}}
+	c.must(http.StatusOK, c.do("PUT", "/api/v1/workshop/settings", s))
+	its = c.must(http.StatusOK, c.do("GET", base+"/checklist", nil)).body["items"].([]any)
+	luces := its[0].(map[string]any)
+	if len(its) != 2 || luces["estado"] != "mal" || luces["nota"] != "stop fundido" {
+		t.Fatalf("la recepción conserva su copia de ítems: %v", its)
+	}
+}

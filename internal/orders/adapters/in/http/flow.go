@@ -118,15 +118,18 @@ func (h *Handler) assign(r *http.Request, p reqctx.Principal) (int, any, error) 
 }
 
 type checklistDTO struct {
-	Tipo         string             `json:"tipo"`
-	Kilometraje  *int               `json:"kilometraje"`
-	Combustible  *string            `json:"combustible"`
-	Accesorios   []string           `json:"accesorios"`
-	Salvedades   []domain.Exception `json:"salvedades"`
-	LadosConFoto []string           `json:"ladosConFoto"`
-	LadosPedidos []string           `json:"ladosPedidos"`
-	Falta        []string           `json:"falta"`
-	CompletadoEn *time.Time         `json:"completadoEn"`
+	Tipo          string             `json:"tipo"`
+	Kilometraje   *int               `json:"kilometraje"`
+	Combustible   *string            `json:"combustible"`
+	Accesorios    []string           `json:"accesorios"`
+	Salvedades    []domain.Exception `json:"salvedades"`
+	LadosConFoto  []string           `json:"ladosConFoto"`
+	LadosPedidos  []string           `json:"ladosPedidos"`
+	Falta         []string           `json:"falta"`
+	CompletadoEn  *time.Time         `json:"completadoEn"`
+	Items         []domain.ItemCheck `json:"items"`
+	FotosMinimas  int                `json:"fotosMinimas"`
+	KmObligatorio bool               `json:"kmObligatorio"`
 }
 
 func checklistOut(v app.ChecklistView) checklistDTO {
@@ -136,7 +139,10 @@ func checklistOut(v app.ChecklistView) checklistDTO {
 	}
 	d := checklistDTO{Tipo: v.Checklist.Kind, Kilometraje: v.Checklist.Km, Combustible: v.Checklist.Fuel,
 		Accesorios: v.Checklist.Accessories, Salvedades: v.Checklist.Exceptions, LadosConFoto: v.Sides, LadosPedidos: pedidos,
-		Falta: v.Missing, CompletadoEn: v.Checklist.DoneAt}
+		Falta: v.Missing, CompletadoEn: v.Checklist.DoneAt, Items: v.Checklist.Items, FotosMinimas: v.MinPhotos, KmObligatorio: v.MileageRequired}
+	if d.Items == nil {
+		d.Items = []domain.ItemCheck{}
+	}
 	if d.Accesorios == nil {
 		d.Accesorios = []string{}
 	}
@@ -163,6 +169,7 @@ type checklistReq struct {
 	Combustible *string            `json:"combustible"`
 	Accesorios  []string           `json:"accesorios"`
 	Salvedades  []domain.Exception `json:"salvedades"`
+	Items       []domain.ItemCheck `json:"items"`
 }
 
 func (h *Handler) saveChecklist(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -175,7 +182,7 @@ func (h *Handler) saveChecklist(r *http.Request, p reqctx.Principal) (int, any, 
 		return 0, nil, err
 	}
 	v, err := h.flow.SaveChecklist(r.Context(), p.TallerID, id, p.Actor(), domain.Checklist{Km: q.Kilometraje, Fuel: q.Combustible,
-		Accessories: append([]string{}, q.Accesorios...), Exceptions: q.Salvedades})
+		Accessories: append([]string{}, q.Accesorios...), Exceptions: q.Salvedades, Items: q.Items})
 	return http.StatusOK, checklistOut(v), err
 }
 

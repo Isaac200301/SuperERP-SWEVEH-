@@ -26,6 +26,24 @@ type Flow struct {
 	events   ports.EventPublisher
 	clock    ports.Clock
 	stats    Stats
+	settings ports.SettingsReader
+}
+
+// SetSettings conecta los parámetros del taller (tenancy). Sin lector se usan los valores por defecto.
+func (f *Flow) SetSettings(r ports.SettingsReader) { f.settings = r }
+
+func (f *Flow) settingsIn(ctx context.Context, tallerID shared.ID) (ports.Settings, error) {
+	if f.settings == nil {
+		return ports.DefaultSettings, nil
+	}
+	return f.settings.Settings(ctx, tallerID)
+}
+
+// withItems pone en el checklist los ítems vigentes del taller si todavía no tiene su copia.
+func withItems(cl *domain.Checklist, s ports.Settings, kind string) {
+	if len(cl.Items) == 0 && cl.DoneAt == nil {
+		cl.Items = s.ItemsFor(kind)
+	}
 }
 
 func portsFilter(tallerID shared.ID, st *domain.State) ports.ListFilter {
@@ -96,7 +114,11 @@ func (f *Flow) move(ctx context.Context, c TransitionCmd, fromQuote bool) (domai
 				return err
 			}
 			cl.Kind = o.VehicleKind
-			missing := cl.Missing(sides)
+			st, err := f.settingsIn(ctx, c.TallerID)
+			if err != nil {
+				return err
+			}
+			missing := cl.Missing(sides, st.Reception)
 			in.ChecklistComplete = len(missing) == 0
 			if !in.ChecklistComplete {
 				return domain.ErrChecklist.WithMessage("Para pasar a Recibido falta: " + join(missing) + ".")
@@ -188,9 +210,11 @@ func (f *Flow) Assign(ctx context.Context, tallerID, orderID shared.ID, actor sh
 
 // ChecklistView es el checklist con lo que falta.
 type ChecklistView struct {
-	Checklist domain.Checklist
-	Sides     []string
-	Missing   []string
+	Checklist       domain.Checklist
+	Sides           []string
+	Missing         []string
+	MinPhotos       int
+	MileageRequired bool
 }
 
 func (f *Flow) GetChecklist(ctx context.Context, tallerID, orderID shared.ID) (ChecklistView, error) {
@@ -209,7 +233,13 @@ func (f *Flow) GetChecklist(ctx context.Context, tallerID, orderID shared.ID) (C
 		if err != nil {
 			return err
 		}
-		out = ChecklistView{Checklist: cl, Sides: sides, Missing: cl.Missing(sides)}
+		st, err := f.settingsIn(ctx, tallerID)
+		if err != nil {
+			return err
+		}
+		withItems(&cl, st, o.VehicleKind)
+		out = ChecklistView{Checklist: cl, Sides: sides, Missing: cl.Missing(sides, st.Reception), MinPhotos: st.Reception.MinPhotos,
+			MileageRequired: st.Reception.MileageRequired}
 		return nil
 	})
 	return out, err
@@ -230,6 +260,12 @@ func (f *Flow) SaveChecklist(ctx context.Context, tallerID, orderID shared.ID, a
 			return err
 		}
 		in.OrderID, in.Kind, in.DoneBy, in.DoneAt = o.ID, o.VehicleKind, cur.DoneBy, cur.DoneAt
+		st, err := f.settingsIn(ctx, tallerID)
+		if err != nil {
+			return err
+		}
+		withItems(&cur, st, o.VehicleKind)
+		in.Items = mergeItems(cur.Items, in.Items)
 		now := f.clock.Now()
 		for i := range in.Exceptions {
 			if in.Exceptions[i].At.IsZero() {
@@ -243,7 +279,8 @@ func (f *Flow) SaveChecklist(ctx context.Context, tallerID, orderID shared.ID, a
 			return err
 		}
 		return f.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "orden.checklist", Entity: "orden", EntityID: o.ID,
-			After:      map[string]any{"kilometraje": in.Km, "combustible": in.Fuel, "accesorios": in.Accessories, "salvedades": len(in.Exceptions)},
+			After: map[string]any{"kilometraje": in.Km, "combustible": in.Fuel, "accesorios": in.Accessories, "salvedades": len(in.Exceptions),
+				"items": in.Items},
 			OccurredAt: now})
 	})
 	if err != nil {
@@ -484,4 +521,20 @@ func idString(id *shared.ID) *string {
 	}
 	s := id.String()
 	return &s
+}
+
+// mergeItems aplica lo que marcó la persona sobre la copia de ítems del checklist; claves desconocidas se ignoran.
+func mergeItems(base, in []domain.ItemCheck) []domain.ItemCheck {
+	byKey := map[string]domain.ItemCheck{}
+	for _, it := range in {
+		byKey[it.Key] = it
+	}
+	out := make([]domain.ItemCheck, 0, len(base))
+	for _, b := range base {
+		if it, ok := byKey[b.Key]; ok {
+			b.State, b.Note = it.State, it.Note
+		}
+		out = append(out, b)
+	}
+	return out
 }

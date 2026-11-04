@@ -18,6 +18,7 @@ import {
   useQuoteActions,
   useSaveChecklist,
   useTransition,
+  type ItemRevisado,
 } from './work';
 import { usePermission } from '../auth/api';
 
@@ -33,6 +34,7 @@ export function agrupar(list: Evidencia[]): Evidencia[][] {
   }
   return [...grupos.values()];
 }
+const estadosItem: [ItemRevisado['estado'], string][] = [['bien', 'Bien'], ['mal', 'Mal'], ['no_tiene', 'No tiene']];
 const ladosCarro = ['frente', 'trasera', 'izquierdo', 'derecho'];
 const ladosMoto = [...ladosCarro, 'tablero'];
 const combustibles: Record<string, string> = {
@@ -127,11 +129,15 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
   const [acc, setAcc] = useState('');
   const [nota, setNota] = useState('');
   const [fotos, setFotos] = useState<File[]>([]);
+  const [items, setItems] = useState<ItemRevisado[] | null>(null);
 
   if (cl.isPending) return <p role="status">Cargando checklist…</p>;
   if (cl.isError) return <Alert>{cl.error.message}</Alert>;
   const c = cl.data;
   const lados = c.tipo === 'moto' ? ladosMoto : ladosCarro;
+  const revisados = items ?? c.items ?? [];
+  const marcar = (clave: string, cambio: Partial<ItemRevisado>) =>
+    setItems(revisados.map((it) => (it.clave === clave ? { ...it, ...cambio } : it)));
   const abierta = orden.estado !== 'entregado' && orden.estado !== 'cancelada';
 
   const onSave = (e: FormEvent) => {
@@ -140,6 +146,7 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
       kilometraje: km === '' ? (c.kilometraje ?? null) : Number(km),
       combustible: fuel === '' ? (c.combustible ?? null) : fuel,
       accesorios: acc === '' ? c.accesorios : acc.split(',').map((s) => s.trim()).filter(Boolean),
+      items: revisados,
     });
   };
 
@@ -181,6 +188,35 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
             value={acc}
             onChange={(e) => setAcc(e.target.value)}
           />
+          {revisados.length ? (
+            <fieldset className="flex flex-col gap-2 sm:col-span-3">
+              <legend className="mb-1 text-[15px] font-extrabold">Revisión al recibir</legend>
+              {revisados.map((it) => (
+                <div key={it.clave} className="flex flex-wrap items-center gap-2">
+                  <span className="w-44 font-bold">{it.nombre}</span>
+                  <div role="radiogroup" aria-label={it.nombre} className="flex gap-1">
+                    {estadosItem.map(([v, t]) => (
+                      <button
+                        key={v}
+                        type="button"
+                        role="radio"
+                        aria-checked={it.estado === v}
+                        className={`min-h-[40px] rounded-full px-3 text-sm font-bold ${it.estado === v ? 'bg-ink text-white' : 'bg-surface'}`}
+                        onClick={() => marcar(it.clave, { estado: v })}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  {it.estado === 'mal' ? (
+                    <div className="min-w-[200px] flex-1">
+                      <Field label={`Qué tiene ${it.nombre}`} value={it.nota ?? ''} onChange={(e) => marcar(it.clave, { nota: e.target.value })} />
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </fieldset>
+          ) : null}
           <div className="sm:col-span-3">
             <Button type="submit" variant="secondary" busy={guardar.isPending}>
               Guardar checklist
