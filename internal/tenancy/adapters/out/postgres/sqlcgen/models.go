@@ -11,6 +11,12 @@ import (
 	"github.com/google/uuid"
 )
 
+type AssistantAjuste struct {
+	TallerID  uuid.UUID
+	AutoEnvio bool
+	UpdatedAt time.Time
+}
+
 type AssistantBorrador struct {
 	ID                uuid.UUID
 	TallerID          uuid.UUID

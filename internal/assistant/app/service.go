@@ -130,7 +130,9 @@ type InterpretResult struct {
 const AITimeout = 30 * time.Second
 
 type Repository interface {
-	InsertDraft(ctx context.Context, d DraftRecord) error
+	InsertDraft(ctx context.Context, d DraftRecord) (bool, error) // false si el mensaje ya tenía borrador
+	AutoReply(ctx context.Context, tallerID shared.ID) (bool, error)
+	SetAutoReply(ctx context.Context, tallerID shared.ID, on bool, at time.Time) error
 	Draft(ctx context.Context, tallerID, id shared.ID) (DraftRecord, error)
 	Drafts(ctx context.Context, tallerID shared.ID, onlyPending bool, limit int) ([]DraftRecord, error)
 	Resolve(ctx context.Context, tallerID, id shared.ID, state string, final *string, by shared.ID, at time.Time) (bool, error)
@@ -331,7 +333,8 @@ func (s *Service) status(ctx context.Context, tallerID shared.ID, in Inbound, c 
 	return err
 }
 
-// process clasifica y responde: plantillas exactas salen solas; todo lo demás queda como borrador.
+// process clasifica y responde: plantillas exactas salen solas; las respuestas armadas con datos del taller salen
+// solas con el envío automático (ADR-0028) o quedan como borrador. Las notas para el dueño siempre esperan.
 func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c Customer) error {
 	on, err := s.taller.AgentOn(ctx, tallerID)
 	if err != nil || !on {
@@ -373,7 +376,7 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 	case "humano":
 		return s.human(ctx, tallerID, in)
 	case "fuera_tema": // HU-58: borrador de plantilla; el dueño decide si lo envía
-		return s.saveDraft(ctx, tallerID, in, "fuera_tema", sprintf(offTopicTxt, name), nil, nil, "plantilla")
+		return s.answer(ctx, tallerID, in, "fuera_tema", sprintf(offTopicTxt, name), nil, nil, "plantilla")
 	case "estado":
 		orders, err := s.taller.OpenOrders(ctx, tallerID, c.ID)
 		if err != nil {
@@ -425,7 +428,7 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 			if len(intent.Services)+len(intent.Others) == 0 {
 				d := domain.Draft{Text: "¡Gracias " + firstName(c.Name) + "! Te dejamos registrada la placa " + intent.Plate + ". Te esperamos " +
 					strings.TrimSuffix(nextOpening, ".") + "."}
-				return s.saveDraft(ctx, tallerID, in, "placa", d.Text, d.Sources, action, "ia")
+				return s.answer(ctx, tallerID, in, "placa", d.Text, d.Sources, action, "ia")
 			}
 		}
 	}
@@ -435,7 +438,7 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 		// Lo que no valida no sale: pasa a "Lo contesto yo" (RF-17).
 		return s.saveDraft(ctx, tallerID, in, intent.Kind, cantAnswer, nil, nil, "plantilla")
 	}
-	return s.saveDraft(ctx, tallerID, in, intent.Kind, d.Text, d.Sources, action, "ia")
+	return s.answer(ctx, tallerID, in, intent.Kind, d.Text, d.Sources, action, "ia")
 }
 
 func firstName(n string) string {
@@ -499,14 +502,105 @@ func monthStart(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
 }
 
+// saveDraft deja una tarjeta para el dueño en "Por revisar". La usan las notas que no van al cliente
+// ("Responde tú", nota de voz) y AU-05 apagada.
 func (s *Service) saveDraft(ctx context.Context, tallerID shared.ID, in Inbound, intent, text string, src []domain.Source, a *Action, origin string) error {
+	return s.uow.Do(ctx, func(ctx context.Context) error {
+		_, err := s.repo.InsertDraft(ctx, s.draft(tallerID, in, intent, text, src, a, origin))
+		return err
+	})
+}
+
+// answer guarda la respuesta al cliente y, con el envío automático encendido (ADR-0028), la envía de una vez: queda
+// "auto_enviado". La IA no redacta: el texto sale de plantillas con datos del taller y se valida antes de salir. Si no
+// valida o la ventana de 24 h está cerrada, se queda pendiente para el dueño.
+func (s *Service) answer(ctx context.Context, tallerID shared.ID, in Inbound, intent, text string, src []domain.Source, a *Action, origin string) error {
+	d := s.draft(tallerID, in, intent, text, src, a, origin)
+	return s.uow.Do(ctx, func(ctx context.Context) error {
+		inserted, err := s.repo.InsertDraft(ctx, d)
+		if err != nil || !inserted { // si el evento llegó otra vez, no se envía de nuevo
+			return err
+		}
+		on, err := s.repo.AutoReply(ctx, tallerID)
+		if err != nil || !on {
+			return err
+		}
+		final, sent, err := s.deliver(ctx, tallerID, d, d.Proposed, true)
+		if errors.Is(err, errInvalidDraft) || (err == nil && !sent) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		now := s.clock.Now()
+		if _, err := s.repo.Resolve(ctx, tallerID, d.ID, "auto_enviado", &final, shared.ID{}, now); err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: shared.Actor{Type: shared.ActorAgent}, Action: "borrador.auto_enviado",
+			Entity: "borrador", EntityID: d.ID, After: map[string]any{"final": final}, OccurredAt: now})
+	})
+}
+
+func (s *Service) draft(tallerID shared.ID, in Inbound, intent, text string, src []domain.Source, a *Action, origin string) DraftRecord {
 	if src == nil {
 		src = []domain.Source{}
 	}
+	return DraftRecord{ID: shared.NewID(), TallerID: tallerID, ConversationID: in.ConversationID, InboundID: in.ID,
+		Intent: intent, Proposed: text, Sources: src, Action: a, State: "pendiente", Origin: origin, CreatedAt: s.clock.Now(),
+		Phone: in.Phone, InboundText: in.Text}
+}
+
+var errInvalidDraft = shared.Rule("borrador_invalido", "El borrador no pasó la validación de precios. Edítalo antes de enviar.")
+
+// deliver envía un borrador: revalida el texto del agente (check), crea la orden de la placa (HU-55) y lo manda.
+// sent=false si la ventana de 24 h está cerrada.
+func (s *Service) deliver(ctx context.Context, tallerID shared.ID, d DraftRecord, text string, check bool) (string, bool, error) {
+	if check {
+		services, parts, err := s.taller.Catalog(ctx, tallerID)
+		if err != nil {
+			return "", false, err
+		}
+		if err := domain.Validate(text, append(services, parts...)); err != nil {
+			return "", false, errInvalidDraft
+		}
+	}
+	if d.Action != nil && d.Action.CreateOrder != nil {
+		code, err := s.createOrder(ctx, tallerID, d)
+		if err != nil {
+			return "", false, err
+		}
+		if code != "" {
+			text += " Tu orden es la " + code + "."
+		}
+	}
+	ok, err := s.taller.Send(ctx, tallerID, d.Phone, text, nil, "AU-04", nil)
+	return text, ok, err
+}
+
+// AutoReply dice si el agente responde solo en este taller (ADR-0028).
+func (s *Service) AutoReply(ctx context.Context, tallerID shared.ID) (bool, error) {
+	var on bool
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		on, err = s.repo.AutoReply(ctx, tallerID)
+		return err
+	})
+	return on, err
+}
+
+// SetAutoReply enciende o apaga el envío automático. Apagado, todo vuelve a "Por revisar" (HU-67).
+func (s *Service) SetAutoReply(ctx context.Context, tallerID shared.ID, actor shared.Actor, on bool) error {
 	return s.uow.Do(ctx, func(ctx context.Context) error {
-		return s.repo.InsertDraft(ctx, DraftRecord{ID: shared.NewID(), TallerID: tallerID, ConversationID: in.ConversationID, InboundID: in.ID,
-			Intent: intent, Proposed: text, Sources: src, Action: a, State: "pendiente", Origin: origin, CreatedAt: s.clock.Now(),
-			Phone: in.Phone, InboundText: in.Text})
+		before, err := s.repo.AutoReply(ctx, tallerID)
+		if err != nil {
+			return err
+		}
+		now := s.clock.Now()
+		if err := s.repo.SetAutoReply(ctx, tallerID, on, now); err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "asistente.auto_envio", Entity: "taller",
+			EntityID: tallerID, Before: map[string]any{"autoEnvio": before}, After: map[string]any{"autoEnvio": on}, OccurredAt: now})
 	})
 }
 
@@ -549,26 +643,8 @@ func (s *Service) Resolve(ctx context.Context, tallerID, draftID shared.ID, acto
 				t := strings.TrimSpace(*edited)
 				text, state = t, "editado_enviado"
 			}
-			services, parts, err := s.taller.Catalog(ctx, tallerID)
-			if err != nil {
-				return err
-			}
-			if state == "enviado" { // el texto del agente se vuelve a validar; el editado es del dueño
-				if err := domain.Validate(text, append(services, parts...)); err != nil {
-					return shared.Rule("borrador_invalido", "El borrador no pasó la validación de precios. Edítalo antes de enviar.")
-				}
-			}
-			var orderID *shared.ID
-			if d.Action != nil && d.Action.CreateOrder != nil {
-				code, err := s.createOrder(ctx, tallerID, d)
-				if err != nil {
-					return err
-				}
-				if code != "" {
-					text += " Tu orden es la " + code + "."
-				}
-			}
-			ok, err := s.taller.Send(ctx, tallerID, d.Phone, text, nil, "AU-04", orderID)
+			// El texto del agente se vuelve a validar; el editado es del dueño.
+			text, ok, err := s.deliver(ctx, tallerID, d, text, state == "enviado")
 			if err != nil {
 				return err
 			}

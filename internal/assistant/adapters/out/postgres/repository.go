@@ -55,19 +55,20 @@ const sel = `SELECT b.id, b.taller_id, b.conversacion_id, b.mensaje_entrante_id,
 	b.accion, b.estado, b.origen, b.created_at, b.resuelto_en, b.texto_entrante AS entrante, b.celular
 	FROM assistant.borrador b`
 
-func (Repository) InsertDraft(ctx context.Context, d app.DraftRecord) error {
+// InsertDraft guarda el borrador; false si ese mensaje ya tenía uno (el evento llegó otra vez).
+func (Repository) InsertDraft(ctx context.Context, d app.DraftRecord) (bool, error) {
 	src, _ := json.Marshal(d.Sources)
 	var act any
 	if d.Action != nil {
 		b, _ := json.Marshal(d.Action)
 		act = json.RawMessage(b)
 	}
-	_, err := db.Exec(ctx, `INSERT INTO assistant.borrador (id, taller_id, conversacion_id, mensaje_entrante_id, intencion, texto_propuesto,
+	n, err := db.Exec(ctx, `INSERT INTO assistant.borrador (id, taller_id, conversacion_id, mensaje_entrante_id, intencion, texto_propuesto,
 		fuentes, accion, estado, origen, created_at, celular, texto_entrante) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		ON CONFLICT ON CONSTRAINT borrador_por_mensaje DO NOTHING`,
 		d.ID, d.TallerID, d.ConversationID, d.InboundID, d.Intent, d.Proposed, json.RawMessage(src), act, d.State, d.Origin, d.CreatedAt,
 		d.Phone, d.InboundText)
-	return err
+	return n == 1, err
 }
 
 func (Repository) Draft(ctx context.Context, tallerID, id shared.ID) (app.DraftRecord, error) {
@@ -85,10 +86,26 @@ func (Repository) Drafts(ctx context.Context, tallerID shared.ID, onlyPending bo
 	return out, err
 }
 
+// Resolve cierra un borrador pendiente. Sin by (envío automático, ADR-0028) queda sin persona que lo resolvió.
 func (Repository) Resolve(ctx context.Context, tallerID, id shared.ID, state string, final *string, by shared.ID, at time.Time) (bool, error) {
+	var who *shared.ID
+	if by != (shared.ID{}) {
+		who = &by
+	}
 	n, err := db.Exec(ctx, `UPDATE assistant.borrador SET estado = $3, texto_final = $4, resuelto_por = $5, resuelto_en = $6
-		WHERE taller_id = $1 AND id = $2 AND estado = 'pendiente'`, tallerID, id, state, final, by, at)
+		WHERE taller_id = $1 AND id = $2 AND estado = 'pendiente'`, tallerID, id, state, final, who, at)
 	return n == 1, err
+}
+
+// AutoReply dice si el agente responde solo (ADR-0028). Sin fila, sí: así arranca todo taller.
+func (Repository) AutoReply(ctx context.Context, tallerID shared.ID) (bool, error) {
+	return db.Scalar[bool](ctx, `SELECT COALESCE((SELECT auto_envio FROM assistant.ajuste WHERE taller_id = $1), true)`, tallerID)
+}
+
+func (Repository) SetAutoReply(ctx context.Context, tallerID shared.ID, on bool, at time.Time) error {
+	_, err := db.Exec(ctx, `INSERT INTO assistant.ajuste (taller_id, auto_envio, updated_at) VALUES ($1, $2, $3)
+		ON CONFLICT (taller_id) DO UPDATE SET auto_envio = EXCLUDED.auto_envio, updated_at = EXCLUDED.updated_at`, tallerID, on, at)
+	return err
 }
 
 func (Repository) LogCall(ctx context.Context, tallerID shared.ID, c app.AICall) error {

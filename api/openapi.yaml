@@ -1404,6 +1404,33 @@ paths:
                   editados: { type: integer }
                   porcentajeEditados: { type: number }
 
+  /assistant/settings:
+    get:
+      operationId: getAssistantSettings
+      summary: Si el agente responde solo (ADR-0028). Permiso inbox:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantSettings' }
+    put:
+      operationId: setAssistantSettings
+      summary: Enciende o apaga el envío automático del agente (HU-67, ADR-0028). Permiso automation:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssistantSettings' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantSettings' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem' }
+
   /conversations:
     get:
       operationId: listConversations
@@ -1729,6 +1756,11 @@ components:
               ordenId: { type: string, format: uuid, description: 'Obligatorio en devoluciones' }
 
   schemas:
+    AssistantSettings:
+      type: object
+      required: [autoEnvio]
+      properties:
+        autoEnvio: { type: boolean, description: 'true = el agente responde solo; false = todo pasa por Por revisar' }
     WahaSession:
       type: object
       required: [configurado]

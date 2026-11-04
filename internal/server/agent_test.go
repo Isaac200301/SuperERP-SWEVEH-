@@ -238,6 +238,84 @@ func TestAgent_HumanRequestAndHandBack(t *testing.T) {
 	}
 }
 
+// ADR-0028 / HU-67: el agente responde solo desde que el taller existe. Se detiene si el cliente pide una persona,
+// y vuelve al devolverle la conversación. Las notas para el dueño ("Responde tú") nunca salen. Apagado, todo vuelve a
+// "Por revisar". Solo el dueño lo cambia.
+func TestAgent_AutoReply(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550535", "Rosa Pérez")
+	if s := owner.must(http.StatusOK, owner.do("GET", "/api/v1/assistant/settings", nil)).body; s["autoEnvio"] != true {
+		t.Fatalf("un taller nuevo arranca con el envío automático: %v", s)
+	}
+	w := e.whatsapp(t, owner, nil)
+	w.autoReply(true)
+	w.service("Cambio de aceite", "ambos", 45000)
+	const laura = "3001234535"
+	w.customer(laura, "Laura Gómez")
+
+	before := len(w.sent(laura))
+	w.write(laura, "Laura Gómez", "¿cuánto el cambio de aceite?")
+	if got := w.last(laura)["cuerpo"].(string); len(w.sent(laura)) != before+1 || !strings.Contains(got, "$45.000") {
+		t.Fatalf("respuesta automática: %q", got)
+	}
+	if len(w.drafts()) != 0 {
+		t.Fatalf("quedó algo por revisar: %v", w.drafts())
+	}
+	all := owner.must(http.StatusOK, owner.do("GET", "/api/v1/inbox?todos=1", nil)).body["borradores"].([]any)
+	if d := all[0].(map[string]any); d["estado"] != "auto_enviado" || d["final"] != w.last(laura)["cuerpo"] {
+		t.Fatalf("historial: %v", d)
+	}
+
+	// El cliente pide una persona: el agente se detiene hasta que se la devuelvan.
+	w.write(laura, "Laura Gómez", "quiero hablar con una persona")
+	conv, _ := w.conversation(laura)
+	n := len(w.sent(laura))
+	w.write(laura, "Laura Gómez", "¿y el cambio de aceite para moto?")
+	if len(w.sent(laura)) != n {
+		t.Fatalf("respondió con la conversación en manos de una persona: %v", w.last(laura))
+	}
+	owner.must(http.StatusNoContent, owner.do("PATCH", "/api/v1/conversations/"+conv["id"].(string), map[string]any{"modo": "agente"}))
+	w.write(laura, "Laura Gómez", "¿cuánto vale el cambio de aceite?")
+	if len(w.sent(laura)) != n+1 {
+		t.Fatal("al devolverla al asistente no respondió solo")
+	}
+
+	// Apagado por el dueño: el siguiente mensaje espera en "Por revisar".
+	w.autoReply(false)
+	n = len(w.sent(laura))
+	w.write(laura, "Laura Gómez", "¿y el cambio de aceite lo hacen hoy?")
+	if len(w.sent(laura)) != n || len(w.drafts()) != 1 {
+		t.Fatalf("apagado: enviados %d, por revisar %v", len(w.sent(laura))-n, w.drafts())
+	}
+
+	// Recepción ve el interruptor pero no lo cambia.
+	owner.must(http.StatusCreated, owner.do("POST", "/api/v1/users", map[string]any{"celular": "3005550535", "nombre": "Recepción", "rol": "recepcion"}))
+	rec := e.login("3005550535")
+	rec.must(http.StatusOK, rec.do("GET", "/api/v1/assistant/settings", nil))
+	if r := rec.do("PUT", "/api/v1/assistant/settings", map[string]any{"autoEnvio": true}); r.status != http.StatusForbidden {
+		t.Fatalf("recepción cambió el envío automático: %d", r.status)
+	}
+	if r := owner.do("PUT", "/api/v1/assistant/settings", map[string]any{}); r.status != http.StatusBadRequest {
+		t.Fatalf("sin autoEnvio: %d", r.status)
+	}
+}
+
+// Con el envío automático encendido, si la IA falla la tarjeta "Responde tú" queda para el dueño y al cliente no le
+// sale nada (HU-54).
+func TestAgent_AutoReplyKeepsOwnerNotes(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550536", "Rosa Pérez")
+	w := e.whatsappWith(t, owner, nil, fakeAI{err: errors.New("openrouter: respuesta 502 (código 0)")})
+	w.autoReply(true)
+	const laura = "3001234536"
+	w.customer(laura, "Laura Gómez")
+	before := len(w.sent(laura))
+	w.write(laura, "Laura Gómez", "¿cuánto el cambio de aceite?")
+	if d := w.draftFor("cambio de aceite"); !strings.Contains(d["propuesto"].(string), "Responde tú") || len(w.sent(laura)) != before {
+		t.Fatalf("nota para el dueño: %v, enviados %d", d, len(w.sent(laura))-before)
+	}
+}
+
 // HU-58: lo ajeno al taller y el diagnóstico quedan como borradores de plantilla; nada sale solo.
 func TestAgent_OffTopicAndDiagnosis(t *testing.T) {
 	e := newEnv(t)

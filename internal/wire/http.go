@@ -62,6 +62,8 @@ func (h *handler) routes(r chi.Router) {
 	r.With(h.g.Require("inbox:manage")).Get("/inbox", j(h.inbox))
 	r.With(h.g.Require("inbox:manage")).Post("/inbox/{id}", j(h.resolve))
 	r.With(h.g.Require("inbox:manage")).Get("/inbox/stats", j(h.inboxStats))
+	r.With(h.g.Require("inbox:manage")).Get("/assistant/settings", j(h.assistantSettings))
+	r.With(h.g.Require("automation:manage")).Put("/assistant/settings", j(h.setAssistantSettings))
 	r.With(h.g.Require("audit:read")).Get("/audit", j(h.audit))
 }
 
@@ -419,6 +421,29 @@ func (h *handler) inboxStats(r *http.Request, p reqctx.Principal) (int, any, err
 		pct = float64(edited) * 100 / float64(sent)
 	}
 	return http.StatusOK, map[string]any{"enviados": sent, "editados": edited, "porcentajeEditados": pct}, err
+}
+
+// assistantSettings dice si el agente responde solo (ADR-0028).
+func (h *handler) assistantSettings(r *http.Request, p reqctx.Principal) (int, any, error) {
+	on, err := h.s.Assistant.AutoReply(r.Context(), p.TallerID)
+	return http.StatusOK, map[string]any{"autoEnvio": on}, err
+}
+
+// setAssistantSettings enciende o apaga el envío automático; solo el dueño (automation:manage).
+func (h *handler) setAssistantSettings(r *http.Request, p reqctx.Principal) (int, any, error) {
+	var q struct {
+		AutoEnvio *bool `json:"autoEnvio"`
+	}
+	if err := httpx.Decode(r, &q); err != nil {
+		return 0, nil, err
+	}
+	if q.AutoEnvio == nil {
+		return 0, nil, shared.Validation("auto_envio_requerido", "Indica si el asistente responde solo.").WithField("autoEnvio")
+	}
+	if err := h.s.Assistant.SetAutoReply(r.Context(), p.TallerID, p.Actor(), *q.AutoEnvio); err != nil {
+		return 0, nil, err
+	}
+	return http.StatusOK, map[string]any{"autoEnvio": *q.AutoEnvio}, nil
 }
 
 // audit lista la bitácora con filtros por entidad o por fecha (HU-88, criterio 2).
