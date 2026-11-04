@@ -149,7 +149,7 @@ func TestAdvisor_GreetsOffersAndSchedules(t *testing.T) {
 		t.Fatalf("no mandó la foto: %v", img)
 	}
 
-	w.write(laura, "Laura Gómez", "te la llevo mañana, placa GNO667")
+	w.write(laura, "Laura Gómez", "sí, te la llevo mañana, placa GNO667")
 	open := func() int {
 		return len(owner.must(http.StatusOK, owner.do("GET", "/api/v1/orders?abiertas=1", nil)).body["ordenes"].([]any))
 	}
@@ -157,7 +157,7 @@ func TestAdvisor_GreetsOffersAndSchedules(t *testing.T) {
 	if o != 1 || !strings.Contains(w.last(laura)["cuerpo"].(string), "GNO667") || !strings.Contains(w.last(laura)["cuerpo"].(string), "OS-") {
 		t.Fatalf("agendar: abiertas %d, %q", o, w.last(laura)["cuerpo"])
 	}
-	w.write(laura, "Laura Gómez", "GNO667 otra vez")
+	w.write(laura, "Laura Gómez", "sí, GNO667 otra vez")
 	if open() != o || !strings.Contains(w.last(laura)["cuerpo"].(string), "Ya tienes") {
 		t.Fatalf("duplicó la orden: abiertas %d, %q", open(), w.last(laura)["cuerpo"])
 	}

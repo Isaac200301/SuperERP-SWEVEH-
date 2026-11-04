@@ -21,8 +21,8 @@
     ]
   },
   "hoy": "2026-11-04 14:20",
-  "cliente": { "nombre": "Laura Gómez", "vehiculos": [{ "placa": "GNO667", "descripcion": "(moto Yamaha NMAX)" },
-    { "placa": "PQR45E", "descripcion": "(moto Honda CB190, agendada y sin llegar)" }] },
+  "cliente": { "nombre": "Laura Gómez", "vehiculos": [{ "placa": "GNO667", "descripcion": "(moto Yamaha NMAX) — orden OS-0040: en diagnóstico" },
+    { "placa": "PQR45E", "descripcion": "(moto Honda CB190) — orden OS-0039: por recibir, cita jueves 5 de noviembre, 8:00 a. m." }] },
   "notas": "Servicios y vitrina van precargados en el prompt (no hace falta consultarlos para nombrarlos). Conversaciones propuestas por el equipo (no son mensajes reales). Hoy es miércoles 4 de noviembre de 2026, 2:20 p. m. La placa GNO667 es de la clienta y tiene una orden en diagnóstico; PQR45E es suya y está agendada sin llegar (se reagenda); KMX123 es de otro cliente; cualquier otra placa es nueva. dice_alguno y no_dice se comparan sin tildes ni mayúsculas.",
   "conversaciones": [
     { "nombre": "saludo ofrece el taller", "turnos": [
@@ -38,7 +38,7 @@
     { "nombre": "diagnóstico no se adivina", "turnos": [
       { "cliente": "mi carro hace un ruido raro al frenar, ¿qué tiene?", "dice_alguno": ["revis", "escaner", "escáner"] } ] },
     { "nombre": "agendar completo: placa, día, hora y confirmación", "turnos": [
-      { "cliente": "quiero llevar el carro para alineación", "dice_alguno": ["placa"], "no_dice": ["OS-", "celular", "telefono"], "no_agenda": true },
+      { "cliente": "quiero llevar el carro para alineación", "dice_alguno": ["placa", "agend"], "no_dice": ["OS-", "celular", "telefono"], "no_agenda": true },
       { "cliente": "ABC123", "dice_alguno": ["dia", "día", "cuando", "cuándo", "hora"], "no_dice": ["OS-", "celular", "telefono"], "no_agenda": true },
       { "cliente": "el sábado a las 9 de la mañana", "dice_alguno": ["confirm", "?"], "no_dice": ["celular", "telefono"], "no_agenda": true },
       { "cliente": "sí, confirmo", "usa_alguna": ["agendar"], "dice_alguno": ["OS-"], "agenda": "2026-11-07 09:00" } ] },

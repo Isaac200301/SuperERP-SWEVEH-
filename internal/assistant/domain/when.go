@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -72,4 +73,21 @@ func FormatWhen(t time.Time) string {
 func FormatToday(t time.Time) string {
 	t = t.In(Bogota)
 	return fmt.Sprintf("%s %d de %s de %d, %s", weekdays[t.Weekday()], t.Day(), months[t.Month()-1], t.Year(), Clock12(t))
+}
+
+// affirmatives son las formas de decir que sí a un resumen. "Agéndame…" no está: es un pedido, no una confirmación.
+var affirmatives = []string{"si", "sí", "confirmo", "confirmado", "dale", "listo", "de una", "ok", "okay", "claro", "correcto",
+	"perfecto", "hagale", "hágale", "vale", "esta bien", "está bien", "de acuerdo"}
+
+// IsAffirmative dice si el mensaje del cliente empieza diciendo que sí ("sí", "dale, el lunes", "confirmo"). La tool
+// agendar solo crea la cita cuando el último mensaje es una afirmación (ADR-0029).
+func IsAffirmative(text string) bool {
+	t := strings.Trim(Normalize(strings.TrimSpace(text)), "¡!¿?.,;: ")
+	for _, a := range affirmatives {
+		a = Normalize(a)
+		if t == a || strings.HasPrefix(t, a+" ") || strings.HasPrefix(t, a+",") || strings.HasPrefix(t, a+".") || strings.HasPrefix(t, a+"!") {
+			return true
+		}
+	}
+	return false
 }

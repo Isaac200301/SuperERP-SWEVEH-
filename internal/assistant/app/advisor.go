@@ -252,5 +252,19 @@ func (s *Service) advisorContext(ctx context.Context, tallerID shared.ID, c Cust
 		return AdvisorContext{}, err
 	}
 	vs, err := s.taller.Vehicles(ctx, tallerID, c.ID)
+	if err != nil {
+		return AdvisorContext{}, err
+	}
+	orders, err := s.taller.OpenOrders(ctx, tallerID, c.ID)
+	for i := range vs { // el asesor sabe qué vehículo ya está agendado o en el taller
+		for _, o := range orders {
+			if o.Plate == vs[i].Plate {
+				vs[i].Description += " — orden " + o.Code + ": " + stateText[o.State]
+				if o.PromisedAt != nil && o.State == "por_recibir" {
+					vs[i].Description += ", cita " + domain.FormatWhen(*o.PromisedAt)
+				}
+			}
+		}
+	}
 	return AdvisorContext{Workshop: prof, Open: open, NextOpening: next, Customer: c, Vehicles: vs, Now: s.clock.Now()}, err
 }

@@ -31,12 +31,17 @@ func (b *bookTaller) SetCustomerName(_ context.Context, _, _ shared.ID, name str
 	return true, nil
 }
 
+func (b *bookTaller) PlateOf(context.Context, shared.ID, shared.ID, string) (PlateInfo, error) {
+	return PlateInfo{Owner: "nueva"}, nil
+}
+
 func (b *bookTaller) CreateOrderFromPlate(_ context.Context, _, _ shared.ID, _, _ string, when *time.Time) (PlateInfo, error) {
 	b.booked = when
 	return PlateInfo{Owner: "nueva", Code: "OS-0007"}, nil
 }
 
-// La tool agendar valida en código la placa escrita por el cliente, la fecha y el horario antes de crear nada.
+// La tool agendar valida en código, en orden, la placa escrita por el cliente, la fecha, el horario, el nombre y la
+// confirmación antes de crear nada.
 func TestAgendarValidates(t *testing.T) {
 	now := time.Date(2026, 11, 4, 14, 20, 0, 0, domain.Bogota) // miércoles
 	for _, tc := range []struct{ name, said, args, want string }{
@@ -44,16 +49,27 @@ func TestAgendarValidates(t *testing.T) {
 		{"en el pasado", "ABC123", `{"placa":"ABC123","sintoma":"aceite","fecha":"2026-11-03","hora":"09:00"}`, "fecha_invalida"},
 		{"domingo", "ABC123", `{"placa":"ABC123","sintoma":"aceite","fecha":"2026-11-08","hora":"09:00"}`, "no abrimos"},
 		{"de noche", "ABC123", `{"placa":"ABC123","sintoma":"aceite","fecha":"2026-11-07","hora":"20:00"}`, "atendemos de 8:00"},
+		{"sin día", "ABC123", `{"placa":"ABC123","sintoma":"aceite"}`, "falta_fecha"},
+		{"sin nombre", "ABC123", `{"placa":"ABC123","sintoma":"aceite","fecha":"2026-11-07","hora":"09:00"}`, "falta_nombre"},
 	} {
 		b := &bookTaller{}
-		out := NewTools(b, shared.NewID(), Customer{}, Inbound{}, tc.said, now).Run(context.Background(), "agendar", tc.args)
+		c := Customer{Name: "Laura Gómez"}
+		if tc.name == "sin nombre" {
+			c.Name = "Cliente de prueba"
+		}
+		out := NewTools(b, shared.NewID(), c, Inbound{Text: "sí"}, tc.said, now).Run(context.Background(), "agendar", tc.args)
 		if !strings.Contains(out, tc.want) || b.booked != nil {
 			t.Errorf("%s: %s (agendó %v)", tc.name, out, b.booked)
 		}
 	}
+	// Todo listo pero el cliente aún no dijo que sí: devuelve el resumen y no agenda.
+	args := `{"placa":"ABC123","sintoma":"aceite","fecha":"2026-11-07","hora":"09:00","nombre":"Carlos Ruiz"}`
 	b := &bookTaller{}
-	out := NewTools(b, shared.NewID(), Customer{}, Inbound{}, "es la abc-123", now).Run(context.Background(), "agendar",
-		`{"placa":"ABC123","sintoma":"aceite","fecha":"2026-11-07","hora":"09:00","nombre":"Carlos Ruiz"}`)
+	out := NewTools(b, shared.NewID(), Customer{}, Inbound{Text: "el sábado a las 9"}, "es la abc-123", now).Run(context.Background(), "agendar", args)
+	if !strings.Contains(out, `"confirmar"`) || b.booked != nil || b.named != "" {
+		t.Fatalf("sin confirmar: %s", out)
+	}
+	out = NewTools(b, shared.NewID(), Customer{}, Inbound{Text: "sí, confirmo"}, "es la abc-123", now).Run(context.Background(), "agendar", args)
 	if !strings.Contains(out, `"agendado"`) || !strings.Contains(out, "sábado 7 de noviembre, 9:00 a. m.") || b.booked == nil ||
 		b.named != "Carlos Ruiz" {
 		t.Fatalf("agendar: %s, nombre %q", out, b.named)

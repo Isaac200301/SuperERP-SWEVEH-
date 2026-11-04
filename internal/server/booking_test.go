@@ -63,7 +63,7 @@ func TestAdvisor_BooksWithDateTimeAndName(t *testing.T) {
 
 	// Día que no abre: no se agenda nada y la tool lo dice.
 	step(book("MTO45E", closed, ""), "Ese día no abrimos, ¿te sirve otro?")
-	w.write(phone, "Cliente de prueba", "agéndame la MTO45E")
+	w.write(phone, "Cliente de prueba", "sí, agéndame la MTO45E")
 	if len(open()) != 0 || !strings.Contains(results[len(results)-1], "fuera_de_horario") {
 		t.Fatalf("día cerrado: abiertas %d, %s", len(open()), results[len(results)-1])
 	}
@@ -93,7 +93,7 @@ func TestAdvisor_BooksWithDateTimeAndName(t *testing.T) {
 	// Cambiar la cita: la misma orden queda con la nueva hora.
 	later := when.Add(4 * time.Hour)
 	step(book("MTO45E", later, "Otro Nombre"), "Te cambié la cita.")
-	w.write(phone, "Carlos Ruiz", "mejor a las 2 de la tarde, la MTO45E")
+	w.write(phone, "Carlos Ruiz", "sí, mejor a las 2 de la tarde, la MTO45E")
 	if res := results[len(results)-1]; !strings.Contains(res, `"reagendado"`) || len(open()) != 1 {
 		t.Fatalf("reagendar: %s, abiertas %d", res, len(open()))
 	}

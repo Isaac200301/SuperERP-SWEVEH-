@@ -42,8 +42,8 @@ var AdvisorTools = []ToolSpec{
 		Params: obj(`"producto":{"type":"string","description":"la referencia del producto que devolvió productos"}`, "producto")},
 	{Name: "horario", Description: "Horario del taller y si está abierto ahora.", Params: obj(``)},
 	{Name: "mis_ordenes", Description: "Órdenes abiertas del cliente que escribe, con su estado. Solo las suyas.", Params: obj(``)},
-	{Name: "agendar", Description: "Agenda la cita para recibir el vehículo (orden \"Por recibir\" con fecha y hora). Úsala solo después de que el cliente confirme el resumen. Si ya tiene una orden por recibir, la cambia a la nueva fecha; si tiene una en otro estado, la devuelve.",
-		Params: obj(`"placa":{"type":"string","description":"placa tal como la escribió el cliente"},"sintoma":{"type":"string","description":"qué necesita o qué le pasa, en pocas palabras"},"fecha":{"type":"string","description":"día de la cita, AAAA-MM-DD"},"hora":{"type":"string","description":"hora de la cita, HH:MM en 24 horas"},"nombre":{"type":"string","description":"nombre del cliente, solo si te lo dio y no lo tenías"}`, "placa", "sintoma", "fecha", "hora")},
+	{Name: "agendar", Description: "Agenda la cita para recibir el vehículo (orden \"Por recibir\" con fecha y hora). Úsala apenas tengas la placa: te dice qué falta (día y hora, nombre), te devuelve el resumen para que el cliente confirme y, cuando el cliente dice que sí, agenda. Si ya tiene una orden por recibir, la cambia a la nueva fecha; si el vehículo ya está en el taller, devuelve su orden.",
+		Params: obj(`"placa":{"type":"string","description":"placa tal como la escribió el cliente"},"sintoma":{"type":"string","description":"qué necesita o qué le pasa, en pocas palabras"},"fecha":{"type":"string","description":"día de la cita, AAAA-MM-DD (vacío si aún no lo sabes)"},"hora":{"type":"string","description":"hora de la cita, HH:MM en 24 horas (vacío si aún no la sabes)"},"nombre":{"type":"string","description":"nombre del cliente, solo si te lo dio y no lo tenías"}`, "placa", "sintoma")},
 	{Name: "apartar_producto", Description: "El cliente quiere comprar un producto de la vitrina: avisa al taller para que una persona confirme el apartado y el pago.",
 		Params: obj(`"producto":{"type":"string"},"cantidad":{"type":"integer","minimum":1,"maximum":20}`, "producto", "cantidad")},
 	{Name: "pasar_a_persona", Description: "Pasa la conversación a una persona del taller (el cliente lo pide, está molesto o no lo puedes resolver).",
@@ -185,8 +185,13 @@ func (t *turn) exec(ctx context.Context, name, kind, q, product, plate, symptom 
 	return map[string]any{"error": fmt.Sprintf("no existe la tool %q", name)}, nil
 }
 
-// book es la tool agendar (ADR-0029): valida placa, fecha y horario en código, guarda el nombre si el cliente lo dio
-// y tenía uno de relleno, y crea o reagenda la orden "Por recibir" con la cita en la fecha prometida (AU-06).
+// book es la tool agendar (ADR-0029). Las reglas van en código y en este orden:
+//  1. la placa la escribió el cliente (HU-55); si es de otro cliente lo revisa una persona; si ya tiene una orden que
+//     no está por recibir, se devuelve esa;
+//  2. día y hora: no en el pasado, hasta 30 días y dentro del horario de ese día;
+//  3. el nombre, si el que tiene es de relleno;
+//  4. la confirmación: la orden solo se crea (o se reagenda) si el último mensaje del cliente dice que sí. Si no, se
+//     devuelve el resumen para que el asesor le pregunte. Así el modelo no puede agendar sin que el cliente confirme.
 func (t *turn) book(ctx context.Context, plate, symptom, date, hour, name string) (any, error) {
 	p := domain.FindPlate(plate)
 	if p == "" {
@@ -194,6 +199,21 @@ func (t *turn) book(ctx context.Context, plate, symptom, date, hour, name string
 	}
 	if !strings.Contains(compact(t.said), p) { // HU-55: la placa la escribe el cliente, no la deduce la IA
 		return map[string]any{"resultado": "placa_no_confirmada", "nota": "pídele al cliente que escriba la placa del vehículo que va a traer"}, nil
+	}
+	info, err := t.taller.PlateOf(ctx, t.tallerID, t.c.ID, p)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case info.Owner == "ajena": // de otro cliente: no se dice nada del vehículo y lo revisa una persona (HU-12)
+		t.handed = true
+		return map[string]any{"resultado": "revision", "nota": "di solo que una persona del taller le escribe para confirmar"},
+			t.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true)
+	case info.Open != nil && info.Open.State != "por_recibir": // el vehículo ya está en el taller
+		return map[string]any{"resultado": "ya_tenia_orden", "orden": info.Code, "estado": stateText[info.Open.State]}, nil
+	}
+	if strings.TrimSpace(date) == "" || strings.TrimSpace(hour) == "" {
+		return map[string]any{"resultado": "falta_fecha", "nota": "pregunta qué día y a qué hora lo trae"}, nil
 	}
 	when, err := domain.ParseWhen(date, hour, t.now)
 	if err != nil {
@@ -210,26 +230,41 @@ func (t *turn) book(ctx context.Context, plate, symptom, date, hour, name string
 		}
 		return map[string]any{"resultado": "fuera_de_horario", "nota": day + "; ofrece otra hora o día dentro del horario"}, nil
 	}
+	if domain.IsPlaceholder(t.c.Name) && strings.TrimSpace(name) == "" {
+		return map[string]any{"resultado": "falta_nombre", "nota": "pregúntale su nombre para la cita"}, nil
+	}
+	summary := map[string]any{"placa": p, "servicio": symptom, "cita": domain.FormatWhen(when)}
+	if info.Open != nil {
+		summary["orden"] = info.Code
+	}
+	if !domain.IsAffirmative(t.in.Text) {
+		summary["resultado"] = "confirmar"
+		summary["nota"] = "aún no está agendado: muéstrale este resumen y pregúntale si confirma; cuando diga que sí, vuelve a usar agendar"
+		return summary, nil
+	}
 	if strings.TrimSpace(name) != "" {
 		if _, err := t.taller.SetCustomerName(ctx, t.tallerID, t.c.ID, name); err != nil {
 			return nil, err
 		}
 	}
-	info, err := t.taller.CreateOrderFromPlate(ctx, t.tallerID, t.c.ID, p, symptom, &when)
+	res, err := t.taller.CreateOrderFromPlate(ctx, t.tallerID, t.c.ID, p, symptom, &when)
 	if err != nil {
 		return nil, err
 	}
+	summary["orden"] = res.Code
 	switch {
-	case info.Owner == "ajena": // de otro cliente: no se dice nada del vehículo y lo revisa una persona (HU-12)
+	case res.Owner == "ajena": // cambió entre la consulta y la creación
 		t.handed = true
 		return map[string]any{"resultado": "revision", "nota": "di solo que una persona del taller le escribe para confirmar"},
 			t.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true)
-	case info.Rescheduled:
-		return map[string]any{"resultado": "reagendado", "orden": info.Code, "cita": domain.FormatWhen(when)}, nil
-	case info.Open != nil:
-		return map[string]any{"resultado": "ya_tenia_orden", "orden": info.Code, "estado": stateText[info.Open.State]}, nil
+	case res.Rescheduled:
+		summary["resultado"] = "reagendado"
+	case res.Open != nil:
+		return map[string]any{"resultado": "ya_tenia_orden", "orden": res.Code, "estado": stateText[res.Open.State]}, nil
+	default:
+		summary["resultado"] = "agendado"
 	}
-	return map[string]any{"resultado": "agendado", "orden": info.Code, "placa": p, "cita": domain.FormatWhen(when)}, nil
+	return summary, nil
 }
 
 // product busca un producto de la vitrina por referencia (o nombre), aunque el modelo no haya listado antes.

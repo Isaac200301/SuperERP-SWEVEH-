@@ -124,7 +124,7 @@ func RunConversations(ctx context.Context, adv app.Advisor, set ConvSet) ConvRep
 		for _, turn := range c.Turns {
 			said += " " + turn.Customer
 			tl.booked = ""
-			tools := app.NewTools(tl, tl.id, actx.Customer, app.Inbound{ConversationID: shared.NewID()}, said, tl.now)
+			tools := app.NewTools(tl, tl.id, actx.Customer, app.Inbound{ConversationID: shared.NewID(), Text: turn.Customer}, said, tl.now)
 			var used []string
 			run := func(ctx context.Context, name, args string) string {
 				used = append(used, name)
@@ -300,6 +300,20 @@ func (f *fakeTaller) Workshop(context.Context, shared.ID) (string, bool, string,
 
 func (f *fakeTaller) OpenOrders(context.Context, shared.ID, shared.ID) ([]app.Order, error) {
 	return []app.Order{{ID: shared.NewID(), Code: "OS-0040", Plate: "GNO667", Vehicle: "Yamaha NMAX", State: "en_diagnostico"}}, nil
+}
+
+func (f *fakeTaller) PlateOf(_ context.Context, _, _ shared.ID, plate string) (app.PlateInfo, error) {
+	switch plate {
+	case "KMX123":
+		return app.PlateInfo{Owner: "ajena"}, nil
+	case "GNO667":
+		o := app.Order{Code: "OS-0040", Plate: plate, State: "en_diagnostico"}
+		return app.PlateInfo{Owner: "propia", Open: &o, Code: o.Code}, nil
+	case "PQR45E":
+		o := app.Order{Code: "OS-0039", Plate: plate, State: "por_recibir"}
+		return app.PlateInfo{Owner: "propia", Open: &o, Code: o.Code}, nil
+	}
+	return app.PlateInfo{Owner: "nueva"}, nil
 }
 
 func (f *fakeTaller) CreateOrderFromPlate(_ context.Context, _, _ shared.ID, plate, _ string, when *time.Time) (app.PlateInfo, error) {

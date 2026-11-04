@@ -238,6 +238,17 @@ func TestPromisesPerson(t *testing.T) {
 	}
 }
 
+// ADR-0029: agendar solo crea la cita si el último mensaje del cliente dice que sí.
+func TestIsAffirmative(t *testing.T) {
+	for text, want := range map[string]bool{"sí": true, "Si, confirmo": true, "dale, el lunes": true, "¡Listo!": true, "ok": true,
+		"De acuerdo.": true, "agéndame la KMX123": false, "el sábado a las 9": false, "sinceramente no": false, "no": false,
+		"va a ir mi hermano": false} {
+		if got := IsAffirmative(text); got != want {
+			t.Errorf("IsAffirmative(%q) = %v", text, got)
+		}
+	}
+}
+
 // ADR-0029: la cita se arma en hora de Colombia y no puede quedar en el pasado ni a más de 30 días.
 func TestParseWhen(t *testing.T) {
 	now := time.Date(2026, 11, 4, 14, 20, 0, 0, Bogota) // miércoles
