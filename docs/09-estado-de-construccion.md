@@ -7,7 +7,7 @@
 
 | Dato | Valor |
 |---|---|
-| Fecha de la última actualización | 2026-11-03 |
+| Fecha de la última actualización | 2026-11-04 |
 | Tramo actual | T0 (Sprint 0) — **en curso**: pasos 1, 2, 4 y 6 hechos; CI corriendo en GitHub (PR #1, `developer` → `main`); 3 y 5 esperan cuentas de GCP y Supabase |
 | HU terminadas | 0 de 101 (ninguna cumple aún la definición de R-03: falta staging y pantallas). Hay código para ~80 HU; 21 con prueba |
 | Bloqueos ⛔ abiertos | Solo AQ-10 (asesoría jurídica; necesaria antes de datos reales). AQ-01 (Cloud Run, ADR-0022), AQ-02 (`sa-east-1`) y AQ-04 (auth propia) decididas el 2026-11-01; AQ-12 provisional (ver `docs/07-preguntas-abiertas.md`) |
@@ -16,11 +16,12 @@
 
 ## Qué sigue (lo escribe el agente al cerrar cada sesión)
 
-1. Isaac/Pablo: revisar y hacer merge del PR #8 (`dev/pablo`) con el CI en verde, incluido el job `e2e` nuevo.
-2. **T1 quedó completo en código** (falta staging para "Terminada"). Siguiente tramo: **T2, avisos por WhatsApp**, en este orden por dependencias: HU-85 (autorización) → HU-47 (ventana de 24 h) → HU-48 (aviso al cambiar el estado; incluye probar "Te devolvemos: casco" de AU-03) → HU-28 (aprobar por botón) → HU-19 (constancia con fotos y accesorios) → HU-24 (conversación en la orden) → HU-43.
-3. Isaac/Pablo, antes del T2: **número de prueba de Meta** y una URL pública para el webhook (staging).
-4. Decidir Q-33 (¿devolver al inventario después de entregar?) y validar el checklist de moto con 2 talleres (Q-02).
-5. Isaac/Pablo: cuentas de GCP y Supabase staging; repetir `rls_test.go` contra el pooler; AQ-10 antes de datos reales.
+1. Isaac/Pablo: revisar y hacer merge del PR #8 (`dev/pablo`) con el CI en verde (jobs backend, frontend, security y e2e, que ahora levanta también el worker).
+2. **T2 quedó completo en código y probado con el canal local** (`internal/server/whatsapp_test.go` y `web/e2e/whatsapp.spec.ts`). Falta validarlo contra WhatsApp real: **número de prueba de Meta** + URL pública del webhook (`WHATSAPP_PROVIDER=meta`, ADR-0025).
+3. **Supabase staging (pedido de Pablo, 4-nov):** borrar el proyecto "weveh" y crear `sweveh-staging` en `sa-east-1`. Bloqueado: el conector de Supabase solo ve "Isaac200301's Org"; hay que reconectarlo con la cuenta de weveh. Luego roles (`db/bootstrap/roles.sql`), migraciones y `rls_test.go` contra el pooler.
+4. Demo (al final, decisión de Pablo): WAHA como canal no oficial y OpenRouter como proveedor de IA, cada uno como adaptador detrás de su puerto (ADR-0025 para el canal; el puerto de IA llega con el T3).
+5. Siguiente tramo: **T3 (agente)**. Cobertura de `messaging/app` 72 %, `automations/app` 50 % y `assistant/app` 37 %: todavía fuera de la lista vigilada de R-11.
+6. Decidir Q-33 (¿devolver al inventario después de entregar?) y validar el checklist de moto con 2 talleres (Q-02). AQ-10 antes de datos reales.
 
 ## Estado por historia
 
@@ -28,6 +29,7 @@
 
 | HU | Título | Tramo | Demo | Estado | PR | Notas |
 |---|---|---|---|---|---|---|
+| 2026-11-04 | Claude (rama `dev/pablo`) | **T2 con el canal local.** Canal de WhatsApp por proveedor (ADR-0025: Meta modular con pruebas contra una Graph API falsa, simulador, `WHATSAPP_PROVIDER`). Arnés de pruebas del circuito completo (simulador → worker → respuesta) que encontró **4 bugs**: aprobar desde WhatsApp fallaba por permisos del worker (migración 00019 + `TestWorkerHasAPIPrivileges`), AU-03 se repetía, tras "Acepto" se perdía la pregunta original, y los envíos fallidos quedaban "enviado" sin reintento. HU-19 constancia con botones (00020), HU-43 siguiente día hábil, HU-24 conversación en la orden, simulador en la web, fuentes del borrador (HU-64, otro bug). e2e con api y worker: 2 recorridos. **Verde:** `go test ./...` (sin `-race`: sin gcc local), cobertura vigilada ≥ 80 % (total 76,9 %), golangci-lint (solo CRLF locales), Vitest 58, `tsc`, ESLint, build, e2e 2/2. Supabase: no se tocó nada (el conector no ve la cuenta de weveh) | WhatsApp real (Meta); Supabase staging; T3 |
 | 2026-11-03 | Claude (rama `dev/pablo`) | **Accesorios fuera** (decisión de Pablo): se quitan el campo de accesorios y los botones de moto de la recepción (carro y moto) y la lista por accesorio de la entrega; lo que deja el cliente va como nota con foto (pista junto a "Nota") y la entrega pide una casilla de revisión. Se quitan `accesorios_devueltos` de la bitácora y `MotoAccessories`. Columna y campo de contrato quedan sin uso, por limpiar (`docs/07`). **Verde:** Go (pruebas y cobertura ≥ 80 %, gofmt), Vitest 53, `tsc`, ESLint, e2e | Limpiar la columna `accesorios` cuando el equipo confirme; T2 |
 | 2026-11-03 | Claude (rama `dev/pablo`) | **Cierre del T1.** CI del PR #8 en verde (modelos sqlc al día, gofmt, errcheck, cobertura de `quotes/app` 84 %). **HU-25:** la entrega lista los accesorios del checklist y pide marcar cada uno; bitácora con `accesorios_devueltos`; prueba HTTP nueva. **HU-18:** accesorios de moto de un toque y "no aplica" solo en moto; prueba HTTP de la recepción de moto. **HU-91:** verificada sin código nuevo. **E2E en CI:** `scripts/e2e.sh` (api sirviendo la SPA, OTP del log) en el job `e2e` y en `make e2e`; el recorrido termina entregando. **HU-23:** PWA con `vite-plugin-pwa` 1.3.0; el api sirve el manifest como `application/manifest+json` y revalida `sw.js`. `npm audit`: 0 altas; 20 moderadas y 2 bajas (antes 13 moderadas), las nuevas son de `workbox-build`, solo en build. **Verde:** `go test ./...` y cobertura ≥ 80 % (sin `-race`: sin gcc local), golangci-lint (solo avisos CRLF locales), Vitest 54, `tsc`, ESLint, build, e2e | T2 (WhatsApp); Q-33 |
 | 2026-11-03 | Claude (rama `dev/pablo`) | **Fase 7: recorrido real en navegador** con Playwright 1.64.1 (`npm run e2e`, `web/e2e/orden.spec.ts`): registro → parámetros → repuesto → orden con ficha → recepción con ítems y fotos → diagnóstico con mano de obra → cotización (servicio sin precio, repuesto × 2, horas, IVA aparte) → aprobar → devolver → esperando repuesto → listo. **Pasa** contra api y web locales; capturas revisadas. Encontró que "Cotizar esto" seguía visible en Listo (corregido). No corre en CI todavía (necesita api con OTP en consola) | Llevar el e2e al CI con Postgres y el api en el job; Bloque 3 restante (HU-18 checklist de moto completo, HU-25 entrega, PWA) |
@@ -58,21 +60,21 @@
 | HU-16 | Abrir una orden desde la placa | T1 | sí | 🟦 En curso | | Los 2 criterios con prueba; números consecutivos probados con 25 órdenes simultáneas |
 | HU-17 | Hacer el checklist de recepción en el celular (carro) | T1 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-18 | Hacer el checklist de recepción de una moto | T1 | sí | 🟦 En curso | #8 | Criterios 1 y 2 con prueba HTTP (`moto_reception_test.go`: 5 lados con tablero, mínimo 4 fotos, combustible "no aplica") y Vitest ("no aplica" solo en moto). **Accesorios (casco, documentos): sin campo, van como nota con foto** (decisión de Pablo, 3-nov; se aparta de los criterios 1 y 3, ver `docs/07`). Contenido provisional (Q-02). Falta: staging |
-| HU-19 | Recibir la constancia con fotos y confirmarla | T2 | sí | ⬜ Pendiente | | |
+| HU-19 | Recibir la constancia con fotos y confirmarla | T2 | sí | 🟦 En curso | #8 | AU-01 con "Está bien" / "Algo no cuadra"; la orden guarda la primera respuesta con hora (migración 00020); "Algo no cuadra" pasa a una persona y sale en "Hoy tienes pendiente"; la orden lo muestra. Prueba de punta a punta (`TestWhatsApp_ReceiptConfirmation`). **Falta: las fotos dentro del mensaje** (el canal ya sabe enviar imágenes, ADR-0025) y WhatsApp real |
 | HU-20 | Mover la orden por sus estados | T1 | sí | 🟦 En curso | | Código ya existe (dominio, caso de uso, HTTP). Criterios 1–4 con prueba: dominio (`orders/domain/flow_test.go`) y HTTP (`server/flow_test.go`: saltos, 409 por versión, falta de cotización, historial con usuario y hora). 2026-11-02: corregido que devolverse a Recibido pedía el checklist. Falta: prueba del permiso del mecánico (sin anulación del dueño) y pantalla del piso |
 | HU-21 | Agregar fotos y notas en cualquier momento | T1 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-22 | Asignar mecánico y fecha prometida | T6 | sí | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-23 | Ver mis órdenes en el celular | T1 | sí | 🟦 En curso | #8 | Criterios 1 y 2 con prueba HTTP; vista "Piso". **Instalable (PWA)** desde 2026-11-03: manifest que abre en `/panel/piso`, service worker solo con el build (nunca `/api`); probado en Chromium (registrado, sin errores de CSP). Sin conexión todavía no (AQ-05). Falta: staging y probar la instalación en un celular real |
-| HU-24 | Ver la conversación de WhatsApp dentro de la orden | T2 | sí | ⬜ Pendiente | | |
+| HU-24 | Ver la conversación de WhatsApp dentro de la orden | T2 | sí | 🟦 En curso | #8 | Panel "WhatsApp" en la orden con hora, quién envió y si no se entregó (Vitest). Falta: criterio 2 (mensaje nuevo del cliente con orden abierta se adjunta a la orden) y WhatsApp real |
 | HU-25 | Entregar el vehículo | T1 | sí | 🟦 En curso | #8 | Criterios con prueba HTTP (`delivery_test.go`: quién recoge y confirmación obligatorios, sale de abiertas, `cerrada_en` para los KPIs, bitácora con `recogido_por`), Vitest y e2e (termina entregando). La confirmación es una casilla "Revisé con el cliente lo que dejó (notas de la recepción)" (decisión de Pablo, 3-nov). Falta: staging |
 | HU-26 | Cancelar una orden que no siguió | T6 | no | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-27 | Armar la cotización con servicios y repuestos | T1 | sí | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
-| HU-28 | Aprobar la cotización desde WhatsApp | T2 | sí | ⬜ Pendiente | | |
-| HU-29 | Registrar la respuesta del cliente y mover la orden | T2 | sí | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
+| HU-28 | Aprobar la cotización desde WhatsApp | T2 | sí | 🟦 En curso | #8 | AU-02 con Aprobar / Tengo dudas; Aprobar mueve la orden y descuenta; doble pulsación sin doble descuento; Tengo dudas pasa a una persona (`TestWhatsApp_ApproveQuoteFromButton`). **Bug corregido:** el worker no tenía permiso sobre `quotes.linea` (migración 00019). Falta: WhatsApp real |
+| HU-29 | Registrar la respuesta del cliente y mover la orden | T2 | sí | 🟦 En curso | #8 | Por mostrador (`quote_test.go`) y por WhatsApp (canal `whatsapp`). Falta: WhatsApp real |
 | HU-30 | Aprobar ítem por ítem | T6 | no | ⬜ Pendiente | | |
 | HU-31 | Cotización adicional durante la reparación | T6 | no | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
 | HU-32 | Crear, editar y desactivar repuestos | T1 | sí | 🟦 En curso | | Pantalla `/panel/repuestos`: crear con marca, categoría, ubicación y referencia OEM; editar con versión; activar/desactivar. Pruebas HTTP (`inventory_test.go`) y Vitest. Falta: staging |
-| HU-33 | Descontar el repuesto al aprobarse la orden | T2 | sí | 🟦 En curso | | Prueba HTTP de punta a punta (`quote_test.go`, 2026-11-02). Falta revisar criterio por criterio |
+| HU-33 | Descontar el repuesto al aprobarse la orden | T2 | sí | 🟦 En curso | #8 | Probado también al aprobar desde el botón de WhatsApp (5 → 3, sin doble descuento). Falta: staging |
 | HU-34 | Buscar repuestos al cotizar | T1 | sí | 🟦 En curso | | Búsqueda por referencia, nombre, marca o OEM y filtro por categoría (`GET /parts?q=&categoria=`). Prueba HTTP. Falta: staging |
 | HU-35 | Registrar entrada de mercancía | T6 | no | 🟦 En curso | | Entrada con campo de cantidad (sin `prompt`) y movimientos del repuesto (`GET /parts/{id}/movements`). Prueba HTTP y Vitest. Falta: staging |
 | HU-36 | Recibir alerta de repuesto bajo el mínimo | T6 | no | 🟦 En curso | | Filtro "Solo bajo el mínimo" (`/parts/low`) y enlace desde "Pendiente hoy" del tablero. Falta: staging |
@@ -80,14 +82,14 @@
 | HU-38 | Devolver al inventario lo que no se usó | T6 | no | 🟦 En curso | | Botón "Devolver 1 al inventario" en la cotización aprobada; el servidor no deja devolver más de lo descontado (`FOR UPDATE`). Prueba HTTP (`quote_test.go`) y Vitest. Falta: staging |
 | HU-39 | Proveedores, órdenes de compra y bodegas | T7 | no | ⬜ Pendiente | | |
 | HU-40 | Ver el catálogo de automatizaciones | T4 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
-| HU-41 | Encender y apagar una automatización | T2 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
+| HU-41 | Encender y apagar una automatización | T2 | sí | 🟦 En curso | #8 | Apagada no sale (`TestWhatsApp_StateNoticesOncePerOrder`). Falta: WhatsApp real |
 | HU-42 | Editar el texto de un aviso | T4 | no | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
-| HU-43 | Saber que mi vehículo está listo | T2 | sí | ⬜ Pendiente | | |
+| HU-43 | Saber que mi vehículo está listo | T2 | sí | 🟦 En curso | #8 | AU-03 con total y horario; si hoy ya cerró, el del siguiente día hábil (`schedule_test.go`). Accesorios: van en las notas (decisión de Pablo). Falta: WhatsApp real |
 | HU-44 | Recordatorio de la cita | T6 | no | ⬜ Pendiente | | |
 | HU-45 | Recordatorio de vehículo sin recoger | T6 | sí | ⬜ Pendiente | | |
-| HU-46 | Registrar cada ejecución de una automatización | T2 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
-| HU-47 | Respetar la ventana de 24 horas | T2 | no | ⬜ Pendiente | | |
-| HU-48 | Enviar el aviso correcto al cambiar el estado | T2 | sí | ⬜ Pendiente | | |
+| HU-46 | Registrar cada ejecución de una automatización | T2 | sí | 🟦 En curso | #8 | **Bug corregido:** un envío fallido quedaba "enviado" y no se reintentaba. Fallas pasajeras se reintentan (hasta 5); las definitivas dejan mensaje y ejecución fallidos y salen en "Hoy tienes pendiente"; la orden sigue (`TestWhatsApp_FailedDeliveryIsVisibleAndRetried`). Falta: criterio 1 con el estado "entregado" que confirma Meta |
+| HU-47 | Respetar la ventana de 24 horas | T2 | no | 🟦 En curso | #8 | Fuera de la ventana no sale y queda "omitido" con el motivo (`TestWhatsApp_NoConsentOrClosedWindowSkips`). El adaptador de Meta traduce el error 131047 a la misma regla. Falta: plantilla aprobada (Q-07) y "avisarle por otro medio" en la pantalla |
+| HU-48 | Enviar el aviso correcto al cambiar el estado | T2 | sí | 🟦 En curso | #8 | AU-01 y AU-03 salen con datos reales. **Bug corregido (criterio 2):** AU-03 se repetía al volver a Listo; ahora una vez por orden. Falta: reenvío manual del dueño y WhatsApp real |
 | HU-49 | Seguimiento de garantía y garantía por orden | T7 | no | ⬜ Pendiente | | |
 | HU-50 | Recordatorio de técnico-mecánica por tipo de vehículo | — | — | ⛔ Cancelada | | |
 | HU-51 | Escribirle al taller en mis palabras | T3 | sí | ⬜ Pendiente | | |
@@ -101,9 +103,9 @@
 | HU-59 | Pedir hablar con una persona | T3 | no | ⬜ Pendiente | | |
 | HU-60 | Mandar notas de voz | T6 | no | ⬜ Pendiente | | |
 | HU-61 | Respuesta fuera de horario | T6 | no | ⬜ Pendiente | | |
-| HU-62 | Revisar y enviar el borrador | T3 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
+| HU-62 | Revisar y enviar el borrador | T3 | sí | 🟦 En curso | #8 | Vitest de Por revisar (enviar con texto editado) y e2e: el borrador llega tras la autorización. Falta: T3 |
 | HU-63 | Editar el borrador antes de enviarlo | T3 | no | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
-| HU-64 | Saber de dónde salió cada dato | T3 | no | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
+| HU-64 | Saber de dónde salió cada dato | T3 | no | 🟦 En curso | #8 | **Bug corregido:** mostraba "[object Object]"; contrato y pantalla con {campo, valor, origen}. Falta: T3 |
 | HU-65 | Ver qué tan seguido edito los borradores | T3 | no | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
 | HU-66 | Enterarme de que hay algo por revisar | T6 | no | ⬜ Pendiente | | |
 | HU-67 | Auto-envío para respuestas exactas | T7 | no | ⬜ Pendiente | | |
@@ -124,7 +126,7 @@
 | HU-82 | Trabajar como recepción | T6 | no | ⬜ Pendiente | | |
 | HU-83 | Ocultar la gestión de usuarios si trabajo solo | T6 | no | 🟦 En curso | | Con tamaño "solo yo" el menú no muestra Equipo (`PanelLayout`, Vitest). Falta: staging |
 | HU-84 | Desactivar a un usuario que se va | T6 | no | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
-| HU-85 | Dar mi autorización antes de que procesen mi mensaje | T2 | sí | ⬜ Pendiente | | |
+| HU-85 | Dar mi autorización antes de que procesen mi mensaje | T2 | sí | 🟦 En curso | #8 | Autorización con el nombre del taller antes de cualquier proceso; Acepto guarda texto, versión, canal, id y hora; No acepto deja la conversación a una persona (`TestWhatsApp_ConsentBeforeAnything` y e2e). **Bug corregido:** se procesaba el último mensaje y no el original. Falta: WhatsApp real y Q-08 |
 | HU-86 | Pedir la autorización en el mostrador | T2 | no | 🟦 En curso | | Código y prueba HTTP de punta a punta (2026-11-02). Falta revisar criterio por criterio, pantalla y permisos por rol |
 | HU-87 | Pedir mis datos o que los borren | T6 | no | ⬜ Pendiente | | |
 | HU-88 | Ver quién cambió qué | T0 | no | 🟦 En curso | | Bitácora solo-inserción escrita en la misma transacción (taller, usuario, cliente, vehículo, motor, orden). Falta la pantalla con filtros (criterio 2) y la cadena de hashes (ADR-17) |
@@ -134,7 +136,7 @@
 | HU-92 | Subir mis clientes y vehículos con una plantilla | T6 | no | ⬜ Pendiente | | |
 | HU-93 | Pasar mi lista de precios con una foto | T6 | sí | ⬜ Pendiente | | |
 | HU-94 | Subir mi propio Excel con mapeo de columnas | T7 | no | ⬜ Pendiente | | |
-| HU-95 | No escribirle a clientes importados sin autorización | T2 | no | ⬜ Pendiente | | |
+| HU-95 | No escribirle a clientes importados sin autorización | T2 | no | 🟦 En curso | #8 | Sin autorización no sale AU-01 y la ejecución queda "omitido" con el motivo (`TestWhatsApp_NoConsentOrClosedWindowSkips`). Falta: que el dueño lo vea en la orden |
 | HU-96 | Traer cuadernos completos y chats viejos | T7 | no | ⬜ Pendiente | | |
 | HU-97 | Reiniciar el taller ficticio entre demos | T5 | sí | ⬜ Pendiente | | |
 | HU-98 | Agregar una moto al taller ficticio | T5 | sí | ⬜ Pendiente | | |
