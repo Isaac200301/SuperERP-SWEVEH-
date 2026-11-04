@@ -50,7 +50,20 @@ type WhatsApp struct {
 	PhoneNumberID string
 	VerifyToken   string
 	APIBase       string
+	WAHA          WAHA
 }
+
+// WAHA es el WhatsApp no oficial para la demo (ADR-0027): un número de prueba vinculado con QR. Se activa con
+// WAHA_URL y convive con el proveedor del taller (el número "waha:<sesión>" va a WAHA). Prohibido en producción.
+type WAHA struct {
+	URL           string
+	APIKey        string
+	WebhookSecret string // la misma clave de WHATSAPP_HOOK_HMAC_KEY en WAHA
+	Session       string
+}
+
+// Enabled dice si WAHA está configurado.
+func (w WAHA) Enabled() bool { return w.URL != "" }
 
 // AI configura el intérprete del agente (D-08 abierta, ADR-0026). "reglas" = local sin costo; "openrouter" =
 // modelo de lenguaje por la API compatible con OpenAI, solo fuera de producción hasta cerrar AQ-09.
@@ -78,6 +91,8 @@ func engine(env Env, errs *[]error) (WhatsApp, AI) {
 		AppSecret: os.Getenv("WHATSAPP_APP_SECRET"), AccessToken: os.Getenv("WHATSAPP_ACCESS_TOKEN"),
 		PhoneNumberID: os.Getenv("WHATSAPP_PHONE_NUMBER_ID"), VerifyToken: os.Getenv("WHATSAPP_VERIFY_TOKEN"),
 		APIBase: get("WHATSAPP_API_BASE", "https://graph.facebook.com/v21.0"),
+		WAHA: WAHA{URL: os.Getenv("WAHA_URL"), APIKey: os.Getenv("WAHA_API_KEY"), WebhookSecret: os.Getenv("WAHA_WEBHOOK_SECRET"),
+			Session: get("WAHA_SESSION", "default")},
 	}
 	wa.Provider = get("WHATSAPP_PROVIDER", map[bool]string{true: "meta", false: "local"}[wa.AccessToken != ""])
 	switch {
@@ -87,6 +102,13 @@ func engine(env Env, errs *[]error) (WhatsApp, AI) {
 		*errs = append(*errs, errors.New("WHATSAPP_PROVIDER=meta necesita WHATSAPP_ACCESS_TOKEN y WHATSAPP_APP_SECRET"))
 	case wa.Provider == "local" && env == EnvProduction:
 		*errs = append(*errs, errors.New("WHATSAPP_PROVIDER=local (simulador) no se permite en producción"))
+	}
+	switch w := wa.WAHA; {
+	case !w.Enabled():
+	case env == EnvProduction:
+		*errs = append(*errs, errors.New("WAHA_URL es solo para la demo (WhatsApp no oficial): no se permite en producción"))
+	case w.APIKey == "" || w.WebhookSecret == "":
+		*errs = append(*errs, errors.New("WAHA_URL necesita WAHA_API_KEY y WAHA_WEBHOOK_SECRET (firma de los webhooks)"))
 	}
 	return wa, aiConfig(env, errs)
 }

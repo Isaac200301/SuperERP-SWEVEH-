@@ -15,6 +15,7 @@ import (
 	"sweveh/internal/messaging/adapters/out/whatsapp"
 	"sweveh/internal/messaging/adapters/out/whatsapp/local"
 	"sweveh/internal/messaging/adapters/out/whatsapp/meta"
+	"sweveh/internal/messaging/adapters/out/whatsapp/waha"
 	messagingapp "sweveh/internal/messaging/app"
 	"sweveh/internal/platform/config"
 	"sweveh/internal/server"
@@ -42,17 +43,34 @@ func Interpreter(ai config.AI) assistantapp.Interpreter {
 }
 
 // Channel elige el proveedor de WhatsApp según la configuración (WHATSAPP_PROVIDER). Los números del
-// simulador ("local-…") siempre van al canal local, para la demo sin cuenta.
+// simulador ("local-…") siempre van al canal local, para la demo sin cuenta; los de WAHA ("waha:…") a WAHA si
+// está configurado (demo con número de prueba, ADR-0027).
 func Channel(wa config.WhatsApp) messagingapp.Channel {
 	r := whatsapp.Router{Local: local.Channel{}}
 	if wa.Provider == "meta" {
 		r.Provider = meta.New(wa.APIBase, wa.AccessToken, 10*time.Second)
 	}
+	if wa.WAHA.Enabled() {
+		r.WAHA = WAHAClient(wa.WAHA)
+	}
 	return r
 }
 
-// Parser interpreta el webhook del proveedor. Meta y el simulador comparten formato (meta.SimulatedBody).
-func Parser() messagingapp.InboundParser { return meta.Parser{} }
+// WAHAClient es el cliente de WAHA (envíos y sesión) con su timeout.
+func WAHAClient(w config.WAHA) *waha.Client { return waha.New(w.URL, w.APIKey, 10*time.Second) }
+
+// Parser interpreta los webhooks guardados: todos van a la misma cola y cada cuerpo se lee con el parser de su
+// formato (WAHA trae "event" y "session"; Meta y el simulador, el formato de Cloud API).
+func Parser() messagingapp.InboundParser { return parser{} }
+
+type parser struct{}
+
+func (parser) Parse(body []byte) ([]messagingapp.Inbound, []messagingapp.Status, error) {
+	if waha.Is(body) {
+		return waha.Parser{}.Parse(body)
+	}
+	return meta.Parser{}.Parse(body)
+}
 
 // BuildWith es Build con el canal y el intérprete ya elegidos: las pruebas inyectan un canal que falla o que
 // registra lo enviado, y una IA falsa.

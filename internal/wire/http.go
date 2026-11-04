@@ -2,6 +2,7 @@ package wire
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -14,7 +15,9 @@ import (
 	"sweveh/internal/audit"
 	automationsdomain "sweveh/internal/automations/domain"
 	"sweveh/internal/inventory"
+	"sweveh/internal/messaging/adapters/out/whatsapp/local"
 	"sweveh/internal/messaging/adapters/out/whatsapp/meta"
+	"sweveh/internal/messaging/adapters/out/whatsapp/waha"
 	messagingapp "sweveh/internal/messaging/app"
 	"sweveh/internal/platform/authn"
 	"sweveh/internal/platform/config"
@@ -49,6 +52,9 @@ func (h *handler) routes(r chi.Router) {
 	r.With(h.g.Require("inbox:manage")).Patch("/conversations/{id}", j(h.mode))
 	r.With(h.g.Require("order:read")).Get("/orders/{id}/messages", j(h.orderMessages))
 	r.With(h.g.Require("workshop:manage")).Get("/whatsapp/channel", j(h.channel))
+	r.With(h.g.Require("workshop:manage")).Put("/whatsapp/channel", j(h.setChannel))
+	r.With(h.g.Require("workshop:manage")).Get("/whatsapp/waha", j(h.wahaStatus))
+	r.With(h.g.Require("workshop:manage")).Post("/whatsapp/waha/start", j(h.wahaStart))
 	r.With(h.g.Require("workshop:manage")).Post("/simulator/inbound", j(h.simulate))
 	r.With(h.g.Require("order:read")).Get("/automations", j(h.cards))
 	r.With(h.g.Require("automation:manage")).Patch("/automations/{code}", j(h.setCard))
@@ -208,11 +214,95 @@ func (h *handler) channel(r *http.Request, p reqctx.Principal) (int, any, error)
 	return http.StatusOK, map[string]any{"canal": map[string]any{"proveedor": ch.Provider, "numero": ch.Visible}}, nil
 }
 
+var errNoWAHA = shared.NotFound("waha_no_configurado", "El WhatsApp de prueba (WAHA) no está configurado en este servidor.")
+
+// demoOnly: las rutas de demo (simulador y WAHA) no existen en producción.
+func (h *handler) demoOnly() error {
+	if h.cfg.Env == config.EnvProduction {
+		return shared.NotFound("ruta_no_encontrada", "Esa ruta no existe.")
+	}
+	return nil
+}
+
+// setChannel cambia el número del taller entre el simulador ("prueba_local") y el WhatsApp de prueba de WAHA
+// ("waha", ADR-0027), sin tocar nada más (HU-101). El número oficial de Meta se conecta aparte.
+func (h *handler) setChannel(r *http.Request, p reqctx.Principal) (int, any, error) {
+	if err := h.demoOnly(); err != nil {
+		return 0, nil, err
+	}
+	var q struct {
+		Proveedor string `json:"proveedor"`
+	}
+	if err := httpx.Decode(r, &q); err != nil {
+		return 0, nil, err
+	}
+	ch := messagingapp.ChannelInfo{TallerID: p.TallerID}
+	switch q.Proveedor {
+	case "prueba_local":
+		ch.Provider, ch.PhoneNumberID = "prueba_local", local.Prefix+p.TallerID.String()
+	case "waha":
+		if !h.cfg.WhatsApp.WAHA.Enabled() {
+			return 0, nil, errNoWAHA
+		}
+		ch.Provider, ch.PhoneNumberID = "waha", waha.Prefix+h.cfg.WhatsApp.WAHA.Session
+	default:
+		return 0, nil, shared.Validation("proveedor_invalido", "Elige prueba_local o waha.").WithField("proveedor")
+	}
+	if err := h.s.Messaging.SetChannel(r.Context(), ch); err != nil {
+		return 0, nil, err
+	}
+	return h.channel(r, p)
+}
+
+// wahaStatus dice si WAHA está configurado, el estado de la sesión y, si espera el escaneo, el QR como imagen
+// (data URL). La clave de WAHA nunca sale al navegador.
+func (h *handler) wahaStatus(r *http.Request, _ reqctx.Principal) (int, any, error) {
+	if err := h.demoOnly(); err != nil {
+		return 0, nil, err
+	}
+	w := h.cfg.WhatsApp.WAHA
+	if !w.Enabled() {
+		return http.StatusOK, map[string]any{"configurado": false}, nil
+	}
+	c := WAHAClient(w)
+	st, err := c.SessionStatus(r.Context(), w.Session)
+	if err != nil {
+		h.log.WarnContext(r.Context(), "WAHA no responde", "error", err)
+		return http.StatusOK, map[string]any{"configurado": true, "sesion": w.Session, "estado": "SIN_CONEXION"}, nil
+	}
+	out := map[string]any{"configurado": true, "sesion": w.Session, "estado": st.Status}
+	if st.Me != nil {
+		out["numero"] = st.Me.ID
+	}
+	if st.Status == "SCAN_QR_CODE" {
+		if png, err := c.QR(r.Context(), w.Session); err == nil {
+			out["qr"] = "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
+		}
+	}
+	return http.StatusOK, out, nil
+}
+
+// wahaStart crea o arranca la sesión de WAHA para poder escanear el QR.
+func (h *handler) wahaStart(r *http.Request, p reqctx.Principal) (int, any, error) {
+	if err := h.demoOnly(); err != nil {
+		return 0, nil, err
+	}
+	w := h.cfg.WhatsApp.WAHA
+	if !w.Enabled() {
+		return 0, nil, errNoWAHA
+	}
+	if err := WAHAClient(w).StartSession(r.Context(), w.Session); err != nil {
+		h.log.WarnContext(r.Context(), "no se pudo arrancar la sesión de WAHA", "error", err)
+		return 0, nil, shared.Rule("waha_sin_conexion", "No pudimos conectar con WAHA. Revisa que esté corriendo (make waha).")
+	}
+	return h.wahaStatus(r, p)
+}
+
 // simulate inyecta un mensaje de cliente por el canal de prueba local, con el mismo formato del webhook de Meta.
 // Solo existe para la demo sin cuenta de Meta (D-01 pendiente) y nunca en producción.
 func (h *handler) simulate(r *http.Request, p reqctx.Principal) (int, any, error) {
-	if h.cfg.Env == config.EnvProduction {
-		return 0, nil, shared.NotFound("ruta_no_encontrada", "Esa ruta no existe.")
+	if err := h.demoOnly(); err != nil {
+		return 0, nil, err
 	}
 	var q struct {
 		Celular string `json:"celular"`
@@ -230,6 +320,10 @@ func (h *handler) simulate(r *http.Request, p reqctx.Principal) (int, any, error
 	ch, err := h.s.Messaging.EnsureLocalChannel(r.Context(), p.TallerID)
 	if err != nil {
 		return 0, nil, err
+	}
+	// Con un número real (WAHA o Meta) las respuestas saldrían a ese celular: el simulador no se mezcla.
+	if ch.Provider != "prueba_local" {
+		return 0, nil, shared.Rule("canal_real", "El taller está usando un WhatsApp real. Vuelve al simulador en Mi taller para usar esta pantalla.")
 	}
 	body, err := meta.SimulatedBody(ch.PhoneNumberID, phone, q.Nombre, q.Texto, q.Boton, h.s.M.Clock.Now())
 	if err != nil {

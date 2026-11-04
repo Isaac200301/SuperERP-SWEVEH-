@@ -8,20 +8,25 @@ import (
 	"strings"
 
 	"sweveh/internal/messaging/adapters/out/whatsapp/local"
+	"sweveh/internal/messaging/adapters/out/whatsapp/waha"
 	"sweveh/internal/messaging/app"
 	"sweveh/internal/messaging/domain"
 )
 
-// Router manda los números del simulador ("local-…") al canal local y el resto al proveedor del taller.
-// Sin proveedor configurado, todo va al simulador.
+// Router manda los números del simulador ("local-…") al canal local, los de WAHA ("waha:…", solo demo) a WAHA y
+// el resto al proveedor del taller. Sin proveedor configurado, lo que no es de WAHA va al simulador.
 type Router struct {
 	Provider app.Channel
 	Local    app.Channel
+	WAHA     app.Channel // nil si WAHA no está configurado
 }
 
 var _ app.Channel = Router{}
 
 func (r Router) pick(pnid string) app.Channel {
+	if strings.HasPrefix(pnid, waha.Prefix) && r.WAHA != nil {
+		return r.WAHA
+	}
 	if strings.HasPrefix(pnid, local.Prefix) || r.Provider == nil {
 		return r.Local
 	}

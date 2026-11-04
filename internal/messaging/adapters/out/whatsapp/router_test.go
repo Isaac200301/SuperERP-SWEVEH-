@@ -7,6 +7,7 @@ import (
 
 	"sweveh/internal/messaging/adapters/out/whatsapp"
 	"sweveh/internal/messaging/adapters/out/whatsapp/local"
+	"sweveh/internal/messaging/adapters/out/whatsapp/waha"
 	"sweveh/internal/messaging/app"
 	"sweveh/internal/messaging/domain"
 )
@@ -64,5 +65,23 @@ func TestRouter_SimulatorNumbersStayLocal(t *testing.T) {
 	}
 	if _, err := r.SendButtons(ctx, local.Prefix+"taller", "+57300", "x", eleven); err == nil {
 		t.Fatal("11 opciones en el simulador")
+	}
+}
+
+// Los números de WAHA (demo) van a WAHA aunque el taller tenga otro proveedor; sin WAHA configurado no se
+// pierden: siguen la regla general.
+func TestRouter_WAHANumbers(t *testing.T) {
+	ctx := context.Background()
+	meta, demo := &provider{}, &provider{}
+	r := whatsapp.Router{Provider: meta, Local: local.Channel{}, WAHA: demo}
+	if _, err := r.SendText(ctx, waha.Prefix+"default", "+57300", "hola"); err != nil || demo.n != 1 || meta.n != 0 {
+		t.Fatalf("waha: %d meta: %d %v", demo.n, meta.n, err)
+	}
+	if _, _ = r.SendText(ctx, "PNID-REAL", "+57300", "hola"); meta.n != 1 || demo.n != 1 {
+		t.Fatalf("meta: %d waha: %d", meta.n, demo.n)
+	}
+	r.WAHA = nil
+	if _, _ = r.SendText(ctx, waha.Prefix+"default", "+57300", "hola"); meta.n != 2 {
+		t.Fatal("sin WAHA va al proveedor")
 	}
 }

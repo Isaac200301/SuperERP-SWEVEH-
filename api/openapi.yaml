@@ -1515,6 +1515,60 @@ paths:
                     properties:
                       proveedor: { type: string }
                       numero: { type: string }
+    put:
+      operationId: setWhatsAppChannel
+      summary: 'Solo fuera de producción: cambia el número del taller entre el simulador (prueba_local) y el WhatsApp de prueba de WAHA (waha, ADR-0027). Permiso workshop:manage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [proveedor]
+              properties:
+                proveedor: { type: string, enum: [prueba_local, waha] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [canal]
+                properties:
+                  canal:
+                    type: object
+                    nullable: true
+                    properties:
+                      proveedor: { type: string }
+                      numero: { type: string }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /whatsapp/waha:
+    get:
+      operationId: getWahaSession
+      summary: 'Solo fuera de producción: estado de la sesión de WAHA y, si espera el escaneo, el QR como data URL (ADR-0027). Permiso workshop:manage'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WahaSession' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /whatsapp/waha/start:
+    post:
+      operationId: startWahaSession
+      summary: 'Solo fuera de producción: crea o arranca la sesión de WAHA para escanear el QR (ADR-0027). Permiso workshop:manage'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WahaSession' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
 
   /simulator/inbound:
     post:
@@ -1675,6 +1729,15 @@ components:
               ordenId: { type: string, format: uuid, description: 'Obligatorio en devoluciones' }
 
   schemas:
+    WahaSession:
+      type: object
+      required: [configurado]
+      properties:
+        configurado: { type: boolean }
+        sesion: { type: string }
+        estado: { type: string, description: 'STOPPED, STARTING, SCAN_QR_CODE, WORKING, FAILED, NOT_FOUND o SIN_CONEXION' }
+        numero: { type: string, description: 'chat del número vinculado, p. ej. 573009999999@c.us' }
+        qr: { type: string, description: 'data:image/png;base64,… mientras espera el escaneo' }
     ItemRecepcion:
       type: object
       required: [clave, nombre]

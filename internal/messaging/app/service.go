@@ -196,6 +196,9 @@ func (s *Service) storeInbound(ctx context.Context, in Inbound) error {
 		if err != nil {
 			return err
 		}
+		if in, err = s.menuReply(ctx, tallerID, conv.ID, in); err != nil {
+			return err
+		}
 		payload, _ := json.Marshal(map[string]any{"boton": in.ButtonID, "nombre": in.Name})
 		wamid := in.WAMID
 		m := Message{ID: shared.NewID(), TallerID: tallerID, ConversationID: conv.ID, Direction: "entrante", WAMID: &wamid,
@@ -211,6 +214,27 @@ func (s *Service) storeInbound(ctx context.Context, in Inbound) error {
 			Payload: map[string]any{"conversacion_id": conv.ID.String(), "celular": in.From, "tipo": in.Kind, "boton": in.ButtonID,
 				"nombre": in.Name}})
 	})
+}
+
+// menuReply convierte un texto en la respuesta de un botón cuando el último mensaje de la conversación fue
+// nuestro con opciones y el cliente contesta con su número o su título ("1", "acepto"). Los canales sin botones
+// (WAHA, ADR-0027) las muestran como menú numerado; con botones reales, escribir la opción también vale.
+func (s *Service) menuReply(ctx context.Context, tallerID, convID shared.ID, in Inbound) (Inbound, error) {
+	if in.Kind != "texto" {
+		return in, nil
+	}
+	last, err := s.repo.Messages(ctx, tallerID, convID, 1)
+	if err != nil || len(last) == 0 || last[0].Direction != "saliente" || last[0].Kind != "botones" {
+		return in, err
+	}
+	var p struct {
+		Buttons []domain.Button `json:"botones"`
+	}
+	_ = json.Unmarshal(last[0].Payload, &p)
+	if id, ok := domain.MatchReply(in.Text, p.Buttons); ok {
+		in.Kind, in.ButtonID = "respuesta_boton", id
+	}
+	return in, nil
 }
 
 // Outgoing es un mensaje que se quiere enviar.

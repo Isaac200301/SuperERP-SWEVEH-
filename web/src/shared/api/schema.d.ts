@@ -1113,8 +1113,43 @@ export interface paths {
         };
         /** Canal de WhatsApp del taller (número de prueba o real, HU-101). Permiso workshop:manage */
         get: operations["getWhatsAppChannel"];
+        /** Solo fuera de producción: cambia el número del taller entre el simulador (prueba_local) y el WhatsApp de prueba de WAHA (waha, ADR-0027). Permiso workshop:manage */
+        put: operations["setWhatsAppChannel"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp/waha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Solo fuera de producción: estado de la sesión de WAHA y, si espera el escaneo, el QR como data URL (ADR-0027). Permiso workshop:manage */
+        get: operations["getWahaSession"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp/waha/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Solo fuera de producción: crea o arranca la sesión de WAHA para escanear el QR (ADR-0027). Permiso workshop:manage */
+        post: operations["startWahaSession"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1159,6 +1194,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        WahaSession: {
+            configurado: boolean;
+            sesion?: string;
+            /** @description STOPPED, STARTING, SCAN_QR_CODE, WORKING, FAILED, NOT_FOUND o SIN_CONEXION */
+            estado?: string;
+            /** @description chat del número vinculado, p. ej. 573009999999@c.us */
+            numero?: string;
+            /** @description data:image/png;base64,… mientras espera el escaneo */
+            qr?: string;
+        };
         ItemRecepcion: {
             /** @description Estable; vacía = se arma con el nombre */
             clave: string;
@@ -3946,6 +3991,83 @@ export interface operations {
                     };
                 };
             };
+        };
+    };
+    setWhatsAppChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    proveedor: "prueba_local" | "waha";
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        canal: {
+                            proveedor?: string;
+                            numero?: string;
+                        } | null;
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getWahaSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WahaSession"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    startWahaSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WahaSession"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     simulateInbound: {
