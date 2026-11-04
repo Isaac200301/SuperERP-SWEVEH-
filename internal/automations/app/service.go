@@ -270,16 +270,40 @@ func Money(v int64) string {
 	return "$" + b.String()
 }
 
-var days = []string{"dom", "lun", "mar", "mie", "jue", "vie", "sab"}
+var (
+	days     = []string{"dom", "lun", "mar", "mie", "jue", "vie", "sab"}
+	dayNames = []string{"domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"}
+)
 
-// ScheduleText da el horario de un día en palabras: "hoy de 7:30 a. m. a 5:30 p. m.".
+// ScheduleText dice cuándo puede pasar el cliente, en hora de Colombia: "hoy de 7:30 a. m. a 5:30 p. m." si hoy
+// abre y no ha cerrado; si no, el siguiente día con horario: "mañana de…" o "el lunes de…" (HU-43, criterio 2).
 func (s *Service) ScheduleText(w Workshop, at time.Time) string {
-	d := days[at.In(s.loc).Weekday()]
-	sl := w.Schedule[d]
-	if sl == nil {
-		return "en nuestro horario de atención"
+	now := at.In(s.loc)
+	for i := range 7 {
+		day := now.AddDate(0, 0, i)
+		sl := w.Schedule[days[day.Weekday()]]
+		if sl == nil || (i == 0 && closed(sl[1], now)) {
+			continue
+		}
+		when := "el " + dayNames[day.Weekday()]
+		switch i {
+		case 0:
+			when = "hoy"
+		case 1:
+			when = "mañana"
+		}
+		return when + " de " + hour(sl[0]) + " a " + hour(sl[1])
 	}
-	return "hoy de " + hour(sl[0]) + " a " + hour(sl[1])
+	return "en nuestro horario de atención"
+}
+
+// closed dice si a la hora de now ya pasó la hora de cierre ("17:30").
+func closed(hhmm string, now time.Time) bool {
+	var h, m int
+	if _, err := fmt.Sscanf(hhmm, "%d:%d", &h, &m); err != nil {
+		return false
+	}
+	return now.Hour()*60+now.Minute() >= h*60+m
 }
 
 func hour(hhmm string) string {
