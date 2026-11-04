@@ -176,6 +176,8 @@ func (s *Service) StatusReply(ctx context.Context, tallerID shared.ID, o OrderIn
 			data["prometida"] = "Te lo tenemos prometido para " + s.FormatDate(*o.PromisedAt, s.clock.Now()) + "."
 		} else if o.State == "listo" {
 			data["prometida"] = "Puedes recogerlo " + s.ScheduleText(w, s.clock.Now()) + "."
+		} else { // HU-22, criterio 2: sin fecha prometida no se inventa una
+			data["prometida"] = "Te avisamos apenas esté listo."
 		}
 		text = strings.TrimSpace(domain.Render(s.text(rules, d), data))
 		return nil

@@ -191,3 +191,24 @@ func TestAutomations_CatalogAndTexts(t *testing.T) {
 		t.Fatalf("HU-42 moto: %v", got)
 	}
 }
+
+// HU-22: al preguntar por el vehículo, con fecha prometida la respuesta la dice; sin fecha, da el estado y "te avisamos
+// apenas esté listo", sin inventar una.
+func TestAgent_StatusWithAndWithoutPromise(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550650", "Rosa Pérez")
+	w := e.whatsapp(t, owner, nil)
+	const andres = "3001234650"
+	id, _ := w.orderFor(w.customer(andres, "Andrés Ruiz"), "PRO651")
+
+	w.write(andres, "Andrés Ruiz", "ya está mi carro?")
+	if got := w.last(andres)["cuerpo"].(string); !strings.Contains(got, "Te avisamos apenas esté listo") || strings.Contains(got, "prometido") {
+		t.Fatalf("sin fecha prometida: %q", got)
+	}
+	when := e.clk.Now().Add(6 * time.Hour)
+	owner.must(http.StatusOK, owner.do("PATCH", "/api/v1/orders/"+id+"/assignment", map[string]any{"fechaPrometida": when.Format(time.RFC3339)}))
+	w.write(andres, "Andrés Ruiz", "cómo va mi carro?")
+	if got := w.last(andres)["cuerpo"].(string); !strings.Contains(got, "Te lo tenemos prometido para") || strings.Contains(got, "Te avisamos apenas") {
+		t.Fatalf("con fecha prometida: %q", got)
+	}
+}

@@ -52,6 +52,28 @@ describe('DashboardPage (HU-68 a HU-71)', () => {
   });
 });
 
+describe('Pendiente hoy (HU-76)', () => {
+  it('cada pendiente lleva a resolverlo', async () => {
+    mockApi({
+      'GET /me': { ...owner, permisos: [...owner.permisos, 'kpi:read'] },
+      'GET /dashboard': tablero('', false),
+      'GET /today': {
+        pendientes: [
+          { tipo: 'aprobacion', titulo: 'GBW118 no ha aprobado', detalle: 'OS-0044 · cotización enviada hace 26 h', ordenId: 'o44', tono: 'warn' },
+          { tipo: 'sin_recoger', titulo: 'Mazda 2 JNX907 · 4 días sin recoger', detalle: 'OS-0040 · Marta Ospina', ordenId: 'o40', tono: 'err' },
+          { tipo: 'borradores', titulo: '2 borradores por revisar', detalle: 'Respuestas del agente esperando tu revisión', tono: 'info' },
+        ],
+      },
+      'GET /workshop': { atiende: 'carro', nombre: 'Taller' },
+      'GET /workshop/settings': {},
+    });
+    renderPage(<DashboardPage />);
+    expect(await screen.findByText(/4 días sin recoger/)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Ver orden' }).map((l) => l.getAttribute('href'))).toEqual(['/panel/ordenes/o44', '/panel/ordenes/o40']);
+    expect(screen.getByRole('link', { name: 'Revisar' })).toHaveAttribute('href', '/panel/por-revisar');
+  });
+});
+
 describe('AutomationsPage (HU-42)', () => {
   it('avisa que en producción el texto de un aviso fuera de la ventana necesita aprobación de Meta', async () => {
     const tarjeta = (codigo: string, fueraDeVentana: boolean) => ({

@@ -45,6 +45,11 @@ export function DashboardPage() {
                     Atender
                   </Link>
                 ) : null}
+                {p.tipo === 'borradores' ? (
+                  <Link className="font-bold underline" to="/panel/por-revisar">
+                    Revisar
+                  </Link>
+                ) : null}
                 {p.tipo === 'inventario' ? (
                   <Link className="font-bold underline" to="/panel/repuestos?bajo=1">
                     Ver repuestos

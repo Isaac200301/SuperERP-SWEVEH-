@@ -123,7 +123,7 @@ func (l *loader) load(today time.Time, orders map[string]string) error {
 	if err != nil {
 		return err
 	}
-	if err := l.at(today.AddDate(0, 0, -4).Add(16 * time.Hour)); err != nil {
+	if err := l.at(l.now.Add(-4*24*time.Hour - 2*time.Hour)); err != nil { // "4 días sin recoger" a cualquier hora del día
 		return err
 	}
 	if err := l.move(id, "listo", nil); err != nil {

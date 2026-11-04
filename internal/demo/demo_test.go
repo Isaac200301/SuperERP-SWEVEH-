@@ -94,6 +94,32 @@ func TestSeedAndReset(t *testing.T) {
 		return nil
 	})
 
+	// Lo que ve Hernán con los datos de la demo: HU-76 (pendientes con su botón), HU-45 (4 días sin recoger) y HU-75
+	// (el ticket explicado frente al mes pasado y con las órdenes que lo mueven).
+	read, err := demo.AsOwner(deps, "/api/v1/today", "/api/v1/dashboard")
+	if err != nil {
+		t.Fatal(err)
+	}
+	today, dash := read[0], read[1]
+	var seen []string
+	for _, x := range today["pendientes"].([]any) {
+		p := x.(map[string]any)
+		seen = append(seen, p["tipo"].(string)+": "+p["titulo"].(string)+" "+p["detalle"].(string))
+	}
+	all := strings.Join(seen, " | ")
+	if !strings.Contains(all, "aprobacion: GBW118 no ha aprobado OS-0044") || !strings.Contains(all, "JNX907 · 4 días sin recoger") {
+		t.Fatalf("HU-76 / HU-45, pendientes de hoy: %s", all)
+	}
+	for _, x := range dash["kpis"].([]any) {
+		k := x.(map[string]any)
+		if k["codigo"] == "ticket" && (!strings.Contains(k["queSignifica"].(string), "mes pasado") || !strings.Contains(k["queSignifica"].(string), "sobre todo OS-")) {
+			t.Fatalf("HU-75: %v", k["queSignifica"])
+		}
+		if k["codigo"] == "aprobaciones" && !strings.HasPrefix(k["texto"].(string), "1 · 2") {
+			t.Fatalf("HU-69 con la demo: %v", k)
+		}
+	}
+
 	if _, err := demo.Seed(context.Background(), deps, false); !errors.Is(err, demo.ErrExists) {
 		t.Fatalf("cargar dos veces sin reiniciar: %v", err)
 	}

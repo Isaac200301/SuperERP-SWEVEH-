@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -189,10 +190,41 @@ func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, erro
 			sum += t
 		}
 		k = KPI{Code: "ticket", Label: "Ticket promedio", Display: "sin datos",
-			Meaning: "Lo que paga en promedio cada cliente por orden entregada este mes (lo aprobado en la cotización)."}
+			Meaning: "Es lo que paga en promedio cada cliente por orden entregada este mes (lo aprobado en la cotización)."}
+		// HU-75: frente al mes pasado y qué órdenes lo mueven.
+		prevIDs, err := st.DeliveredSince(ctx, p.TallerID, monthStart.AddDate(0, -1, 0), flt)
+		if err != nil {
+			return err
+		}
+		cur := map[shared.ID]bool{}
+		for _, id := range ids {
+			cur[id] = true
+		}
+		var onlyPrev []shared.ID
+		for _, id := range prevIDs {
+			if !cur[id] {
+				onlyPrev = append(onlyPrev, id)
+			}
+		}
+		prev, err := h.quotes.ApprovedTotals(ctx, p.TallerID, onlyPrev)
+		if err != nil {
+			return err
+		}
 		if len(totals) > 0 {
 			avg := sum / int64(len(totals))
 			k.Value, k.Display, k.Detail = f(float64(avg)), money(avg), fmt.Sprintf("%d órdenes con cotización aprobada", len(totals))
+			movers, err := h.topOrders(ctx, p.TallerID, totals, 2)
+			if err != nil {
+				return err
+			}
+			k.Meaning += " " + compare(avg, average(prev), "el mes pasado") + " " + movers
+		} else if len(prev) > 0 { // al empezar el mes todavía no hay entregas: se cuenta cómo cerró el anterior
+			movers, err := h.topOrders(ctx, p.TallerID, prev, 2)
+			if err != nil {
+				return err
+			}
+			k.Meaning += fmt.Sprintf(" Todavía no hay entregas este mes; el mes pasado fue %s en %d órdenes. %s", money(average(prev)), len(prev),
+				strings.Replace(movers, "Lo mueven", "Lo movieron", 1))
 		}
 		kpis = append(kpis, k)
 
@@ -238,6 +270,58 @@ func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, erro
 		byState = map[string]int{}
 	}
 	return http.StatusOK, map[string]any{"kpis": kpis, "porEstado": byState, "ejemplo": example, "tipo": kind}, err
+}
+
+// average es el promedio de los totales (0 si no hay).
+func average(totals map[shared.ID]int64) int64 {
+	if len(totals) == 0 {
+		return 0
+	}
+	var sum int64
+	for _, t := range totals {
+		sum += t
+	}
+	return sum / int64(len(totals))
+}
+
+// compare dice en una frase cómo va el número frente a otro periodo (HU-75).
+func compare(now, before int64, period string) string {
+	if before == 0 {
+		return "No hay entregas de " + period + " para comparar."
+	}
+	pct := float64(now-before) * 100 / float64(before)
+	switch {
+	case pct >= 1:
+		return fmt.Sprintf("Va %.0f %% arriba de %s (%s).", pct, period, money(before))
+	case pct <= -1:
+		return fmt.Sprintf("Va %.0f %% abajo de %s (%s).", -pct, period, money(before))
+	}
+	return fmt.Sprintf("Va igual que %s (%s).", period, money(before))
+}
+
+// topOrders nombra las órdenes que más pesan en el ticket (HU-75): "Lo mueven sobre todo OS-0043 ($145.000) y …".
+func (h *Handler) topOrders(ctx context.Context, tallerID shared.ID, totals map[shared.ID]int64, n int) (string, error) {
+	type item struct {
+		id    shared.ID
+		total int64
+	}
+	var list []item
+	for id, t := range totals {
+		list = append(list, item{id, t})
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].total > list[j].total })
+	var parts []string
+	for i := 0; i < len(list) && i < n; i++ {
+		o, err := h.orders.Load(ctx, tallerID, list[i].id)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, fmt.Sprintf("%s (%s)", o.Code, money(list[i].total)))
+	}
+	if len(parts) == 0 {
+		return "", nil
+	}
+	return "Lo mueven sobre todo " + strings.Join(parts, " y ") + ".", nil
 }
 
 // BusinessDays son los días hábiles (lunes a viernes) entre a y b, con fracción: un fin de semana en medio no cuenta.
@@ -292,8 +376,8 @@ func (h *Handler) today(r *http.Request, p reqctx.Principal) (int, any, error) {
 				continue
 			}
 			id := o.ID.String()
-			out = append(out, Pending{Kind: "sin_recoger", Title: fmt.Sprintf("%s %s sin recoger", o.Vehicle, o.Plate),
-				Detail: fmt.Sprintf("Listo hace %d días · %s", d, names[o.CustomerID]), OrderID: &id, Tone: "err"})
+			out = append(out, Pending{Kind: "sin_recoger", Title: fmt.Sprintf("%s %s · %d días sin recoger", o.Vehicle, o.Plate, d),
+				Detail: fmt.Sprintf("%s · %s", o.Code, names[o.CustomerID]), OrderID: &id, Tone: "err"})
 		}
 		if money {
 			pend, err := h.quotes.Pending(ctx, p.TallerID)
