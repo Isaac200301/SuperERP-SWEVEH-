@@ -26,6 +26,8 @@ type Repository interface {
 	WeekCounts(ctx context.Context, tallerID shared.ID, since time.Time) (map[string]int, error)
 	Runs(ctx context.Context, tallerID shared.ID, limit int) ([]Run, error)
 	HasRun(ctx context.Context, tallerID shared.ID, code, key string) (bool, error)
+	// FailRunByMessage marca fallida la ejecución que envió ese mensaje (HU-46).
+	FailRunByMessage(ctx context.Context, tallerID, msgID shared.ID, detail string) error
 }
 
 type Run struct {
@@ -242,6 +244,14 @@ func (s *Service) Runs(ctx context.Context, tallerID shared.ID) ([]Run, error) {
 		return err
 	})
 	return out, err
+}
+
+// OnDeliveryFailed: WhatsApp no entregó el mensaje de una automatización; la ejecución queda fallida para que
+// el dueño lo vea (HU-46). Idempotente: marcarla dos veces deja lo mismo.
+func (s *Service) OnDeliveryFailed(ctx context.Context, tallerID, msgID shared.ID, detail string) error {
+	return s.uow.Do(ctx, func(ctx context.Context) error {
+		return s.repo.FailRunByMessage(ctx, tallerID, msgID, "WhatsApp no lo entregó: "+detail)
+	})
 }
 
 var stateWords = map[string]string{"por_recibir": "por recibir", "recibido": "recibido", "en_diagnostico": "en diagnóstico",

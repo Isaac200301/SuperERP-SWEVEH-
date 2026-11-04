@@ -12,6 +12,7 @@ import (
 	"sweveh/internal/analytics"
 	assistantapp "sweveh/internal/assistant/app"
 	"sweveh/internal/audit"
+	automationsdomain "sweveh/internal/automations/domain"
 	"sweveh/internal/inventory"
 	"sweveh/internal/messaging/adapters/out/whatsapp/meta"
 	messagingapp "sweveh/internal/messaging/app"
@@ -354,6 +355,26 @@ type extra struct{ s *Services }
 
 func (e extra) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error) {
 	return e.s.Messaging.ResponseMinutes(ctx, tallerID, since)
+}
+
+func (e extra) FailedNotices(ctx context.Context, tallerID shared.ID, since time.Time) ([]analytics.FailedNotice, error) {
+	runs, err := e.s.Automations.Runs(ctx, tallerID)
+	var out []analytics.FailedNotice
+	for _, r := range runs {
+		if r.Result != "fallido" || r.CreatedAt.Before(since) {
+			continue
+		}
+		name := r.Code
+		if d, ferr := automationsdomain.Find(r.Code); ferr == nil {
+			name = d.Name
+		}
+		f := analytics.FailedNotice{Name: name, OrderID: r.OrderID, At: r.CreatedAt}
+		if r.Detail != nil {
+			f.Detail = *r.Detail
+		}
+		out = append(out, f)
+	}
+	return out, err
 }
 
 func (e extra) PendingDrafts(ctx context.Context, tallerID shared.ID) (int, error) {

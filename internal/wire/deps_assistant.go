@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	assistantapp "sweveh/internal/assistant/app"
@@ -47,14 +48,34 @@ func (t *taller) PreviousText(ctx context.Context, tallerID, convID shared.ID, b
 	if err != nil {
 		return nil, err
 	}
-	for i := len(msgs) - 1; i >= 0; i-- {
-		m := msgs[i]
-		if m.Direction == "entrante" && m.Kind == "texto" && m.CreatedAt.Before(before) {
-			in, err := t.Message(ctx, tallerID, m.ID)
-			return &in, err
+	// Lo que el cliente escribió mientras esperaba la autorización: los textos desde la última respuesta a una
+	// autorización anterior (gracias / sin autorización) hasta ahora. Se procesan juntos y en orden, para no
+	// perder la pregunta original (HU-85) ni crear un borrador por cada "¿hola?".
+	var since time.Time
+	for _, m := range msgs {
+		if m.Direction == "saliente" && m.Automation != nil && *m.Automation == "consentimiento" && m.Kind == "texto" && m.CreatedAt.Before(before) {
+			since = m.CreatedAt
 		}
 	}
-	return nil, nil
+	var first *assistantapp.Inbound
+	var texts []string
+	for _, m := range msgs {
+		if m.Direction != "entrante" || m.Kind != "texto" || !m.CreatedAt.After(since) || !m.CreatedAt.Before(before) {
+			continue
+		}
+		if first == nil {
+			in, err := t.Message(ctx, tallerID, m.ID)
+			if err != nil {
+				return nil, err
+			}
+			first = &in
+		}
+		texts = append(texts, m.Body)
+	}
+	if first != nil {
+		first.Text = strings.Join(texts, "\n")
+	}
+	return first, nil
 }
 
 func (t *taller) ConsentAsked(ctx context.Context, tallerID, convID shared.ID) (bool, error) {

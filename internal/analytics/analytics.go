@@ -32,6 +32,16 @@ type Extra interface {
 	PendingDrafts(ctx context.Context, tallerID shared.ID) (int, error)
 	LowStock(ctx context.Context, tallerID shared.ID) ([]inventory.Part, error)
 	CustomerNames(ctx context.Context, tallerID shared.ID, ids []shared.ID) (map[shared.ID]string, error)
+	// FailedNotices son los avisos automáticos que WhatsApp no entregó desde since (HU-46).
+	FailedNotices(ctx context.Context, tallerID shared.ID, since time.Time) ([]FailedNotice, error)
+}
+
+// FailedNotice es un aviso que no salió: qué automatización, de qué orden y por qué.
+type FailedNotice struct {
+	Name    string
+	OrderID *shared.ID
+	Detail  string
+	At      time.Time
 }
 
 type Handler struct {
@@ -236,6 +246,19 @@ func (h *Handler) today(r *http.Request, p reqctx.Principal) (int, any, error) {
 			if n > 0 {
 				out = append(out, Pending{Kind: "borradores", Title: fmt.Sprintf("%d borradores por revisar", n), Detail: "Respuestas del agente esperando tu revisión", Tone: "info"})
 			}
+		}
+		failed, err := h.extra.FailedNotices(ctx, p.TallerID, now.AddDate(0, 0, -7))
+		if err != nil {
+			return err
+		}
+		for _, f := range failed {
+			pend := Pending{Kind: "aviso_fallido", Title: fmt.Sprintf("No salió el aviso «%s»", f.Name),
+				Detail: "WhatsApp no lo entregó. Escríbele al cliente por otro medio.", Tone: "err"}
+			if f.OrderID != nil {
+				id := f.OrderID.String()
+				pend.OrderID = &id
+			}
+			out = append(out, pend)
 		}
 		low, err := h.extra.LowStock(ctx, p.TallerID)
 		if err != nil {

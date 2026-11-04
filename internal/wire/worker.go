@@ -27,14 +27,15 @@ func Register(d *outbox.Dispatcher, s *Services) {
 	str := func(p map[string]any, k string) string { s, _ := p[k].(string); return s }
 
 	d.On("orders.estado_cambiado", with(func(ctx context.Context, m outbox.Message, p map[string]any) error {
-		return s.Automations.OnStateChanged(ctx, m.TallerID, m.AggregateID, str(p, "hacia"), m.ID.String())
+		return s.Automations.OnStateChanged(ctx, m.TallerID, m.AggregateID, str(p, "hacia"))
 	}))
 	d.On("quotes.enviada", with(func(ctx context.Context, m outbox.Message, p map[string]any) error {
 		oid, err := shared.ParseID(str(p, "orden_id"))
 		if err != nil {
 			return nil
 		}
-		return s.Automations.OnQuoteSent(ctx, m.TallerID, oid, m.ID.String())
+		n, _ := p["numero"].(float64) // JSON: los números llegan como float64
+		return s.Automations.OnQuoteSent(ctx, m.TallerID, oid, int(n))
 	}))
 	d.On("inventory.bajo_minimo", with(func(ctx context.Context, m outbox.Message, p map[string]any) error {
 		return s.Automations.LowStock(ctx, m.TallerID, m.AggregateID, str(p, "referencia"), "bajo:"+m.AggregateID.String()+":"+time.Now().UTC().Format("2006-01-02"))
@@ -43,7 +44,10 @@ func Register(d *outbox.Dispatcher, s *Services) {
 		return s.Assistant.HandleInbound(ctx, m.TallerID, m.AggregateID)
 	}))
 	d.On("messaging.enviar", with(func(ctx context.Context, m outbox.Message, _ map[string]any) error {
-		return s.Messaging.Deliver(ctx, m.TallerID, m.AggregateID)
+		return s.Messaging.Deliver(ctx, m.TallerID, m.AggregateID, m.Attempts)
+	}))
+	d.On("messaging.envio_fallido", with(func(ctx context.Context, m outbox.Message, p map[string]any) error {
+		return s.Automations.OnDeliveryFailed(ctx, m.TallerID, m.AggregateID, str(p, "error"))
 	}))
 }
 

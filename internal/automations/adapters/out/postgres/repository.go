@@ -48,6 +48,12 @@ func (Repository) HasRun(ctx context.Context, tallerID shared.ID, code, key stri
 	return db.Scalar[bool](ctx, `SELECT EXISTS (SELECT 1 FROM automation.ejecucion WHERE taller_id = $1 AND codigo = $2 AND clave = $3)`, tallerID, code, key)
 }
 
+func (Repository) FailRunByMessage(ctx context.Context, tallerID, msgID shared.ID, detail string) error {
+	_, err := db.Exec(ctx, `UPDATE automation.ejecucion SET resultado = 'fallido', detalle = $3
+		WHERE taller_id = $1 AND mensaje_id = $2`, tallerID, msgID, detail)
+	return err
+}
+
 func (Repository) WeekCounts(ctx context.Context, tallerID shared.ID, since time.Time) (map[string]int, error) {
 	type row struct {
 		Codigo string `db:"codigo"`
