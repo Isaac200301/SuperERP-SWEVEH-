@@ -57,9 +57,12 @@ func TestRouter_SimulatorNumbersStayLocal(t *testing.T) {
 	if id, _ := (whatsapp.Router{Local: local.Channel{}}).SendText(ctx, "PNID-REAL", "+57300", "hola"); !strings.HasPrefix(id, local.Prefix) {
 		t.Fatalf("sin proveedor: %q", id)
 	}
-	// El simulador también respeta el límite de botones (DR-08).
-	four := []domain.Button{{ID: "a", Title: "a"}, {ID: "b", Title: "b"}, {ID: "c", Title: "c"}, {ID: "d", Title: "d"}}
-	if _, err := r.SendButtons(ctx, local.Prefix+"taller", "+57300", "x", four); err == nil {
-		t.Fatal("4 botones en el simulador")
+	// El simulador también respeta el límite de opciones (DR-08): hasta 10 como lista.
+	eleven := make([]domain.Button, 11)
+	for i := range eleven {
+		eleven[i] = domain.Button{ID: string(rune('a' + i)), Title: "x"}
+	}
+	if _, err := r.SendButtons(ctx, local.Prefix+"taller", "+57300", "x", eleven); err == nil {
+		t.Fatal("11 opciones en el simulador")
 	}
 }

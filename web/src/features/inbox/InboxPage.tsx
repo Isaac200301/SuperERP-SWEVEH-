@@ -10,7 +10,7 @@ import { Button } from '../../shared/ui/Button';
 type Borrador = Schemas['Borrador'];
 const card = 'flex flex-col gap-3 rounded-card bg-white p-5';
 const key = ['bandeja'] as const;
-const campos: Record<string, string> = { precio: 'Precio', horario: 'Horario' };
+const campos: Record<string, string> = { precio: 'Precio', horario: 'Horario', otro: 'Pidió algo que no está en tu lista', atiende: 'Atiendes' };
 
 /**
  * HU-62, HU-63 y HU-64: la IA propone, el dueño decide. Nada sale al cliente sin pulsar Enviar (RF-18);

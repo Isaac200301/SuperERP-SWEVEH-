@@ -87,6 +87,10 @@ type message struct {
 			ID    string `json:"id"`
 			Title string `json:"title"`
 		} `json:"button_reply"`
+		ListReply struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		} `json:"list_reply"`
 	} `json:"interactive"`
 	Button struct { // respuesta a un botón de plantilla
 		Payload string `json:"payload"`
@@ -135,6 +139,9 @@ func inbound(pnid, name string, m message) (app.Inbound, bool) {
 		in.Kind, in.Text = "texto", m.Text.Body
 	case "interactive":
 		in.Kind, in.ButtonID, in.Text = "respuesta_boton", m.Interactive.ButtonReply.ID, m.Interactive.ButtonReply.Title
+		if in.ButtonID == "" { // opción de una lista (HU-57)
+			in.ButtonID, in.Text = m.Interactive.ListReply.ID, m.Interactive.ListReply.Title
+		}
 	case "button":
 		in.Kind, in.ButtonID, in.Text = "respuesta_boton", m.Button.Payload, m.Button.Text
 	case "audio":

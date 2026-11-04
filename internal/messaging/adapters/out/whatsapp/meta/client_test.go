@@ -1,6 +1,7 @@
 package meta_test
 
 import (
+	"fmt"
 	"context"
 	"encoding/json"
 	"errors"
@@ -82,24 +83,38 @@ func TestClient_TextButtonsAndTemplate(t *testing.T) {
 	if b["type"] != "interactive" || inter["type"] != "button" || btn["id"] != "quote:aprobar:1" || btn["title"] != "Aprobar" {
 		t.Fatalf("botones: %v", b)
 	}
-	// Más de 3 botones no llega a Meta (DR-08).
-	four := []domain.Button{{ID: "a", Title: "a"}, {ID: "b", Title: "b"}, {ID: "c", Title: "c"}, {ID: "d", Title: "d"}}
-	if _, err := c.SendButtons(ctx, "123", "+573001112233", "x", four); !errors.Is(err, domain.ErrButtons) {
-		t.Fatalf("4 botones: %v", err)
+	// De 4 a 10 opciones va como lista (HU-57); más de 10 no llega a Meta (DR-08).
+	four := []domain.Button{{ID: "estado:1", Title: "KLM482"}, {ID: "estado:2", Title: "ABC12D"}, {ID: "estado:3", Title: "XYZ789"}, {ID: "estado:4", Title: "QWE45R"}}
+	if _, err := c.SendButtons(ctx, "123", "+573001112233", "¿Cuál?", four); err != nil {
+		t.Fatal(err)
+	}
+	b = bodyOf(t, g.reqs[2])
+	inter = b["interactive"].(map[string]any)
+	action := inter["action"].(map[string]any)
+	rows := action["sections"].([]any)[0].(map[string]any)["rows"].([]any)
+	if inter["type"] != "list" || action["button"] != "Ver opciones" || len(rows) != 4 || rows[3].(map[string]any)["id"] != "estado:4" {
+		t.Fatalf("lista: %v", b)
+	}
+	eleven := make([]domain.Button, 11)
+	for i := range eleven {
+		eleven[i] = domain.Button{ID: fmt.Sprint(i), Title: "x"}
+	}
+	if _, err := c.SendButtons(ctx, "123", "+573001112233", "x", eleven); !errors.Is(err, domain.ErrButtons) {
+		t.Fatalf("11 opciones: %v", err)
 	}
 
 	_, err = c.SendTemplate(ctx, "123", "+573001112233", app.Template{Name: "vehiculo_listo", Language: "es_CO", Params: []string{"Laura", "ABC123"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	b = bodyOf(t, g.reqs[2])
+	b = bodyOf(t, g.reqs[3])
 	tpl := b["template"].(map[string]any)
 	params := tpl["components"].([]any)[0].(map[string]any)["parameters"].([]any)
 	if b["type"] != "template" || tpl["name"] != "vehiculo_listo" || tpl["language"].(map[string]any)["code"] != "es_CO" ||
 		len(params) != 2 || params[1].(map[string]any)["text"] != "ABC123" {
 		t.Fatalf("plantilla: %v", b)
 	}
-	if len(g.reqs) != 3 {
+	if len(g.reqs) != 4 {
 		t.Fatalf("peticiones: %d", len(g.reqs))
 	}
 }

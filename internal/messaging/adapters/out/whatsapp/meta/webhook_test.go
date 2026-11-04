@@ -29,6 +29,8 @@ const sample = `{
           {"from": "573001112233", "id": "wamid.B1", "timestamp": "1762200060", "type": "interactive",
            "interactive": {"type": "button_reply", "button_reply": {"id": "quote:aprobar:42", "title": "Aprobar"}}},
           {"from": "573001112233", "id": "wamid.P1", "timestamp": "1762200120", "type": "button", "button": {"payload": "consent:si", "text": "Acepto"}},
+          {"from": "573001112233", "id": "wamid.L1", "timestamp": "1762200150", "type": "interactive",
+           "interactive": {"type": "list_reply", "list_reply": {"id": "estado:7", "title": "ABC12D"}}},
           {"from": "573001112233", "id": "wamid.S1", "timestamp": "1762200180", "type": "sticker", "sticker": {"id": "x"}}
         ],
         "statuses": [
@@ -46,7 +48,7 @@ func TestParser_MessagesButtonsAndStatuses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ins) != 3 { // el sticker se ignora
+	if len(ins) != 4 { // el sticker se ignora
 		t.Fatalf("mensajes: %+v", ins)
 	}
 	if in := ins[0]; in.PhoneNumberID != "PNID-1" || in.From != "+573001112233" || in.Kind != "texto" || in.Text != "¿Ya está mi carro?" ||
@@ -58,6 +60,9 @@ func TestParser_MessagesButtonsAndStatuses(t *testing.T) {
 	}
 	if in := ins[2]; in.Kind != "respuesta_boton" || in.ButtonID != "consent:si" {
 		t.Fatalf("botón de plantilla: %+v", in)
+	}
+	if in := ins[3]; in.Kind != "respuesta_boton" || in.ButtonID != "estado:7" || in.Text != "ABC12D" {
+		t.Fatalf("opción de lista: %+v", in)
 	}
 	if len(sts) != 2 || sts[0].State != "entregado" || sts[1].State != "fallido" || sts[1].WAMID != "wamid.OUT2" {
 		t.Fatalf("estados: %+v", sts) // "deleted" no es un estado que se guarde

@@ -389,10 +389,10 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 		switch {
 		case len(orders) == 1:
 			return s.status(ctx, tallerID, in, c, orders[0])
-		case len(orders) > 1: // HU-57
+		case len(orders) > 1: // HU-57: botones con las placas; de 4 en adelante el canal manda una lista
 			var btns []Button
 			for i, o := range orders {
-				if i == 3 {
+				if i == 10 {
 					break
 				}
 				btns = append(btns, Button{ID: "estado:" + o.ID.String(), Title: o.Plate})

@@ -1217,6 +1217,11 @@ export interface components {
             detalle: string;
             /** Format: uuid */
             ordenId?: string;
+            /**
+             * Format: uuid
+             * @description Conversación que espera a una persona (HU-59)
+             */
+            conversacionId?: string;
             /** @enum {string} */
             tono: "err" | "warn" | "info";
         };

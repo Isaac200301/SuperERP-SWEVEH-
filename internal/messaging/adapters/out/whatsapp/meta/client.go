@@ -84,13 +84,23 @@ func (c *Client) SendButtons(ctx context.Context, pnid, dest, text string, b []d
 	if err := domain.ValidateButtons(b); err != nil {
 		return "", err
 	}
-	btns := make([]map[string]any, 0, len(b))
-	for _, x := range b {
-		btns = append(btns, map[string]any{"type": "reply", "reply": map[string]string{"id": x.ID, "title": x.Title}})
+	interactive := map[string]any{"type": "button", "body": map[string]string{"text": text}}
+	if domain.IsList(b) { // más de 3 opciones: mensaje de lista (HU-57)
+		rows := make([]map[string]string, 0, len(b))
+		for _, x := range b {
+			rows = append(rows, map[string]string{"id": x.ID, "title": x.Title})
+		}
+		interactive["type"] = "list"
+		interactive["action"] = map[string]any{"button": "Ver opciones", "sections": []map[string]any{{"title": "Opciones", "rows": rows}}}
+	} else {
+		btns := make([]map[string]any, 0, len(b))
+		for _, x := range b {
+			btns = append(btns, map[string]any{"type": "reply", "reply": map[string]string{"id": x.ID, "title": x.Title}})
+		}
+		interactive["action"] = map[string]any{"buttons": btns}
 	}
 	return c.send(ctx, pnid, map[string]any{"messaging_product": "whatsapp", "recipient_type": "individual", "to": to(dest),
-		"type": "interactive", "interactive": map[string]any{"type": "button", "body": map[string]string{"text": text},
-			"action": map[string]any{"buttons": btns}}})
+		"type": "interactive", "interactive": interactive})
 }
 
 func (c *Client) SendTemplate(ctx context.Context, pnid, dest string, t app.Template) (string, error) {

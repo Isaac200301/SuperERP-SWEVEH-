@@ -22,14 +22,27 @@ type Button struct {
 	Title string `json:"titulo"`
 }
 
-var ErrButtons = shared.Validation("botones_invalidos", "WhatsApp admite hasta 3 botones de 20 caracteres.")
+var ErrButtons = shared.Validation("botones_invalidos", "WhatsApp admite hasta 3 botones de 20 caracteres o una lista de 10 opciones de 24.")
+
+// MaxButtons es lo que cabe como botones; de 4 a MaxListRows opciones el canal las manda como lista (HU-57).
+const (
+	MaxButtons  = 3
+	MaxListRows = 10
+)
+
+// IsList dice si las opciones van como lista y no como botones.
+func IsList(b []Button) bool { return len(b) > MaxButtons }
 
 func ValidateButtons(b []Button) error {
-	if len(b) > 3 {
+	if len(b) > MaxListRows {
 		return ErrButtons
 	}
+	max := 20
+	if IsList(b) {
+		max = 24
+	}
 	for _, x := range b {
-		if x.ID == "" || x.Title == "" || utf8.RuneCountInString(x.Title) > 20 || len(x.ID) > 256 {
+		if x.ID == "" || x.Title == "" || utf8.RuneCountInString(x.Title) > max || len(x.ID) > 200 {
 			return ErrButtons
 		}
 	}

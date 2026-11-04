@@ -1736,6 +1736,7 @@ components:
         titulo: { type: string }
         detalle: { type: string }
         ordenId: { type: string, format: uuid }
+        conversacionId: { type: string, format: uuid, description: 'Conversación que espera a una persona (HU-59)' }
         tono: { type: string, enum: [err, warn, info] }
 
     Automatizacion:

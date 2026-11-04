@@ -377,6 +377,17 @@ func (e extra) FailedNotices(ctx context.Context, tallerID shared.ID, since time
 	return out, err
 }
 
+func (e extra) HumanRequests(ctx context.Context, tallerID shared.ID) ([]analytics.HumanRequest, error) {
+	list, err := e.s.Messaging.Conversations(ctx, tallerID)
+	var out []analytics.HumanRequest
+	for _, c := range list {
+		if c.WantsHuman && c.Mode == "humano" {
+			out = append(out, analytics.HumanRequest{ConversationID: c.ID, Phone: c.Phone})
+		}
+	}
+	return out, err
+}
+
 func (e extra) PendingDrafts(ctx context.Context, tallerID shared.ID) (int, error) {
 	d, err := e.s.Assistant.Drafts(ctx, tallerID, true)
 	return len(d), err
