@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link } from 'react-router';
 
 import { api, unwrap } from '../../shared/api/client';
 import { Alert } from '../../shared/ui/Alert';
@@ -59,8 +60,11 @@ export function WorkshopPage() {
   if (q.isError) return <Alert>{q.error.message}</Alert>;
   return (
     <>
-      <header>
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[28px] font-extrabold">Mi taller</h1>
+        <Link to="/panel/whatsapp-prueba" className="inline-flex min-h-[44px] items-center font-bold text-primary">
+          Probar WhatsApp
+        </Link>
       </header>
       <ProfileForm t={q.data} />
       <Schedule t={q.data} />

@@ -1,6 +1,7 @@
+import { useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router';
 
-import type { EstadoOrden, Orden } from '../../shared/api/client';
+import { api, unwrap, type EstadoOrden, type Orden } from '../../shared/api/client';
 import { estados, flujoFor } from '../../shared/i18n/es-CO';
 import { formatoFechaHora, formatoHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
@@ -8,6 +9,7 @@ import { IconBack, IconCheck, IconWarn } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
 import { StatePill } from '../../shared/ui/StatePill';
 import { useSession } from '../auth/api';
+import { Thread } from '../messaging/Thread';
 import { useSettings } from '../workshop/SettingsForm';
 import { useOrder } from './api';
 import { DiagnosisPanel } from './DiagnosisPanel';
@@ -65,6 +67,41 @@ function ReceivedPreview({ orden }: { orden: Orden }) {
   );
 }
 
+/** HU-24: la conversación de WhatsApp de esta orden, con hora y quién envió cada mensaje. */
+export function OrderMessages({ orden }: { orden: Orden }) {
+  const q = useQuery({
+    queryKey: ['orden-mensajes', orden.id],
+    queryFn: async () => unwrap(await api.GET('/orders/{id}/messages', { params: { path: { id: orden.id } } })),
+    refetchInterval: 15_000,
+  });
+  let body = <p role="status">Cargando mensajes…</p>;
+  if (q.isError) body = <Alert>{q.error.message}</Alert>;
+  else if (q.isSuccess) body = <Thread mensajes={q.data.mensajes} />;
+  return (
+    <section aria-labelledby="whatsapp" className="flex flex-col gap-3 rounded-card bg-white p-5">
+      <h2 id="whatsapp" className="text-[17px] font-extrabold">
+        WhatsApp
+      </h2>
+      {body}
+    </section>
+  );
+}
+
+/** HU-19: lo que respondió el cliente a la constancia de recibo. */
+function ReceiptAnswer({ orden }: { orden: Orden }) {
+  if (!orden.constancia || !orden.constanciaEn) return null;
+  return orden.constancia === 'observado' ? (
+    <Alert title="El cliente dice que algo no cuadra en el recibo">
+      Respondió a las {formatoHora(orden.constanciaEn)}. Revisa la recepción con él antes de seguir.
+    </Alert>
+  ) : (
+    <p className="flex items-center gap-2 text-sm font-bold text-ok-ink">
+      <IconCheck size={16} />
+      El cliente confirmó el recibo a las {formatoHora(orden.constanciaEn)}
+    </p>
+  );
+}
+
 export function OrderDetailPage() {
   const { id = '' } = useParams();
   const [params] = useSearchParams();
@@ -94,6 +131,7 @@ export function OrderDetailPage() {
           <StatePill estado={o.estado} />
         </div>
         <p className="text-ink-2">Abierta el {formatoFechaHora(o.creadoEn)}</p>
+        <ReceiptAnswer orden={o} />
       </header>
       {params.get('primera') === '1' ? <ReceivedPreview orden={o} /> : null}
       <section className="rounded-card bg-white p-5">
@@ -124,6 +162,7 @@ export function OrderDetailPage() {
       {!['por_recibir', 'cancelada'].includes(o.estado) ? <DiagnosisPanel orden={o} /> : null}
       {/* Se cotiza desde el diagnóstico; en reparación sale la adicional (HU-31). */}
       {!['por_recibir', 'recibido', 'cancelada'].includes(o.estado) ? <QuotePanel orden={o} /> : null}
+      <OrderMessages orden={o} />
     </>
   );
 }

@@ -1,15 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
+import { Link } from 'react-router';
 
 import { api, unwrap, type Schemas } from '../../shared/api/client';
-import { celularValido, formatoCelular, formatoFechaHora, soloCelular } from '../../shared/lib/format';
+import { formatoCelular, formatoFechaHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
-import { Field } from '../../shared/ui/Field';
 
 type Borrador = Schemas['Borrador'];
 const card = 'flex flex-col gap-3 rounded-card bg-white p-5';
 const key = ['bandeja'] as const;
+const campos: Record<string, string> = { precio: 'Precio', horario: 'Horario' };
 
 /**
  * HU-62, HU-63 y HU-64: la IA propone, el dueño decide. Nada sale al cliente sin pulsar Enviar (RF-18);
@@ -49,7 +50,15 @@ function DraftCard({ d }: { d: Borrador }) {
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
       />
-      {d.fuentes && d.fuentes.length > 0 ? <p className="text-sm text-ink-2">Datos tomados de: {d.fuentes.join(', ')}</p> : null}
+      {d.fuentes && d.fuentes.length > 0 ? (
+        <ul className="text-sm text-ink-2" aria-label="De dónde salió cada dato">
+          {d.fuentes.map((f) => (
+            <li key={`${f.campo}-${f.origen}`}>
+              {campos[f.campo] ?? f.campo}: {f.valor} · {f.origen}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {resolver.isError ? <Alert>{resolver.error.message}</Alert> : null}
       <div className="flex flex-wrap gap-3">
         <Button busy={resolver.isPending} missing={texto.trim() ? undefined : 'Escribe la respuesta.'} onClick={() => resolver.mutate('enviar')}>
@@ -63,46 +72,6 @@ function DraftCard({ d }: { d: Borrador }) {
         </Button>
       </div>
     </li>
-  );
-}
-
-/** Simulador del número de prueba (D-01): escribe como si fueras el cliente, sin cuenta de Meta. */
-function Simulator() {
-  const qc = useQueryClient();
-  const [celular, setCelular] = useState('');
-  const [texto, setTexto] = useState('');
-  const enviar = useMutation({
-    mutationFn: async () => unwrap(await api.POST('/simulator/inbound', { body: { celular: soloCelular(celular), nombre: 'Cliente de prueba', texto } })),
-    onSuccess: () => {
-      setTexto('');
-      setTimeout(() => void qc.invalidateQueries({ queryKey: key }), 1500);
-    },
-  });
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    enviar.mutate();
-  };
-  return (
-    <section className={card} aria-labelledby="simulador">
-      <h2 id="simulador" className="text-[17px] font-extrabold">
-        Probar como cliente (número de prueba)
-      </h2>
-      <p className="text-sm text-ink-2">Solo existe fuera de producción. Usa celulares ficticios.</p>
-      <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-[200px_1fr_auto] sm:items-end">
-        <Field label="Celular del cliente" inputMode="tel" value={celular} onChange={(e) => setCelular(e.target.value)} />
-        <Field label="Mensaje" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="¿Ya está mi carro?" />
-        <Button
-          type="submit"
-          variant="secondary"
-          busy={enviar.isPending}
-          missing={!celularValido(celular) ? 'Celular de 10 dígitos.' : texto.trim() ? undefined : 'Escribe el mensaje.'}
-        >
-          Enviar por WhatsApp
-        </Button>
-      </form>
-      {enviar.isError ? <Alert>{enviar.error.message}</Alert> : null}
-      {enviar.isSuccess ? <p role="status">Mensaje recibido. El borrador aparece en unos segundos.</p> : null}
-    </section>
   );
 }
 
@@ -126,7 +95,12 @@ export function InboxPage() {
           <DraftCard key={d.id} d={d} />
         ))}
       </ul>
-      <Simulator />
+      <p className="text-sm text-ink-2">
+        ¿Quieres ver cómo llega un mensaje?{' '}
+        <Link to="/panel/whatsapp-prueba" className="font-bold text-primary">
+          Probar WhatsApp como cliente
+        </Link>
+      </p>
     </>
   );
 }

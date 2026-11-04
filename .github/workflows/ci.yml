@@ -157,6 +157,7 @@ jobs:
           path: |
             .cache/e2e
             .cache/e2e-api/api.log
+            .cache/e2e-api/worker.log
           retention-days: 7
 
   sonar:

@@ -15,6 +15,7 @@ const NewOrderPage = page(() => import('../features/orders/NewOrderPage'), 'NewO
 const OrderDetailPage = page(() => import('../features/orders/OrderDetailPage'), 'OrderDetailPage');
 const FloorPage = page(() => import('../features/orders/FloorPage'), 'FloorPage');
 const InboxPage = page(() => import('../features/inbox/InboxPage'), 'InboxPage');
+const SimulatorPage = page(() => import('../features/messaging/SimulatorPage'), 'SimulatorPage');
 const AutomationsPage = page(() => import('../features/automations/AutomationsPage'), 'AutomationsPage');
 const DashboardPage = page(() => import('../features/dashboard/DashboardPage'), 'DashboardPage');
 const ServicesPage = page(() => import('../features/catalog/ServicesPage'), 'ServicesPage');
@@ -59,6 +60,7 @@ export const router = createBrowserRouter([
       { path: 'catalogo', element: <Navigate to="/panel/repuestos" replace /> },
       { path: 'equipo', element: <Lazy Page={TeamPage} /> },
       { path: 'taller', element: <Lazy Page={WorkshopPage} /> },
+      { path: 'whatsapp-prueba', element: <Lazy Page={SimulatorPage} /> },
       { path: 'arranque', element: <Lazy Page={OnboardingPage} /> },
     ],
   },

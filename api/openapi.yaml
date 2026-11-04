@@ -1765,7 +1765,17 @@ components:
         intencion: { type: string }
         propuesto: { type: string, description: 'Texto que propone la IA o la plantilla; no sale sin aprobación (RF-18)' }
         final: { type: string, nullable: true }
-        fuentes: { type: array, items: { type: string }, nullable: true, description: 'De dónde salió cada dato (HU-64)' }
+        fuentes:
+          type: array
+          nullable: true
+          description: 'De dónde salió cada dato de la respuesta (HU-64)'
+          items:
+            type: object
+            required: [campo, valor, origen]
+            properties:
+              campo: { type: string, description: 'precio, horario…' }
+              valor: { type: string }
+              origen: { type: string, description: 'Servicio: Cambio de aceite, Horario del taller…' }
         accion: { type: object, nullable: true, description: 'Acción propuesta (p. ej. crear la orden con la placa, HU-55)' }
         estado: { type: string }
         origen: { type: string }
@@ -1793,7 +1803,21 @@ components:
         direccion: { type: string }
         tipo: { type: string }
         cuerpo: { type: string }
-        payload: { type: object, nullable: true }
+        payload:
+          type: object
+          nullable: true
+          description: 'Botones de respuesta rápida (máx. 3, DR-08); en un mensaje del cliente, el botón que pulsó'
+          properties:
+            botones:
+              type: array
+              items:
+                type: object
+                required: [id, titulo]
+                properties:
+                  id: { type: string }
+                  titulo: { type: string }
+            boton: { type: string }
+            nombre: { type: string }
         estado: { type: string }
         origen: { type: string }
         ordenId: { type: string, format: uuid, nullable: true }
