@@ -30,5 +30,6 @@ Los **ADR-01 a ADR-21** nacen en `docs/06-arquitectura.md`, sección 14.1 (1-nov
 | [ADR-0025](0025-canal-whatsapp-por-proveedor.md) | Canal de WhatsApp por proveedor: Meta oficial, simulador local, WAHA solo para la demo | Pablo / Propuesta | Propuesto |
 | [ADR-0026](0026-interprete-de-ia-por-proveedor.md) | Intérprete de IA por proveedor: la IA interpreta y el código redacta; reglas por defecto, OpenRouter para la demo | Pablo / Propuesta | Propuesto |
 | [ADR-0027](0027-waha-canal-de-demo.md) | WAHA como WhatsApp de prueba para la demo (no oficial): menú con números en vez de botones, motor GOWS, prohibido en producción | Pablo / Propuesta | Propuesto |
+| [ADR-0028](0028-agente-responde-solo.md) | El agente responde solo, encendido por defecto; se detiene si el cliente pide una persona o el taller toma la conversación; las notas para el dueño esperan en Por revisar | Pablo / Propuesta | Propuesto |
 
 Cuando una propuesta se acepta o se cambia: actualizar la columna Estado, crear el ADR en este directorio si el cambio es nuevo y reflejarlo en `docs/06-arquitectura.md`.
