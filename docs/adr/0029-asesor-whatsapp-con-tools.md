@@ -69,10 +69,16 @@ Qué hace `agendar` según la placa:
   4. el nombre, solo si el que tiene es de relleno.
 - **No pide el celular:** llega con el mensaje de WhatsApp y se guarda al autorizar los datos (HU-85).
 - **Antes de agendar confirma un resumen**, y solo llama a `agendar` cuando el cliente dice que sí. El prompt lleva la fecha y la hora de hoy en Colombia, para entender "mañana", "el sábado" o "a las 3".
-- **`agendar(placa, sintoma, fecha, hora, nombre?)` valida en código:**
-  - que la placa la haya escrito el cliente (HU-55);
-  - que la fecha no esté en el pasado ni a más de 30 días;
-  - que el taller atienda a esa hora según su horario (HU-08). Si no, responde `fuera_de_horario` con el horario de ese día para que el asesor ofrezca otro.
+- **`agendar(placa, sintoma, fecha?, hora?, nombre?)` valida en código y en este orden:**
+
+  | Paso | Qué revisa | Qué responde si falla |
+  |---|---|---|
+  | 1. Placa | La escribió el cliente (HU-55). Si es de otro cliente, lo revisa una persona. Si el vehículo ya está en el taller, devuelve su orden sin pedir la fecha | `placa_no_confirmada`, `revision` o `ya_tenia_orden` |
+  | 2. Día y hora | No en el pasado, hasta 30 días, dentro del horario de ese día (HU-08) | `falta_fecha`, `fecha_invalida` o `fuera_de_horario` con el horario |
+  | 3. Nombre | Si el que tiene es de relleno | `falta_nombre` |
+  | 4. **Confirmación** | Que el **último mensaje del cliente diga que sí** (`domain.IsAffirmative`: "sí", "dale", "confirmo"… pero no "agéndame") | `confirmar` con el resumen, **sin crear nada** |
+
+  Este último paso está en código porque, medido con Nemotron, el modelo agendaba antes de preguntar y al confirmar creaba otra orden. Ahora no puede agendar sin el "sí" del cliente.
 - **La cita queda en la `fecha_prometida`** de la orden "Por recibir". Ahí la busca **AU-06 "Recordatorio de la cita"**, que se la recuerda al cliente ese día; no hizo falta un campo nuevo. Si la placa ya tiene una orden "Por recibir", se reagenda esa misma (`orders.Flow.SetPromise`, auditoría `orden.reagendar`) en vez de crear otra.
 - **El nombre que da el cliente** reemplaza solo uno de relleno ("Cliente de prueba", "Cliente WhatsApp", una letra o números), con `customers` `FillName` y auditoría `cliente.nombre`. Un nombre real no se cambia.
 - **Límite conocido:** el recordatorio AU-06 sale solo si la ventana de 24 h está abierta (HU-47). Una cita agendada con días de anticipación necesita la plantilla de recordatorio aprobada por Meta (Q-07) para que el aviso llegue sin que el cliente haya escrito ese día. Mientras tanto, la ejecución queda como `omitido` con el motivo.
@@ -91,7 +97,7 @@ Qué hace `agendar` según la placa:
 ### Medición (el "entrenamiento")
 - No hay fine-tuning con modelos gratuitos. El comportamiento se ajusta con el prompt, las tools y los guardias, y se mide con `make agent-eval-conv`: 20 conversaciones de 1 a 2 turnos con un taller de prueba, usando el mismo bucle que en producción.
 - **Criterio:** al menos 16 conversaciones completas y 0 precios no consultados.
-- **Resultado del 2026-11-04 con `nvidia/nemotron-3-ultra-550b-a55b:free`: 20/20, 0 precios no consultados, 0 errores**, entre 2 y 12 s por respuesta.
+- **Resultado del 2026-11-04 con `nvidia/nemotron-3-ultra-550b-a55b:free`: 20/20, 0 precios no consultados, 0 errores**, entre 2 y 12 s por respuesta. Con las 4 conversaciones de agendamiento (23 en total): 20/23. Las 4 de agenda, la placa con orden y la placa ajena salieron completas; las 3 que fallaron fueron límites del plan gratuito (429), no del comportamiento.
 - Antes de los ajustes daba 17/20: inventaba un precio, nombraba servicios que no existen, prometía llamadas, usaba `**` y usaba la placa de la moto para agendar el carro.
 
 ## Consecuencias
