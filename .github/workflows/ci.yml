@@ -5,7 +5,8 @@ name: ci
 on:
   pull_request:
   push:
-    branches: [main, developer]
+    # dev/** = ramas de trabajo de cada uno (dev/pablo…): las pruebas corren en cada push, sin esperar al PR.
+    branches: [main, developer, 'dev/**']
 
 permissions:
   contents: read
