@@ -16,13 +16,21 @@
 
 ## Qué sigue (lo escribe el agente al cerrar cada sesión)
 
-1. Isaac/Pablo: revisar y hacer merge del PR #8 (`dev/pablo`) con el CI en verde.
-2. **T3 quedó en código y probado con reglas** (`internal/server/agent_test.go`, `internal/assistant/eval`). Para la demo: OpenRouter gratis con Nemotron 3 Ultra y dos respaldos (`AI_MODEL` con varios separados por coma, clave en `.env`); `make agent-eval` da 28/30 servicios y 30/30 intenciones a US$0 (ver `docs/07`, D-08). Las reglas dan 28/30 y 29/30.
-3. **WhatsApp de prueba con WAHA (ADR-0027) en código y probado contra un WAHA falso y contra la imagen real** (sesión y QR). Falta un **número de prueba** para la prueba completa: `make waha` (claves en `.env`), `make migrate` (00022), Mi taller → WhatsApp de prueba → escanear el QR → "Responder por este número", y escribir desde otro celular. Revisar entonces el id de `sendText` contra `message.ack` y si llegan remitentes `@lid`. Meta sigue para producción (número de prueba + URL pública, ADR-0025).
-4. **Supabase staging:** borrar "weveh" y crear `sweveh-staging` en `sa-east-1`. Bloqueado: el conector de Supabase solo ve "Isaac200301's Org"; hay que reconectarlo con la cuenta de weveh.
-5. Siguiente tramo: **T4 (números y catálogo)**. HU-99 tiene el registro por llamada; la vista del costo va con el medidor del administrador (HU-40).
-6. Pendientes del T3: fecha deseada en la orden creada por la placa (HU-55), última foto marcada para el cliente en el estado (HU-56), mensajes reales anonimizados para HU-102. Cobertura de `assistant/app` 79,6 % (no entra todavía a la lista vigilada; `assistant/domain` sí, 96 %).
-7. Decidir Q-33 y validar el checklist de moto con 2 talleres (Q-02). AQ-10 antes de datos reales.
+1. **Isaac y Pablo:** revisar y hacer merge del PR #9 (`dev/pablo`) con el CI en verde. Se puede revisar commit por commit: hay un commit por tramo.
+2. **Todas las HU de la demo están en código y con pruebas:** T3 (agente y asesor con tools, ADR-0028, ADR-0029), T4 (tablero, catálogo y medidor del administrador, ADR-0030), T5 (taller ficticio, `make seed-demo` / `make reset-demo`, ADR-0031) y lo de T6 que pide la demo (HU-22, HU-45, HU-75, HU-76 y HU-93, ADR-0032). Ninguna está "Terminada" según R-03, porque falta staging.
+3. **Ensayo de la demo:**
+   - `make reset-demo` con los celulares del equipo en `DEMO_CELULAR_*`;
+   - WhatsApp de prueba (WAHA, `make waha`) con un número de prueba;
+   - correr las 10 escenas dos veces y medir que tarden menos de 17 minutos (HU-97, criterio 3).
+
+   **Ojo:** AU-06 y AU-07 solo salen con la ventana de 24 h abierta hasta tener plantillas aprobadas (Q-07).
+4. **Supabase staging:** borrar "weveh" y crear `sweveh-staging` en `sa-east-1`. Está bloqueado: el conector de Supabase solo ve "Isaac200301's Org" y hay que reconectarlo con la cuenta de weveh.
+5. **Resto de T6 (no demo):** HU-06, HU-15, HU-30, HU-44, HU-60, HU-61, HU-66, HU-72, HU-82, HU-87, HU-92, HU-100 y HU-101 siguen pendientes. Además, HU-26, HU-31, HU-35 a HU-38, HU-83 y HU-84 están "En curso" con código y falta revisarlas criterio por criterio.
+6. **Medir con datos reales:**
+   - asesor: `make agent-eval-conv`, una vez por día, por el límite del plan gratuito;
+   - lista de precios por foto (HU-93) con fotos reales;
+   - mensajes reales anonimizados para HU-102.
+7. **Decisiones abiertas:** D-04 (plan y mensajes incluidos), Q-24, Q-33, AQ-09 (IA en producción) y AQ-10 (asesoría jurídica antes de datos reales). Validar el checklist de moto con 2 talleres (Q-02).
 
 ## Estado por historia
 
