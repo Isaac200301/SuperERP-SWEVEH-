@@ -296,7 +296,7 @@ Nota sobre RF-16: la respuesta de estado se arma con una plantilla y datos de la
 | RNF-02 | Celular primero | Todas las pantallas del mecánico usables a 400 px de ancho, con una mano | `[Propuesta]`; Tuulapp se usa desde móvil (ficha) |
 | RNF-03 | Velocidad del borrador | Tarjeta en "Por revisar" en menos de 30 s desde que llega el mensaje | `[Propuesta]`; no hay línea base |
 | RNF-04 | Velocidad de avisos | Aviso de cambio de estado enviado en menos de 1 minuto | `[Propuesta]` |
-| RNF-05 | IA acotada | Una llamada al modelo por mensaje; salida JSON validada por código; cero precios fuera de lista | `[Equipo]` reglas en código; flujo v0 |
+| RNF-05 | IA acotada | Una llamada al modelo por mensaje; salida JSON validada por código; cero precios fuera de lista. **ADR-0029:** el asesor usa hasta 4 rondas con tools (más una de corrección); los precios del texto deben salir de una tool y las reglas viven en las tools | `[Equipo]` reglas en código; flujo v0 |
 | RNF-06 | IA intercambiable | Proveedor detrás de una interfaz propia; costo y tokens registrados por conversación | `[Equipo]` capa multi-proveedor |
 | RNF-07 | Canal intercambiable | WhatsApp detrás de una interfaz `CanalMensajeria` para pasar del número de prueba al número del taller sin tocar el resto | `[Propuesta]` del artifact Arranque |
 | RNF-08 | Uso permitido por Meta | El agente responde solo sobre el taller; nunca como asistente general | `[Tercero]` política desde 15-ene-2026[7] |
