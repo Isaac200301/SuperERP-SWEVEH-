@@ -19,7 +19,7 @@ var catalog = []Priced{
 }
 
 func TestParseUnderstanding_ValidatesSchema(t *testing.T) {
-	names := Names(catalog)
+	names := Names(Items(catalog))
 	ok := `{"intencion":"cotizar","vehiculo":{"tipo":"carro","marca":"Chevrolet","linea":"Spark GT","anio":2015},"placa":"",
 		"sintoma":"chilla al frenar","servicios":["revisión de frenos","Cambio de pastillas","Sincronización"],"otros":[],"fecha":"manana"}`
 	u, err := ParseUnderstanding([]byte(ok), "mi Spark GT 2015 chilla al frenar", names)
@@ -63,8 +63,9 @@ func TestParseUnderstanding_PlateMustBeInTheMessage(t *testing.T) {
 }
 
 func TestInterpret_Rules(t *testing.T) {
-	names := Names(catalog)
-	u := Interpret("Hola, mi Spark GT 2015 está chillando cuando freno, ¿puedo llevarlo mañana?", names)
+	items := Items(catalog)
+	names := Names(items)
+	u := Interpret("Hola, mi Spark GT 2015 está chillando cuando freno, ¿puedo llevarlo mañana?", items)
 	if u.Vehicle != (Vehicle{Type: "carro", Brand: "Chevrolet", Line: "Spark GT", Year: 2015}) {
 		t.Fatalf("vehículo = %+v", u.Vehicle)
 	}
@@ -72,9 +73,16 @@ func TestInterpret_Rules(t *testing.T) {
 		t.Fatalf("%+v", u)
 	}
 	for _, text := range []string{"mi NMAX hace ruido en la cadena", "la nave no prende", "cuánto el aceite de la moto"} {
-		if v := Interpret(text, names).Vehicle; v.Type != "moto" {
+		if v := Interpret(text, items).Vehicle; v.Type != "moto" {
 			t.Errorf("%q: tipo = %q", text, v.Type)
 		}
+	}
+	// "motor" no es "moto"; y de una moto no salen servicios que solo son de carro.
+	if v := Interpret("se prendió el testigo del motor", items).Vehicle; v.Type != "" {
+		t.Errorf("motor: tipo = %q", v.Type)
+	}
+	if u := Interpret("ajuste de cadena y cambio de pastillas de la moto", items); contains(u.Services, "Cambio de pastillas") || !contains(u.Services, "Ajuste de cadena") {
+		t.Errorf("moto: servicios = %v", u.Services)
 	}
 	for text, kind := range map[string]string{
 		"¿qué tiene mi carro? hace un ruido raro": "diagnostico",
@@ -82,7 +90,7 @@ func TestInterpret_Rules(t *testing.T) {
 		"escríbeme un poema":                      "fuera_tema",
 		"ya puedo ir por la nave?":                "estado",
 	} {
-		if got := Interpret(text, names).Intent; got != kind {
+		if got := Interpret(text, items).Intent; got != kind {
 			t.Errorf("%q: intención %q, quería %q", text, got, kind)
 		}
 	}

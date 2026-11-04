@@ -14,15 +14,41 @@ type Priced struct {
 	Vehicle string // carro | moto | ambos ("" = ambos)
 }
 
-// Names son los nombres que se le dan al intérprete como lista cerrada.
-func Names(lists ...[]Priced) []string {
-	var out []string
+// CatalogItem es lo que ve el intérprete de la lista del taller: nombre y tipo de vehículo, sin precios (la IA
+// nunca los necesita: el precio lo pone el código, HU-53).
+type CatalogItem struct {
+	Name    string `json:"nombre"`
+	Vehicle string `json:"tipo"`
+}
+
+// Items junta servicios y repuestos sin repetir nombres; un nombre de carro y de moto queda como "ambos".
+func Items(lists ...[]Priced) []CatalogItem {
+	var out []CatalogItem
+	idx := map[string]int{}
 	for _, l := range lists {
 		for _, p := range l {
-			if !oneOf(p.Name, out...) {
-				out = append(out, p.Name)
+			v := p.Vehicle
+			if v == "" {
+				v = "ambos"
 			}
+			if i, ok := idx[p.Name]; ok {
+				if out[i].Vehicle != v {
+					out[i].Vehicle = "ambos"
+				}
+				continue
+			}
+			idx[p.Name] = len(out)
+			out = append(out, CatalogItem{Name: p.Name, Vehicle: v})
 		}
+	}
+	return out
+}
+
+// Names son los nombres de la lista cerrada (enum del esquema y validación).
+func Names(items []CatalogItem) []string {
+	out := make([]string, 0, len(items))
+	for _, i := range items {
+		out = append(out, i.Name)
 	}
 	return out
 }

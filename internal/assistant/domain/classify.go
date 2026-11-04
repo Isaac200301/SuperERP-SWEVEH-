@@ -86,7 +86,7 @@ func Classify(text string) Intent {
 
 // Interpret es el intérprete por reglas (proveedor "reglas"): lo mismo que se le pide a la IA, sin costo y
 // determinista. Los servicios salen de la lista del taller por coincidencia de palabras (Matches).
-func Interpret(text string, catalog []string) Understanding {
+func Interpret(text string, catalog []CatalogItem) Understanding {
 	in := Classify(text)
 	u := Understanding{Intent: in.Kind, Vehicle: in.Vehicle, Plate: in.Plate, ForDate: in.ForDate, Services: []string{}, Others: []string{}}
 	if in.Kind != "humano" && in.Kind != "fuera_tema" && in.Kind != "saludo" && in.Kind != "estado" {
@@ -95,8 +95,9 @@ func Interpret(text string, catalog []string) Understanding {
 			u.Symptom = string([]rune(u.Symptom)[:300])
 		}
 		for _, c := range catalog {
-			if Matches(c, in.Wants) {
-				u.Services = append(u.Services, c)
+			other := u.Vehicle.Type != "" && c.Vehicle != "ambos" && c.Vehicle != "" && c.Vehicle != u.Vehicle.Type
+			if !other && Matches(c.Name, in.Wants) {
+				u.Services = append(u.Services, c.Name)
 			}
 		}
 	}
@@ -142,10 +143,18 @@ func VehicleIn(t string) Vehicle {
 			break
 		}
 	}
+	word := func(ws ...string) bool { // palabra completa: "motor" no es "moto"
+		for _, w := range words {
+			if oneOf(w, ws...) {
+				return true
+			}
+		}
+		return false
+	}
 	switch {
-	case has(t, "moto", "la nave", "scooter", "motico"):
+	case word("moto", "motos", "motico", "scooter") || has(t, "la nave"):
 		v.Type = "moto"
-	case v.Type == "" && has(t, "carro", "camioneta", "campero", "automovil"):
+	case v.Type == "" && word("carro", "carrito", "camioneta", "campero", "automovil"):
 		v.Type = "carro"
 	}
 	if m := reYear.FindString(t); m != "" {

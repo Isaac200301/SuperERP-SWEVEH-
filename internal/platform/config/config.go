@@ -88,6 +88,10 @@ func engine(env Env, errs *[]error) (WhatsApp, AI) {
 	case wa.Provider == "local" && env == EnvProduction:
 		*errs = append(*errs, errors.New("WHATSAPP_PROVIDER=local (simulador) no se permite en producción"))
 	}
+	return wa, aiConfig(env, errs)
+}
+
+func aiConfig(env Env, errs *[]error) AI {
 	ai := AI{Provider: get("AI_PROVIDER", "reglas"), APIKey: os.Getenv("AI_API_KEY"), Model: os.Getenv("AI_MODEL"),
 		APIBase: get("AI_API_BASE", "https://openrouter.ai/api/v1"), MonthlyCapMicroUSD: int64(getInt("AI_MONTHLY_CAP_MICRO_USD", 5_000_000, errs))}
 	switch {
@@ -98,7 +102,14 @@ func engine(env Env, errs *[]error) (WhatsApp, AI) {
 	case ai.Provider == "openrouter" && env == EnvProduction:
 		*errs = append(*errs, errors.New("AI_PROVIDER=openrouter es solo para la demo: falta cerrar AQ-09 antes de producción"))
 	}
-	return wa, ai
+	return ai
+}
+
+// LoadAI lee solo la configuración de la IA (cmd/agent-eval mide el modelo sin base de datos, HU-102).
+func LoadAI() (AI, error) {
+	var errs []error
+	ai := aiConfig(Env(get("APP_ENV", "local")), &errs)
+	return ai, errors.Join(errs...)
 }
 
 // LoadAPI lee la configuración del api.

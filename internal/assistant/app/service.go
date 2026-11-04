@@ -115,7 +115,7 @@ type Interpreter interface {
 // Sin datos personales del cliente (nombre, celular): no hacen falta para interpretar (AQ-10).
 type InterpretRequest struct {
 	Text, Workshop, Attends string
-	Catalog                 []string
+	Catalog                 []domain.CatalogItem
 }
 
 // InterpretResult es la salida cruda con su costo.
@@ -356,7 +356,7 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 		return err
 	}
 	u, ok, err := s.interpret(ctx, tallerID, in, InterpretRequest{Text: in.Text, Workshop: name, Attends: attends,
-		Catalog: domain.Names(services, parts)})
+		Catalog: domain.Items(services, parts)})
 	if err != nil {
 		return err
 	}
@@ -473,7 +473,7 @@ func (s *Service) interpret(ctx context.Context, tallerID shared.ID, in Inbound,
 	case err != nil:
 		result = "error"
 	default:
-		if u, err = domain.ParseUnderstanding(r.Raw, req.Text, req.Catalog); err != nil {
+		if u, err = domain.ParseUnderstanding(r.Raw, req.Text, domain.Names(req.Catalog)); err != nil {
 			result = "invalido"
 		}
 	}

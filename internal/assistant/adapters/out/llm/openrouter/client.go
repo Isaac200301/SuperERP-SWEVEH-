@@ -55,7 +55,8 @@ Reglas:
 - marca, linea y anio solo si el cliente los dice o el modelo los implica (Spark → Chevrolet). anio 0 si no lo dice.
 - placa: solo si está escrita en el mensaje, sin espacios ni guiones. Si no, "".
 - sintoma: lo que le pasa al vehículo, en pocas palabras. "" si no dice.
-- servicios: SOLO nombres exactos de esta lista del taller que correspondan a lo que pide o a su síntoma: %s.
+- servicios: SOLO nombres exactos de esta lista del taller (cada uno con el tipo de vehículo al que aplica) que
+  correspondan a lo que pide o a su síntoma, y que apliquen a su tipo de vehículo: %s.
   Lo que pide y no está en la lista va en "otros". Nunca inventes servicios ni precios.
 - fecha: "hoy", "manana" o "".`
 
@@ -104,7 +105,7 @@ func (c *Client) Interpret(ctx context.Context, r app.InterpretRequest) (app.Int
 			{Role: "user", Content: "Mensaje del cliente:\n<<<\n" + r.Text + "\n>>>"},
 		},
 		ResponseFormat: map[string]any{"type": "json_schema", "json_schema": map[string]any{
-			"name": "interpretacion", "strict": true, "schema": domain.UnderstandingSchema(r.Catalog)}},
+			"name": "interpretacion", "strict": true, "schema": domain.UnderstandingSchema(domain.Names(r.Catalog))}},
 		Usage: map[string]bool{"include": true},
 	})
 	if err != nil {

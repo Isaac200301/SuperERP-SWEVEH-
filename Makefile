@@ -9,7 +9,7 @@ GITLEAKS_IMAGE  := zricethezav/gitleaks:v8.30.1
 -include .env
 export
 
-.PHONY: help up down dev dev-api dev-worker dev-web migrate migrate-down gen gen-check lint test test-go test-web cover vuln secrets ci build image e2e seed-demo reset-demo
+.PHONY: help up down dev dev-api dev-worker dev-web agent-eval migrate migrate-down gen gen-check lint test test-go test-web cover vuln secrets ci build image e2e seed-demo reset-demo
 
 help: ## Lista los comandos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -40,6 +40,9 @@ dev-worker: ## Corre el worker en local
 
 dev-web: ## Corre el frontend con Vite
 	npm --prefix web run dev
+
+agent-eval: ## Mide el intérprete configurado (AI_PROVIDER) con los 30 mensajes de HU-102
+	go run ./cmd/agent-eval
 
 gen: ## Regenera sqlc y los tipos TypeScript del contrato OpenAPI
 	docker run --rm -v "$(CURDIR):/src" -w /src $(SQLC_IMAGE) generate
