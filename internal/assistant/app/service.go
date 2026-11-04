@@ -170,12 +170,12 @@ type AuditLog interface {
 type Clock interface{ Now() time.Time }
 
 type Service struct {
-	uow    UnitOfWork
-	repo   Repository
-	taller Taller
-	audit  AuditLog
-	clock  Clock
-	ai     Interpreter
+	uow     UnitOfWork
+	repo    Repository
+	taller  Taller
+	audit   AuditLog
+	clock   Clock
+	ai      Interpreter
 	free    Interpreter // reglas: respaldo sin costo cuando se agota el tope mensual
 	capUSD  int64
 	advisor Advisor // asesor con tools (ADR-0029); nil = solo el flujo de reglas

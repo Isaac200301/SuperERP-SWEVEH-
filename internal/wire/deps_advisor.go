@@ -2,6 +2,7 @@ package wire
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"time"
@@ -79,7 +80,7 @@ func (t *taller) SendMedia(ctx context.Context, tallerID shared.ID, phone, capti
 	}
 	_, err := t.s.Messaging.Enqueue(ctx, messagingapp.Outgoing{TallerID: tallerID, Phone: phone, Text: caption, Origin: "agente",
 		Automation: &auto, Media: ref})
-	if err == messagingapp.ErrOutsideWindow {
+	if errors.Is(err, messagingapp.ErrOutsideWindow) {
 		return false, nil
 	}
 	return err == nil, err

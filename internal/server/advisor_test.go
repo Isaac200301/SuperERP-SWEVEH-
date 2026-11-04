@@ -26,7 +26,9 @@ func (f *fakeAdvisor) Chat(_ context.Context, r assistantapp.ChatRequest) (assis
 	f.mu.Unlock()
 	step := f.step
 	if step == nil {
-		step = func(assistantapp.ChatRequest) (assistantapp.ChatMessage, error) { return say("¿En qué te ayudo?"), nil }
+		step = func(assistantapp.ChatRequest) (assistantapp.ChatMessage, error) {
+			return say("¿En qué te ayudo?"), nil
+		}
 	}
 	m, err := step(r)
 	return assistantapp.ChatResult{Message: m, Provider: "falsa", Model: "asesor", TokensIn: 300, TokensOut: 60}, err
@@ -36,7 +38,9 @@ func call(name, args string) assistantapp.ChatMessage {
 	return assistantapp.ChatMessage{Role: "assistant", ToolCalls: []assistantapp.ToolCall{{ID: "c-" + name, Name: name, Args: args}}}
 }
 
-func say(text string) assistantapp.ChatMessage { return assistantapp.ChatMessage{Role: "assistant", Content: text} }
+func say(text string) assistantapp.ChatMessage {
+	return assistantapp.ChatMessage{Role: "assistant", Content: text}
+}
 
 // toolResult son las respuestas de las tools desde el último mensaje del cliente.
 func toolResult(r assistantapp.ChatRequest) string {
