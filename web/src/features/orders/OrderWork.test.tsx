@@ -61,6 +61,26 @@ describe('OrderActions (HU-20, HU-25)', () => {
   });
 });
 
+describe('OrderActions con estados opcionales del taller', () => {
+  const params = { usarEsperandoRepuesto: true, usarControlCalidad: true };
+  it('en reparación permite Esperando repuesto con motivo y avanza a Control de calidad, no a Listo', async () => {
+    const calls = mockApi({ 'GET /me': owner, 'GET /workshop/settings': params, 'POST /orders/{id}/transition': orden() });
+    renderPage(<OrderActions orden={o({ estado: 'en_reparacion' })} />);
+    expect(await screen.findByRole('button', { name: 'Pasar a Control de calidad' })).toBeInTheDocument();
+    expect(screen.getByText('Escribe qué repuesto falta.')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('¿Qué repuesto falta?'), 'Kit de embrague');
+    await userEvent.click(screen.getByRole('button', { name: 'Poner en Esperando repuesto' }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ estado: 'esperando_repuesto', version: 3, motivo: 'Kit de embrague' }));
+  });
+
+  it('esperando repuesto solo vuelve a En reparación', async () => {
+    mockApi({ 'GET /me': owner, 'GET /workshop/settings': params });
+    renderPage(<OrderActions orden={o({ estado: 'esperando_repuesto' })} />);
+    expect(await screen.findByRole('button', { name: 'Pasar a En reparación' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Devolver a/ })).not.toBeInTheDocument();
+  });
+});
+
 describe('ReceptionPanel (HU-17, HU-21)', () => {
   it('dice qué falta, guarda el checklist, sube fotos y notas', async () => {
     const calls = mockApi({

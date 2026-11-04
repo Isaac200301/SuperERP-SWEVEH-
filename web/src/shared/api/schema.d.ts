@@ -1563,8 +1563,11 @@ export interface components {
             vehiculo: components["schemas"]["Vehiculo"];
             existente: boolean;
         };
-        /** @enum {string} */
-        EstadoOrden: "por_recibir" | "recibido" | "en_diagnostico" | "esperando_aprobacion" | "en_reparacion" | "listo" | "entregado" | "cancelada";
+        /**
+         * @description esperando_repuesto y control_calidad solo si el taller los activa en sus parámetros
+         * @enum {string}
+         */
+        EstadoOrden: "por_recibir" | "recibido" | "en_diagnostico" | "esperando_aprobacion" | "en_reparacion" | "esperando_repuesto" | "control_calidad" | "listo" | "entregado" | "cancelada";
         Orden: {
             /** Format: uuid */
             id: string;

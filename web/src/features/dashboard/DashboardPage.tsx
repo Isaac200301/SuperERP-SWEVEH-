@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 
 import { api, unwrap, type EstadoOrden } from '../../shared/api/client';
-import { estados, flujo } from '../../shared/i18n/es-CO';
+import { estados, flujoFor } from '../../shared/i18n/es-CO';
+import { useSettings } from '../workshop/SettingsForm';
 import { Alert } from '../../shared/ui/Alert';
 
 const tonos = { err: 'bg-err-tint text-err-ink', warn: 'bg-warn-tint text-warn-ink', info: 'bg-primary-tint' } as const;
@@ -10,6 +11,7 @@ const tonos = { err: 'bg-err-tint text-err-ink', warn: 'bg-warn-tint text-warn-i
 /** HU-68…73 y HU-76: los 6 números del taller, cada uno con "qué significa" (HU-75), y lo pendiente de hoy. */
 export function DashboardPage() {
   const kpis = useQuery({ queryKey: ['tablero'], queryFn: async () => unwrap(await api.GET('/dashboard')), refetchInterval: 60_000 });
+  const settings = useSettings().data;
   const hoy = useQuery({ queryKey: ['hoy'], queryFn: async () => unwrap(await api.GET('/today')).pendientes, refetchInterval: 60_000 });
   return (
     <>
@@ -61,7 +63,7 @@ export function DashboardPage() {
               Órdenes abiertas por estado
             </h2>
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
-              {flujo
+              {[...flujoFor(settings), ...(settings?.usarEsperandoRepuesto ? (['esperando_repuesto'] as EstadoOrden[]) : [])]
                 .filter((e) => e !== 'entregado')
                 .map((e: EstadoOrden) => (
                   <li key={e} className="rounded-2xl bg-surface p-3">

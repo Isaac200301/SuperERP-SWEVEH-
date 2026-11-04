@@ -1,20 +1,23 @@
 import { Link, useParams, useSearchParams } from 'react-router';
 
 import type { EstadoOrden, Orden } from '../../shared/api/client';
-import { estados, flujo } from '../../shared/i18n/es-CO';
+import { estados, flujoFor } from '../../shared/i18n/es-CO';
 import { formatoFechaHora, formatoHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { IconBack, IconCheck, IconWarn } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
 import { StatePill } from '../../shared/ui/StatePill';
 import { useSession } from '../auth/api';
+import { useSettings } from '../workshop/SettingsForm';
 import { useOrder } from './api';
 import { DiagnosisPanel } from './DiagnosisPanel';
 import { OrderActions, QuotePanel, ReceptionPanel } from './OrderWork';
 
 /** Stepper de los 7 estados con la hora de cada paso (docs/10 §4.3). */
 export function StateStepper({ orden }: { orden: Orden }) {
-  const actual = flujo.indexOf(orden.estado);
+  const flujo = flujoFor(useSettings().data);
+  // Esperando repuesto es un desvío de En reparación: el stepper la muestra en ese paso.
+  const actual = flujo.indexOf(orden.estado === 'esperando_repuesto' ? 'en_reparacion' : orden.estado);
   const horas = new Map<EstadoOrden, string>();
   for (const h of orden.historial ?? []) horas.set(h.hacia, h.ocurridoEn);
   return (

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 
-import { ApiError, type Orden, type Schemas } from '../../shared/api/client';
-import { estados, flujo } from '../../shared/i18n/es-CO';
+import { ApiError, type EstadoOrden, type Orden, type Schemas } from '../../shared/api/client';
+import { estados, flujoFor } from '../../shared/i18n/es-CO';
 import { formatoCOP, formatoHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
@@ -21,6 +21,7 @@ import {
   type ItemRevisado,
 } from './work';
 import { usePermission } from '../auth/api';
+import { useSettings } from '../workshop/SettingsForm';
 
 export const cotizarEvento = 'sweveh:cotizar';
 
@@ -62,12 +63,20 @@ export function OrderActions({ orden }: { orden: Orden }) {
   const [motivo, setMotivo] = useState('');
   const [recogido, setRecogido] = useState('');
   const [accesorios, setAccesorios] = useState(false);
+  const [falta, setFalta] = useState('');
+  const settings = useSettings().data;
+  const flujo = flujoFor(settings);
   const i = flujo.indexOf(orden.estado);
-  if (i < 0 || orden.estado === 'entregado') return null;
-  const siguiente = flujo[i + 1];
-  const anterior = i > 0 ? flujo[i - 1] : undefined;
-  const sinAprobacion = siguiente === 'en_reparacion';
+  if (orden.estado === 'entregado' || orden.estado === 'cancelada') return null;
+  // Esperando repuesto solo vuelve a En reparación; Control de calidad apagado con la orden adentro sale a Listo.
+  let siguiente: EstadoOrden | undefined = flujo[i + 1];
+  let anterior: EstadoOrden | undefined = i > 0 ? flujo[i - 1] : undefined;
+  if (orden.estado === 'esperando_repuesto') [siguiente, anterior] = ['en_reparacion', undefined];
+  else if (i < 0 && orden.estado === 'control_calidad') [siguiente, anterior] = ['listo', 'en_reparacion'];
+  else if (i < 0) return null;
+  const sinAprobacion = siguiente === 'en_reparacion' && orden.estado !== 'esperando_repuesto';
   const entrega = siguiente === 'entregado';
+  const puedeEsperar = orden.estado === 'en_reparacion' && settings?.usarEsperandoRepuesto === true;
 
   return (
     <section className={card} aria-labelledby="acciones">
@@ -114,6 +123,21 @@ export function OrderActions({ orden }: { orden: Orden }) {
           </Button>
         ) : null}
       </div>
+      {puedeEsperar ? (
+        <div className="flex flex-wrap items-end gap-3 border-t border-line pt-3">
+          <div className="min-w-[220px] flex-1">
+            <Field label="¿Qué repuesto falta?" value={falta} onChange={(e) => setFalta(e.target.value)} placeholder="Kit de embrague, llega el jueves" />
+          </div>
+          <Button
+            variant="secondary"
+            busy={mover.isPending}
+            missing={falta.trim() ? undefined : 'Escribe qué repuesto falta.'}
+            onClick={() => mover.mutate({ estado: 'esperando_repuesto', version: orden.version, motivo: falta.trim() }, { onSuccess: () => setFalta('') })}
+          >
+            Poner en Esperando repuesto
+          </Button>
+        </div>
+      ) : null}
     </section>
   );
 }

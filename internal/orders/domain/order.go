@@ -9,7 +9,8 @@ import (
 	"sweveh/internal/shared"
 )
 
-// State es uno de los 7 estados del flujo más Cancelada (Q-04, Q-05).
+// State es uno de los 7 estados del flujo más Cancelada (Q-04, Q-05), y los 2 opcionales por taller
+// (decisión de Pablo, 3-nov-2026): Esperando repuesto (lateral a En reparación) y Control de calidad (antes de Listo).
 type State string
 
 const (
@@ -21,6 +22,9 @@ const (
 	StateReady      State = "listo"
 	StateDelivered  State = "entregado"
 	StateCancelled  State = "cancelada"
+
+	StateAwaitingParts State = "esperando_repuesto"
+	StateQuality       State = "control_calidad"
 )
 
 // Open indica si la orden sigue abierta (Entregado y Cancelada la cierran).

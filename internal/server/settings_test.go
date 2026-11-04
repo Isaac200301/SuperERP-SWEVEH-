@@ -81,3 +81,48 @@ func TestSettings_ReceptionUsesWorkshopRules(t *testing.T) {
 		t.Fatalf("la recepción conserva su copia de ítems: %v", its)
 	}
 }
+
+// Estados opcionales de punta a punta: apagados no existen para el taller; activados, la orden pasa por ellos.
+func TestSettings_OptionalStatesInTheFlow(t *testing.T) {
+	e := newEnv(t)
+	c := e.register("3105550350", "Pablo Rodríguez")
+	id, _ := orderInDiagnosis(t, c, "EST351", 2)
+	tr := func(to string, extra map[string]any) resp {
+		body := map[string]any{"estado": to, "version": r2v(c, id)}
+		for k, v := range extra {
+			body[k] = v
+		}
+		return c.do("POST", "/api/v1/orders/"+id+"/transition", body)
+	}
+	q := "/api/v1/orders/" + id + "/quote"
+	c.must(http.StatusOK, c.do("POST", q+"/lines", map[string]any{"tipo": "servicio", "descripcion": "Mano de obra", "cantidad": 1, "precioUnitario": 50000}))
+	c.must(http.StatusOK, c.do("POST", q+"/send", nil))
+	c.must(http.StatusOK, c.do("POST", q+"/response", map[string]any{"decision": "aprobar", "canal": "mostrador"}))
+
+	if r := tr("esperando_repuesto", map[string]any{"motivo": "Kit"}); r.str("code") != "estado_no_activo" {
+		t.Fatalf("apagado: %d %v", r.status, r.body)
+	}
+	s := c.must(http.StatusOK, c.do("GET", "/api/v1/workshop/settings", nil)).body
+	s["usarEsperandoRepuesto"], s["usarControlCalidad"] = true, true
+	c.must(http.StatusOK, c.do("PUT", "/api/v1/workshop/settings", s))
+
+	is4xx(t, "sin motivo", tr("esperando_repuesto", nil))
+	c.must(http.StatusOK, tr("esperando_repuesto", map[string]any{"motivo": "Llega el kit de embrague el jueves"}))
+	c.must(http.StatusOK, tr("en_reparacion", nil))
+	if r := tr("listo", nil); r.str("code") != "salto_de_estado" {
+		t.Fatalf("con control de calidad no se salta a Listo: %d %v", r.status, r.body)
+	}
+	c.must(http.StatusOK, tr("control_calidad", nil))
+	if r := c.must(http.StatusOK, tr("listo", nil)); r.str("estado") != "listo" {
+		t.Fatalf("listo: %v", r.body)
+	}
+	hist := c.must(http.StatusOK, c.do("GET", "/api/v1/orders/"+id, nil)).body["historial"].([]any)
+	var pasos []string
+	for _, h := range hist {
+		pasos = append(pasos, h.(map[string]any)["hacia"].(string))
+	}
+	want := "esperando_repuesto en_reparacion control_calidad listo"
+	if got := pasos[len(pasos)-4:]; got[0]+" "+got[1]+" "+got[2]+" "+got[3] != want {
+		t.Fatalf("historial: %v", pasos)
+	}
+}

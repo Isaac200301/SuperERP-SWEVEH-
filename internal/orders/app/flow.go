@@ -96,8 +96,13 @@ func (f *Flow) move(ctx context.Context, c TransitionCmd, fromQuote bool) (domai
 		if err != nil {
 			return err
 		}
+		st, err := f.settingsIn(ctx, c.TallerID)
+		if err != nil {
+			return err
+		}
 		in := domain.TransitionInput{To: c.To, FromQuote: fromQuote, CanOverride: c.CanOverride, Reason: c.Reason,
-			PickedUpBy: c.PickedUpBy, AccessoriesOK: c.AccessoriesOK, ExpectedVersion: c.Version, At: f.clock.Now()}
+			PickedUpBy: c.PickedUpBy, AccessoriesOK: c.AccessoriesOK, ExpectedVersion: c.Version, At: f.clock.Now(),
+			Options: domain.FlowOptions{AwaitingParts: st.UseAwaitingParts, QualityCheck: st.UseQualityCheck}}
 		// La puerta de Recibido aplica al avanzar desde Por recibir, no al devolverse desde En diagnóstico.
 		if c.To == domain.StateReceived && o.State == domain.StatePending {
 			v, err := f.vehicles.ByID(ctx, c.TallerID, o.VehicleID)
@@ -114,10 +119,6 @@ func (f *Flow) move(ctx context.Context, c TransitionCmd, fromQuote bool) (domai
 				return err
 			}
 			cl.Kind = o.VehicleKind
-			st, err := f.settingsIn(ctx, c.TallerID)
-			if err != nil {
-				return err
-			}
 			missing := cl.Missing(sides, st.Reception)
 			in.ChecklistComplete = len(missing) == 0
 			if !in.ChecklistComplete {
