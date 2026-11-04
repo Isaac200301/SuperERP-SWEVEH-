@@ -48,6 +48,12 @@ func (Extra) List(ctx context.Context, tallerID shared.ID, limit int) ([]domain.
 	return cList(db.Many[cRow](ctx, `SELECT `+cCols+` FROM customers.cliente WHERE taller_id = $1 ORDER BY created_at DESC LIMIT $2`, tallerID, limit))
 }
 
+func (Extra) SetName(ctx context.Context, tallerID, id shared.ID, name string) error {
+	_, err := db.Exec(ctx, `UPDATE customers.cliente SET nombre = $3, version = version + 1, updated_at = now()
+		WHERE taller_id = $1 AND id = $2`, tallerID, id, name)
+	return err
+}
+
 func (Extra) SetConsent(ctx context.Context, tallerID, id shared.ID, st domain.ConsentStatus, r app.ConsentRecord) error {
 	if _, err := db.Exec(ctx, `UPDATE customers.cliente SET autorizacion_estado = $3, version = version + 1, updated_at = now()
 		WHERE taller_id = $1 AND id = $2`, tallerID, id, string(st)); err != nil {

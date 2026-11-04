@@ -46,3 +46,19 @@ func TestNewCustomer_Validation(t *testing.T) {
 		t.Fatalf("correo vacío: %+v %v", c.Email, err)
 	}
 }
+
+// ADR-0029: solo un nombre de relleno se reemplaza con el que el cliente le da al asesor.
+func TestIsPlaceholderName(t *testing.T) {
+	for name, want := range map[string]bool{"": true, "Cliente WhatsApp": true, "cliente de prueba": true, "J": true, "+573001234567": true,
+		"Laura Gómez": false, "Carlos": false} {
+		if got := IsPlaceholderName(name); got != want {
+			t.Errorf("IsPlaceholderName(%q) = %v", name, got)
+		}
+	}
+	if _, err := CleanName("   "); err != ErrNameRequired {
+		t.Errorf("vacío: %v", err)
+	}
+	if n, err := CleanName("  Carlos   Ruiz "); err != nil || n != "Carlos Ruiz" {
+		t.Errorf("CleanName = %q %v", n, err)
+	}
+}

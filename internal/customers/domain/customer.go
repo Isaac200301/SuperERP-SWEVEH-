@@ -39,6 +39,30 @@ type Customer struct {
 	CreatedAt time.Time
 }
 
+// IsPlaceholderName dice si el nombre es de relleno: vacío, de una letra, solo números o el que se pone cuando
+// WhatsApp no trae nombre ("Cliente WhatsApp", "Cliente de prueba"). Solo esos se reemplazan con el nombre que da el
+// cliente al asesor; un nombre real no se toca.
+func IsPlaceholderName(name string) bool {
+	f := strings.Fields(name)
+	if len(f) == 0 {
+		return true
+	}
+	first := strings.ToLower(f[0])
+	return len([]rune(f[0])) < 2 || first == "cliente" || strings.Trim(f[0], "0123456789+") == ""
+}
+
+// CleanName limpia y valida un nombre de cliente.
+func CleanName(raw string) (string, error) {
+	name := strings.Join(strings.Fields(raw), " ")
+	if name == "" {
+		return "", ErrNameRequired
+	}
+	if len([]rune(name)) > 120 {
+		return "", ErrNameTooLong
+	}
+	return name, nil
+}
+
 // NewCustomer valida y crea un cliente con autorización pendiente (HU-09, criterio 3).
 func NewCustomer(id, tallerID shared.ID, rawPhone, rawName string, rawEmail *string, now time.Time) (Customer, error) {
 	phone, err := shared.ParseColombianMobile(rawPhone)

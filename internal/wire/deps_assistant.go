@@ -218,12 +218,21 @@ func (t *taller) plateOf(ctx context.Context, tallerID, customerID shared.ID, pl
 		Vehicle: i.Vehicle, State: i.State, PromisedAt: i.PromisedAt}}, nil
 }
 
-func (t *taller) CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string) (assistantapp.PlateInfo, error) {
+func (t *taller) CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string, when *time.Time) (assistantapp.PlateInfo, error) {
 	var out assistantapp.PlateInfo
 	err := t.s.M.Tx.Do(ctx, func(ctx context.Context) error {
 		p, err := t.plateOf(ctx, tallerID, customerID, plate)
-		if err != nil || p.Owner == "ajena" || p.Open != nil { // ajena: nada; con orden abierta: esa misma
+		if err != nil || p.Owner == "ajena" {
 			out = p
+			return err
+		}
+		if p.Open != nil { // con orden abierta: esa misma; si aún no llega el vehículo, se cambia la cita
+			out = p
+			if when == nil || p.Open.State != string(ordersdomain.StatePending) {
+				return nil
+			}
+			out.Rescheduled = true
+			_, err := t.s.M.Flow.SetPromise(ctx, tallerID, p.Open.ID, agent, when)
 			return err
 		}
 		v, err := t.s.M.Vehicles.Register(ctx, vehiclesapp.RegisterVehicle{TallerID: tallerID, Actor: agent, Plate: plate, CustomerID: customerID})
@@ -232,10 +241,38 @@ func (t *taller) CreateOrderFromPlate(ctx context.Context, tallerID, customerID 
 		}
 		o, err := t.s.M.Orders.Open(ctx, ordersapp.OpenOrder{TallerID: tallerID, Actor: agent, VehicleID: v.Vehicle.ID, Symptom: symptom,
 			InitialState: ordersdomain.StatePending})
+		if err != nil {
+			return err
+		}
 		out = assistantapp.PlateInfo{Owner: p.Owner, Code: o.Code()}
+		if when != nil { // la cita queda en la fecha prometida: AU-06 la recuerda ese día
+			_, err = t.s.M.Flow.SetPromise(ctx, tallerID, o.ID, agent, when)
+		}
 		return err
 	})
 	return out, err
+}
+
+// OpenAt revisa la hora contra el horario del taller (HU-08). Sin horario registrado se acepta y el taller confirma.
+func (t *taller) OpenAt(ctx context.Context, tallerID shared.ID, at time.Time) (bool, string, error) {
+	st, err := t.s.M.Admin.Get(ctx, tallerID)
+	if err != nil {
+		return false, "", err
+	}
+	if len(st.Schedule) == 0 {
+		return true, "", nil
+	}
+	at = at.In(domain.Bogota)
+	sl := st.Schedule[dayKeys[at.Weekday()]]
+	if sl == nil {
+		return false, "", nil
+	}
+	hm := at.Format("15:04")
+	return hm >= sl.Opens && hm < sl.Closes, automationsHour(sl.Opens) + " a " + automationsHour(sl.Closes), nil
+}
+
+func (t *taller) SetCustomerName(ctx context.Context, tallerID, customerID shared.ID, name string) (bool, error) {
+	return t.s.M.CustDir.FillName(ctx, tallerID, customerID, name, agent)
 }
 
 func (t *taller) Catalog(ctx context.Context, tallerID shared.ID) ([]domain.Priced, []domain.Priced, error) {

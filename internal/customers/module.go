@@ -73,6 +73,11 @@ func (d Directory) SetConsent(ctx context.Context, tallerID, id shared.ID, grant
 	return d.svc.SetConsent(ctx, tallerID, id, actor, granted, rec)
 }
 
+// FillName pone el nombre que dio el cliente si el que tiene es de relleno (ADR-0029).
+func (d Directory) FillName(ctx context.Context, tallerID, id shared.ID, name string, actor shared.Actor) (bool, error) {
+	return d.svc.FillName(ctx, tallerID, id, actor, name)
+}
+
 // ConsentRecord es la prueba de la autorización (re-exportado para otros módulos).
 type ConsentRecord = app.ConsentRecord
 

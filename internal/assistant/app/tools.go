@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"sweveh/internal/assistant/domain"
 	"sweveh/internal/shared"
@@ -41,8 +42,8 @@ var AdvisorTools = []ToolSpec{
 		Params: obj(`"producto":{"type":"string","description":"la referencia del producto que devolvió productos"}`, "producto")},
 	{Name: "horario", Description: "Horario del taller y si está abierto ahora.", Params: obj(``)},
 	{Name: "mis_ordenes", Description: "Órdenes abiertas del cliente que escribe, con su estado. Solo las suyas.", Params: obj(``)},
-	{Name: "agendar", Description: "Registra el vehículo del cliente para recibirlo (orden \"Por recibir\"). Si ya tiene una orden abierta, la devuelve en lugar de crear otra.",
-		Params: obj(`"placa":{"type":"string","description":"placa tal como la escribió el cliente"},"sintoma":{"type":"string","description":"qué necesita o qué le pasa, en pocas palabras"}`, "placa", "sintoma")},
+	{Name: "agendar", Description: "Agenda la cita para recibir el vehículo (orden \"Por recibir\" con fecha y hora). Úsala solo después de que el cliente confirme el resumen. Si ya tiene una orden por recibir, la cambia a la nueva fecha; si tiene una en otro estado, la devuelve.",
+		Params: obj(`"placa":{"type":"string","description":"placa tal como la escribió el cliente"},"sintoma":{"type":"string","description":"qué necesita o qué le pasa, en pocas palabras"},"fecha":{"type":"string","description":"día de la cita, AAAA-MM-DD"},"hora":{"type":"string","description":"hora de la cita, HH:MM en 24 horas"},"nombre":{"type":"string","description":"nombre del cliente, solo si te lo dio y no lo tenías"}`, "placa", "sintoma", "fecha", "hora")},
 	{Name: "apartar_producto", Description: "El cliente quiere comprar un producto de la vitrina: avisa al taller para que una persona confirme el apartado y el pago.",
 		Params: obj(`"producto":{"type":"string"},"cantidad":{"type":"integer","minimum":1,"maximum":20}`, "producto", "cantidad")},
 	{Name: "pasar_a_persona", Description: "Pasa la conversación a una persona del taller (el cliente lo pide, está molesto o no lo puedes resolver).",
@@ -59,7 +60,8 @@ type turn struct {
 	photos   []photo        // fotos a enviar después del texto
 	handed   bool           // la conversación pasó a una persona
 	products map[string]Product
-	said     string // lo que el cliente escribió en la conversación: agendar solo usa placas que estén ahí (HU-55)
+	said     string    // lo que el cliente escribió en la conversación: agendar solo usa placas que estén ahí (HU-55)
+	now      time.Time // para validar la fecha de la cita
 }
 
 func (t *turn) run(ctx context.Context, name, args string) string {
@@ -69,11 +71,21 @@ func (t *turn) run(ctx context.Context, name, args string) string {
 		Producto string `json:"producto"`
 		Placa    string `json:"placa"`
 		Sintoma  string `json:"sintoma"`
+		Fecha    string `json:"fecha"`
+		Hora     string `json:"hora"`
+		Nombre   string `json:"nombre"`
 		Cantidad int    `json:"cantidad"`
 		Motivo   string `json:"motivo"`
 	}
 	if strings.TrimSpace(args) != "" && json.Unmarshal([]byte(args), &a) != nil {
 		return result(map[string]any{"error": "argumentos inválidos"})
+	}
+	if name == "agendar" {
+		out, err := t.book(ctx, a.Placa, a.Sintoma, a.Fecha, a.Hora, a.Nombre)
+		if err != nil {
+			return result(map[string]any{"error": "no se pudo agendar; di que una persona del taller confirma"})
+		}
+		return result(out)
 	}
 	out, err := t.exec(ctx, name, a.Tipo, a.Busqueda, a.Producto, a.Placa, a.Sintoma, a.Cantidad, a.Motivo)
 	if err != nil {
@@ -154,27 +166,6 @@ func (t *turn) exec(ctx context.Context, name, kind, q, product, plate, symptom 
 		}
 		return map[string]any{"ordenes": list,
 			"nota": "si el cliente reclama por la demora o está molesto, discúlpate y usa pasar_a_persona; no prometas llamadas ni tiempos"}, nil
-	case "agendar":
-		p := domain.FindPlate(plate)
-		if p == "" {
-			return map[string]any{"resultado": "placa_invalida", "nota": "pide la placa de nuevo, con letras y números"}, nil
-		}
-		if !strings.Contains(compact(t.said), p) { // HU-55: la placa la escribe el cliente, no la deduce la IA
-			return map[string]any{"resultado": "placa_no_confirmada", "nota": "pídele al cliente que escriba la placa del vehículo que va a traer"}, nil
-		}
-		info, err := t.taller.CreateOrderFromPlate(ctx, t.tallerID, t.c.ID, p, symptom)
-		if err != nil {
-			return nil, err
-		}
-		switch {
-		case info.Owner == "ajena": // de otro cliente: no se dice nada del vehículo y lo revisa una persona (HU-12)
-			t.handed = true
-			return map[string]any{"resultado": "revision", "nota": "di solo que una persona del taller le escribe para confirmar"},
-				t.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true)
-		case info.Open != nil:
-			return map[string]any{"resultado": "ya_tenia_orden", "orden": info.Code, "estado": stateText[info.Open.State]}, nil
-		}
-		return map[string]any{"resultado": "agendado", "orden": info.Code, "placa": p}, nil
 	case "apartar_producto":
 		p, ok := t.product(ctx, product)
 		if !ok {
@@ -192,6 +183,53 @@ func (t *turn) exec(ctx context.Context, name, kind, q, product, plate, symptom 
 			t.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true)
 	}
 	return map[string]any{"error": fmt.Sprintf("no existe la tool %q", name)}, nil
+}
+
+// book es la tool agendar (ADR-0029): valida placa, fecha y horario en código, guarda el nombre si el cliente lo dio
+// y tenía uno de relleno, y crea o reagenda la orden "Por recibir" con la cita en la fecha prometida (AU-06).
+func (t *turn) book(ctx context.Context, plate, symptom, date, hour, name string) (any, error) {
+	p := domain.FindPlate(plate)
+	if p == "" {
+		return map[string]any{"resultado": "placa_invalida", "nota": "pide la placa de nuevo, con letras y números"}, nil
+	}
+	if !strings.Contains(compact(t.said), p) { // HU-55: la placa la escribe el cliente, no la deduce la IA
+		return map[string]any{"resultado": "placa_no_confirmada", "nota": "pídele al cliente que escriba la placa del vehículo que va a traer"}, nil
+	}
+	when, err := domain.ParseWhen(date, hour, t.now)
+	if err != nil {
+		return map[string]any{"resultado": "fecha_invalida", "nota": "la cita debe ser desde ahora y hasta 30 días; pide otro día y hora"}, nil
+	}
+	open, hours, err := t.taller.OpenAt(ctx, t.tallerID, when)
+	if err != nil {
+		return nil, err
+	}
+	if !open {
+		day := "ese día no abrimos"
+		if hours != "" {
+			day = "ese día atendemos de " + hours
+		}
+		return map[string]any{"resultado": "fuera_de_horario", "nota": day + "; ofrece otra hora o día dentro del horario"}, nil
+	}
+	if strings.TrimSpace(name) != "" {
+		if _, err := t.taller.SetCustomerName(ctx, t.tallerID, t.c.ID, name); err != nil {
+			return nil, err
+		}
+	}
+	info, err := t.taller.CreateOrderFromPlate(ctx, t.tallerID, t.c.ID, p, symptom, &when)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case info.Owner == "ajena": // de otro cliente: no se dice nada del vehículo y lo revisa una persona (HU-12)
+		t.handed = true
+		return map[string]any{"resultado": "revision", "nota": "di solo que una persona del taller le escribe para confirmar"},
+			t.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true)
+	case info.Rescheduled:
+		return map[string]any{"resultado": "reagendado", "orden": info.Code, "cita": domain.FormatWhen(when)}, nil
+	case info.Open != nil:
+		return map[string]any{"resultado": "ya_tenia_orden", "orden": info.Code, "estado": stateText[info.Open.State]}, nil
+	}
+	return map[string]any{"resultado": "agendado", "orden": info.Code, "placa": p, "cita": domain.FormatWhen(when)}, nil
 }
 
 // product busca un producto de la vitrina por referencia (o nombre), aunque el modelo no haya listado antes.
@@ -234,9 +272,10 @@ type photo struct{ ref, caption string }
 // Tools ejecuta las tools del asesor para un cliente fuera del servicio (cmd/agent-eval con un taller de prueba).
 type Tools struct{ t *turn }
 
-// said es lo que el cliente escribió en la conversación (agendar solo usa placas que estén ahí).
-func NewTools(tl Taller, tallerID shared.ID, c Customer, in Inbound, said string) *Tools {
-	return &Tools{t: &turn{taller: tl, tallerID: tallerID, in: in, c: c, quoted: map[int64]bool{}, products: map[string]Product{}, said: said}}
+// said es lo que el cliente escribió en la conversación (agendar solo usa placas que estén ahí); now, la hora actual.
+func NewTools(tl Taller, tallerID shared.ID, c Customer, in Inbound, said string, now time.Time) *Tools {
+	return &Tools{t: &turn{taller: tl, tallerID: tallerID, in: in, c: c, quoted: map[int64]bool{}, products: map[string]Product{},
+		said: said, now: now}}
 }
 
 func (x *Tools) Run(ctx context.Context, name, args string) string { return x.t.run(ctx, name, args) }

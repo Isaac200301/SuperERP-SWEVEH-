@@ -219,6 +219,9 @@ func Capitalize(s string) string {
 	return strings.ToUpper(string(r[0])) + string(r[1:])
 }
 
+// IsPlaceholder dice si el nombre es de relleno (vacío, "Cliente…", una letra o números); ver FirstName.
+func IsPlaceholder(name string) bool { return FirstName(name) == "" }
+
 // FirstName es el primer nombre del cliente, o "" si es un nombre de relleno ("Cliente WhatsApp", "Cliente de
 // prueba", una sola letra o números): así no se saluda a nadie como "Cliente".
 func FirstName(name string) string {

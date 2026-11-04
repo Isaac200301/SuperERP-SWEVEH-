@@ -209,6 +209,27 @@ func (f *Flow) Assign(ctx context.Context, tallerID, orderID shared.ID, actor sh
 	return out, err
 }
 
+// SetPromise cambia solo la fecha prometida, sin tocar el mecánico. En una orden "Por recibir" es la fecha de la cita:
+// la agenda el asesor de WhatsApp (ADR-0029) y AU-06 recuerda al cliente ese día.
+func (f *Flow) SetPromise(ctx context.Context, tallerID, orderID shared.ID, actor shared.Actor, when *time.Time) (domain.Order, error) {
+	var out domain.Order
+	err := f.uow.Do(ctx, func(ctx context.Context) error {
+		o, err := f.repo.Load(ctx, tallerID, orderID)
+		if err != nil {
+			return err
+		}
+		before := o.PromisedAt
+		o.PromisedAt = when
+		if err := f.repo.SaveAssignment(ctx, o); err != nil {
+			return err
+		}
+		out = o
+		return f.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "orden.reagendar", Entity: "orden", EntityID: o.ID,
+			Before: map[string]any{"fecha_prometida": before}, After: map[string]any{"fecha_prometida": when}, OccurredAt: f.clock.Now()})
+	})
+	return out, err
+}
+
 // AnswerReceipt guarda la respuesta del cliente a la constancia de recibo (HU-19), con bitácora y evento en la
 // misma transacción. Devuelve false si ya había una respuesta (el cliente pulsó otra vez): no cambia nada.
 func (f *Flow) AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, actor shared.Actor, ok bool, ref string) (bool, error) {

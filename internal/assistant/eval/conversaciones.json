@@ -3,7 +3,9 @@
     "nombre": "Servitaller El Pistón",
     "ciudad": "Medellín",
     "atiende": "ambos",
-    "horario": "lunes a viernes 08:00 a 18:00, sábado 08:00 a 13:00",
+    "horario": "lunes a viernes 08:00 a 18:00, sábado 08:00 a 13:00, domingo cerrado",
+    "horario_dias": { "lun": ["08:00", "18:00"], "mar": ["08:00", "18:00"], "mie": ["08:00", "18:00"], "jue": ["08:00", "18:00"],
+      "vie": ["08:00", "18:00"], "sab": ["08:00", "13:00"] },
     "servicios": [
       { "nombre": "Cambio de aceite", "precio": 45000, "tipo": "ambos" },
       { "nombre": "Alineación y balanceo", "precio": 80000, "tipo": "carro" },
@@ -18,8 +20,10 @@
       { "referencia": "LL-185", "nombre": "Llanta 185/65 R15", "marca": "Michelin", "tipo": "carro", "precio": 310000, "existencia": 0, "foto": false }
     ]
   },
-  "cliente": { "nombre": "Laura Gómez", "vehiculos": [{ "placa": "GNO667", "descripcion": "(moto Yamaha NMAX)" }] },
-  "notas": "Servicios y vitrina van precargados en el prompt (no hace falta consultarlos para nombrarlos). Conversaciones propuestas por el equipo (no son mensajes reales). La placa GNO667 es de la clienta y tiene una orden abierta; KMX123 es de otro cliente; cualquier otra placa es nueva. dice_alguno y no_dice se comparan sin tildes ni mayúsculas.",
+  "hoy": "2026-11-04 14:20",
+  "cliente": { "nombre": "Laura Gómez", "vehiculos": [{ "placa": "GNO667", "descripcion": "(moto Yamaha NMAX)" },
+    { "placa": "PQR45E", "descripcion": "(moto Honda CB190, agendada y sin llegar)" }] },
+  "notas": "Servicios y vitrina van precargados en el prompt (no hace falta consultarlos para nombrarlos). Conversaciones propuestas por el equipo (no son mensajes reales). Hoy es miércoles 4 de noviembre de 2026, 2:20 p. m. La placa GNO667 es de la clienta y tiene una orden en diagnóstico; PQR45E es suya y está agendada sin llegar (se reagenda); KMX123 es de otro cliente; cualquier otra placa es nueva. dice_alguno y no_dice se comparan sin tildes ni mayúsculas.",
   "conversaciones": [
     { "nombre": "saludo ofrece el taller", "turnos": [
       { "cliente": "hola", "dice_alguno": ["cambio de aceite"], "no_dice": ["placa", "**", "suspension", "bateria", "kit de arrastre", "pre-tecnica", "pretecnica", "diagnostico electronico"] } ] },
@@ -33,9 +37,21 @@
       { "cliente": "¿hacen latonería y pintura?", "no_dice": ["$", "suspension"] } ] },
     { "nombre": "diagnóstico no se adivina", "turnos": [
       { "cliente": "mi carro hace un ruido raro al frenar, ¿qué tiene?", "dice_alguno": ["revis", "escaner", "escáner"] } ] },
-    { "nombre": "agendar con placa nueva", "turnos": [
-      { "cliente": "quiero llevar el carro para alineación", "dice_alguno": ["placa"], "no_dice": ["OS-"] },
-      { "cliente": "la placa es ABC123", "usa_alguna": ["agendar"], "dice_alguno": ["OS-"] } ] },
+    { "nombre": "agendar completo: placa, día, hora y confirmación", "turnos": [
+      { "cliente": "quiero llevar el carro para alineación", "dice_alguno": ["placa"], "no_dice": ["OS-", "celular", "telefono"], "no_agenda": true },
+      { "cliente": "ABC123", "dice_alguno": ["dia", "día", "cuando", "cuándo", "hora"], "no_dice": ["OS-", "celular", "telefono"], "no_agenda": true },
+      { "cliente": "el sábado a las 9 de la mañana", "dice_alguno": ["confirm", "?"], "no_dice": ["celular", "telefono"], "no_agenda": true },
+      { "cliente": "sí, confirmo", "usa_alguna": ["agendar"], "dice_alguno": ["OS-"], "agenda": "2026-11-07 09:00" } ] },
+    { "nombre": "fuera de horario", "turnos": [
+      { "cliente": "les llevo el carro ABC123 el domingo a las 10 para sincronización, agéndenme", "no_dice": ["OS-"], "no_agenda": true,
+        "dice_alguno": ["domingo", "lunes", "sábado", "sabado", "horario", "abrimos", "cerrado"] } ] },
+    { "nombre": "pide el nombre si no lo tiene", "cliente_nombre": "Cliente de prueba", "turnos": [
+      { "cliente": "quiero agendar cambio de aceite para la moto XYZ12A el viernes a las 10am", "dice_alguno": ["nombre"], "no_agenda": true },
+      { "cliente": "Carlos Ruiz", "dice_alguno": ["confirm", "?"] },
+      { "cliente": "sí", "usa_alguna": ["agendar"], "agenda": "2026-11-06 10:00", "guarda_nombre": "Carlos Ruiz" } ] },
+    { "nombre": "reagendar sin duplicar", "turnos": [
+      { "cliente": "la moto PQR45E no la puedo llevar mañana, mejor el lunes a las 8", "dice_alguno": ["confirm", "?", "lunes"] },
+      { "cliente": "sí, el lunes 9 a las 8 am", "usa_alguna": ["agendar"], "agenda": "2026-11-09 08:00", "no_dice": ["OS-0042"] } ] },
     { "nombre": "placa con orden abierta no duplica", "turnos": [
       { "cliente": "les llevo la moto GNO667 para cambio de aceite", "usa_alguna": ["agendar", "mis_ordenes"], "no_dice": ["OS-0099"] } ] },
     { "nombre": "placa de otro cliente", "turnos": [

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func price(v int64) *int64 { return &v }
@@ -234,5 +235,33 @@ func TestPromisesPerson(t *testing.T) {
 		if got := PromisesPerson(text); got != want {
 			t.Errorf("PromisesPerson(%q) = %v", text, got)
 		}
+	}
+}
+
+// ADR-0029: la cita se arma en hora de Colombia y no puede quedar en el pasado ni a más de 30 días.
+func TestParseWhen(t *testing.T) {
+	now := time.Date(2026, 11, 4, 14, 20, 0, 0, Bogota) // miércoles
+	got, err := ParseWhen("2026-11-07", "09:00", now)
+	if err != nil || !got.Equal(time.Date(2026, 11, 7, 9, 0, 0, 0, Bogota)) {
+		t.Fatalf("sábado 9:00: %v %v", got, err)
+	}
+	for _, tc := range []struct {
+		d, h string
+		want error
+	}{
+		{"2026-11-04", "08:00", ErrWhenPast}, {"2026-12-20", "09:00", ErrWhenFar}, {"7/11/2026", "9am", ErrWhenFormat},
+	} {
+		if _, err := ParseWhen(tc.d, tc.h, now); err != tc.want {
+			t.Errorf("%s %s: %v", tc.d, tc.h, err)
+		}
+	}
+	if s := FormatWhen(got); s != "sábado 7 de noviembre, 9:00 a. m." {
+		t.Errorf("FormatWhen = %q", s)
+	}
+	if s := FormatToday(now); s != "miércoles 4 de noviembre de 2026, 2:20 p. m." {
+		t.Errorf("FormatToday = %q", s)
+	}
+	if s := Clock12(time.Date(2026, 1, 1, 0, 5, 0, 0, Bogota)); s != "12:05 a. m." {
+		t.Errorf("Clock12 = %q", s)
 	}
 }

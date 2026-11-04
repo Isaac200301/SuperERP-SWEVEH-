@@ -8,8 +8,10 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	assistantapp "sweveh/internal/assistant/app"
+	"sweveh/internal/assistant/domain"
 )
 
 // fakeAdvisor es un modelo de prueba: step decide qué responder en cada ronda según lo que ya pasó (las tools que
@@ -86,6 +88,8 @@ func TestAdvisor_GreetsOffersAndSchedules(t *testing.T) {
 	}
 	const laura = "3001234700"
 	w.customer(laura, "Laura Gómez")
+	now := e.clk.Now().In(domain.Bogota)
+	appointment := time.Date(now.Year(), now.Month(), now.Day()+2, 10, 0, 0, 0, domain.Bogota) // el taller no tiene horario: atiende
 
 	adv.step = func(r assistantapp.ChatRequest) (assistantapp.ChatMessage, error) {
 		switch res := toolResult(r); {
@@ -104,9 +108,9 @@ func TestAdvisor_GreetsOffersAndSchedules(t *testing.T) {
 			return say("Te mando la foto del aceite 20W50. Cuesta $32.000."), nil
 		case strings.Contains(lastUser(r), "GNO667"):
 			if !strings.Contains(res, "resultado") {
-				return call("agendar", `{"placa":"GNO667","sintoma":"cambio de aceite"}`), nil
+				return book("GNO667", appointment, ""), nil
 			}
-			if strings.Contains(res, "ya_tenia_orden") {
+			if strings.Contains(res, "ya_tenia_orden") || strings.Contains(res, "reagendado") {
 				return say("Ya tienes tu moto agendada, no te preocupes."), nil
 			}
 			return say("Listo, te esperamos con la moto GNO667. Tu orden es la " + regexp.MustCompile(`OS-\d+`).FindString(res) + "."), nil

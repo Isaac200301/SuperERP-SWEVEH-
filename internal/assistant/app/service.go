@@ -35,9 +35,14 @@ type Taller interface {
 	AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, ok bool, ref string) (bool, error)
 	// PlateOf dice de quién es la placa en el taller: "nueva", "propia" (con su orden abierta, si tiene) o "ajena".
 	PlateOf(ctx context.Context, tallerID, customerID shared.ID, plate string) (PlateInfo, error)
-	// CreateOrderFromPlate abre la orden "Por recibir" (HU-55). Nunca duplica ni toca un vehículo ajeno: si la placa
-	// ya tiene orden abierta devuelve esa; si es de otro cliente no crea nada (Outcome "ajena").
-	CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string) (PlateInfo, error)
+	// CreateOrderFromPlate abre la orden "Por recibir" (HU-55) con la cita en la fecha prometida si viene when (AU-06
+	// la recuerda ese día). Nunca duplica ni toca un vehículo ajeno: si la placa ya tiene orden abierta devuelve esa
+	// (y si está "Por recibir" y viene when, la reagenda); si es de otro cliente no crea nada (Owner "ajena").
+	CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string, when *time.Time) (PlateInfo, error)
+	// OpenAt dice si el taller atiende a esa hora y cuál es su horario ese día ("" = no abre ese día).
+	OpenAt(ctx context.Context, tallerID shared.ID, at time.Time) (bool, string, error)
+	// SetCustomerName pone el nombre que dio el cliente si el que tiene es de relleno; false = no cambió.
+	SetCustomerName(ctx context.Context, tallerID, customerID shared.ID, name string) (bool, error)
 
 	Catalog(ctx context.Context, tallerID shared.ID) ([]domain.Priced, []domain.Priced, error) // servicios, repuestos
 	Workshop(ctx context.Context, tallerID shared.ID) (name string, open bool, nextOpening string, err error)
@@ -85,9 +90,10 @@ type Button struct{ ID, Title string }
 // PlateInfo es lo que se sabe de una placa para este cliente. Owner: nueva | propia | ajena. Open es la orden abierta
 // del cliente con esa placa; Code, el número de la orden creada o encontrada.
 type PlateInfo struct {
-	Owner string
-	Open  *Order
-	Code  string
+	Owner       string
+	Open        *Order
+	Code        string
+	Rescheduled bool // la orden "Por recibir" quedó con la nueva fecha
 }
 
 // DraftRecord es un borrador guardado.
@@ -722,7 +728,7 @@ func (s *Service) createOrder(ctx context.Context, tallerID shared.ID, d DraftRe
 	if err != nil || c == nil {
 		return PlateInfo{}, err
 	}
-	return s.taller.CreateOrderFromPlate(ctx, tallerID, c.ID, d.Action.CreateOrder.Plate, d.Action.CreateOrder.Symptom)
+	return s.taller.CreateOrderFromPlate(ctx, tallerID, c.ID, d.Action.CreateOrder.Plate, d.Action.CreateOrder.Symptom, nil)
 }
 
 // Stats es qué tan seguido el dueño edita los borradores (HU-65).

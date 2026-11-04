@@ -104,7 +104,8 @@ func (s *Service) advise(ctx context.Context, tallerID shared.ID, in Inbound, c 
 	}
 	msgs = append(msgs, ChatMessage{Role: "user", Content: in.Text})
 
-	t := &turn{taller: s.taller, tallerID: tallerID, in: in, c: c, quoted: map[int64]bool{}, products: map[string]Product{}, said: said}
+	t := &turn{taller: s.taller, tallerID: tallerID, in: in, c: c, quoted: map[int64]bool{}, products: map[string]Product{}, said: said,
+		now: s.clock.Now()}
 	cctx, cancel := context.WithTimeout(ctx, advisorTimeout)
 	defer cancel()
 	chat := func(ctx context.Context, req ChatRequest) (ChatMessage, error) { return s.chat(ctx, tallerID, in, req) }
@@ -251,5 +252,5 @@ func (s *Service) advisorContext(ctx context.Context, tallerID shared.ID, c Cust
 		return AdvisorContext{}, err
 	}
 	vs, err := s.taller.Vehicles(ctx, tallerID, c.ID)
-	return AdvisorContext{Workshop: prof, Open: open, NextOpening: next, Customer: c, Vehicles: vs}, err
+	return AdvisorContext{Workshop: prof, Open: open, NextOpening: next, Customer: c, Vehicles: vs, Now: s.clock.Now()}, err
 }

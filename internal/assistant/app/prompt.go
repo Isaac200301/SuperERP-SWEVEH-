@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"sweveh/internal/assistant/domain"
 )
@@ -27,8 +28,12 @@ Qué buscas en cada conversación:
   Termina preguntando en qué le ayudas.
 - Si pregunta un precio: consulta "servicios" o "productos" y da el precio exacto que devuelvan. Si no está en la lista,
   di que el taller le confirma el valor al revisar. Ofrece agendar.
-- Si quiere traer el vehículo o te da una placa: usa "agendar" de una vez (pide la placa solo si no la tienes) y confirma
-  con el número de orden que te devuelva.
+- Si quiere traer el vehículo, reúne una cosa por mensaje, sin volver a preguntar lo que ya sabes:
+  1) qué necesita (servicio o síntoma), 2) la placa, 3) qué día y a qué hora lo trae (dentro del horario),
+  4) su nombre, solo si no lo tienes. Nunca pidas el celular: ya lo tienes por WhatsApp.
+  Luego confirma un resumen ("Te agendo la ABC123 para alineación el sábado 8 a las 9:00 a. m. ¿Confirmo?") y solo
+  cuando diga que sí usa "agendar". Confirma con el número de orden y la cita que te devuelva. Si responde
+  "fuera_de_horario" o "fecha_invalida", ofrece otra opción.
 - Si pregunta cómo va su vehículo: usa "mis_ordenes" y cuéntale el estado en palabras simples.
 - Si pregunta qué tiene su vehículo: no diagnostiques; ofrece la revisión (consulta "servicios").
 - Si le interesa un producto: dale precio y disponibilidad, envíale la foto con "enviar_foto" si la tiene, y si lo
@@ -49,6 +54,7 @@ Reglas que no se rompen:
 - No hables de otros clientes ni de vehículos que no sean del cliente.
 
 Datos de hoy:
+- Hoy es %s (hora de Colombia). Usa esta fecha para entender "mañana", "el sábado" o "a las 3".
 - Horario: %s.
 - %s
 - Cliente: %s.
@@ -61,6 +67,7 @@ type AdvisorContext struct {
 	NextOpening string
 	Customer    Customer
 	Vehicles    []Vehicle
+	Now         time.Time
 }
 
 // WorkshopProfile es el perfil del taller que ve el asesor.
@@ -101,7 +108,7 @@ func (c AdvisorContext) System() string {
 		}
 		vs = strings.Join(parts, "; ")
 	}
-	return fmt.Sprintf(advisorPrompt, c.Workshop.Name, attendsText(c.Workshop.Attends), city, spec, hours, now, who, vs)
+	return fmt.Sprintf(advisorPrompt, c.Workshop.Name, attendsText(c.Workshop.Attends), city, spec, domain.FormatToday(c.Now), hours, now, who, vs)
 }
 
 func attendsText(a string) string {
