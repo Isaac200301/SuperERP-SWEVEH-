@@ -12,12 +12,6 @@ import (
 	"sweveh/internal/shared"
 )
 
-// Channel es el puerto CanalMensajeria (RNF-07): cambiar del número de prueba al del taller no toca el resto.
-type Channel interface {
-	SendText(ctx context.Context, phoneNumberID, to, text string) (string, error)
-	SendButtons(ctx context.Context, phoneNumberID, to, text string, buttons []domain.Button) (string, error)
-}
-
 // Conversation es una conversación con un celular.
 type Conversation struct {
 	ID          shared.ID
@@ -78,7 +72,7 @@ type Repository interface {
 	ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error)
 }
 
-// WebhookEvent es un cuerpo crudo recibido de Meta.
+// WebhookEvent es un cuerpo crudo recibido del proveedor de WhatsApp.
 type WebhookEvent struct {
 	ID   shared.ID
 	Body json.RawMessage
@@ -106,12 +100,13 @@ type Service struct {
 	tx      TxRunner
 	repo    Repository
 	channel Channel
+	parser  InboundParser
 	events  EventPublisher
 	clock   Clock
 }
 
-func NewService(tx TxRunner, r Repository, ch Channel, e EventPublisher, c Clock) *Service {
-	return &Service{tx: tx, repo: r, channel: ch, events: e, clock: c}
+func NewService(tx TxRunner, r Repository, ch Channel, p InboundParser, e EventPublisher, c Clock) *Service {
+	return &Service{tx: tx, repo: r, channel: ch, parser: p, events: e, clock: c}
 }
 
 // ReceiveWebhook guarda el cuerpo crudo y responde rápido; el worker lo procesa después (R-09).
@@ -142,7 +137,7 @@ func (s *Service) ProcessWebhooks(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	for _, ev := range evs {
-		ins, statuses, perr := ParseMeta(ev.Body)
+		ins, statuses, perr := s.parser.Parse(ev.Body)
 		var msg *string
 		if perr == nil {
 			for _, in := range ins {

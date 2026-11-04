@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -14,6 +13,7 @@ import (
 	assistantapp "sweveh/internal/assistant/app"
 	"sweveh/internal/audit"
 	"sweveh/internal/inventory"
+	"sweveh/internal/messaging/adapters/out/whatsapp/meta"
 	messagingapp "sweveh/internal/messaging/app"
 	"sweveh/internal/platform/authn"
 	"sweveh/internal/platform/config"
@@ -230,7 +230,7 @@ func (h *handler) simulate(r *http.Request, p reqctx.Principal) (int, any, error
 	if err != nil {
 		return 0, nil, err
 	}
-	body, err := SimulatedWebhook(ch.PhoneNumberID, phone, q.Nombre, q.Texto, q.Boton, h.s.M.Clock.Now())
+	body, err := meta.SimulatedBody(ch.PhoneNumberID, phone, q.Nombre, q.Texto, q.Boton, h.s.M.Clock.Now())
 	if err != nil {
 		return 0, nil, err
 	}
@@ -238,20 +238,6 @@ func (h *handler) simulate(r *http.Request, p reqctx.Principal) (int, any, error
 		return 0, nil, err
 	}
 	return http.StatusAccepted, map[string]any{"ok": true}, nil
-}
-
-// SimulatedWebhook arma un cuerpo con el formato de WhatsApp Cloud API.
-func SimulatedWebhook(pnid, phone, name, text, button string, at time.Time) ([]byte, error) {
-	msg := map[string]any{"from": strings.TrimPrefix(phone, "+"), "id": "wamid.local." + shared.NewID().String(),
-		"timestamp": itoa(int(at.Unix())), "type": "text", "text": map[string]string{"body": text}}
-	if button != "" {
-		msg["type"] = "interactive"
-		msg["interactive"] = map[string]any{"type": "button_reply", "button_reply": map[string]string{"id": button, "title": text}}
-	}
-	return json.Marshal(map[string]any{"object": "whatsapp_business_account", "entry": []any{map[string]any{"changes": []any{
-		map[string]any{"field": "messages", "value": map[string]any{"messaging_product": "whatsapp",
-			"metadata": map[string]string{"phone_number_id": pnid}, "contacts": []any{map[string]any{"profile": map[string]string{"name": name},
-				"wa_id": strings.TrimPrefix(phone, "+")}}, "messages": []any{msg}}}}}}})
 }
 
 func (h *handler) cards(r *http.Request, p reqctx.Principal) (int, any, error) {

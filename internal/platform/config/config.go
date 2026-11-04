@@ -41,8 +41,10 @@ type API struct {
 	AI               AI
 }
 
-// WhatsApp configura el canal (HU-101). Sin token se usa el canal de prueba local (no envía nada a Meta).
+// WhatsApp configura el canal (HU-101). Provider elige el adaptador: "meta" (Cloud API, oficial) o "local"
+// (simulador, no envía nada). Sin WHATSAPP_PROVIDER: "meta" si hay token, si no "local".
 type WhatsApp struct {
+	Provider      string
 	AppSecret     string
 	AccessToken   string
 	PhoneNumberID string
@@ -69,12 +71,22 @@ type Worker struct {
 	AI           AI
 }
 
-func engine(errs *[]error) (WhatsApp, AI) {
-	return WhatsApp{
+func engine(env Env, errs *[]error) (WhatsApp, AI) {
+	wa := WhatsApp{
 		AppSecret: os.Getenv("WHATSAPP_APP_SECRET"), AccessToken: os.Getenv("WHATSAPP_ACCESS_TOKEN"),
 		PhoneNumberID: os.Getenv("WHATSAPP_PHONE_NUMBER_ID"), VerifyToken: os.Getenv("WHATSAPP_VERIFY_TOKEN"),
 		APIBase: get("WHATSAPP_API_BASE", "https://graph.facebook.com/v21.0"),
-	}, AI{Provider: get("AI_PROVIDER", "reglas"), APIKey: os.Getenv("AI_API_KEY"), Model: os.Getenv("AI_MODEL"),
+	}
+	wa.Provider = get("WHATSAPP_PROVIDER", map[bool]string{true: "meta", false: "local"}[wa.AccessToken != ""])
+	switch {
+	case wa.Provider != "meta" && wa.Provider != "local":
+		*errs = append(*errs, fmt.Errorf("WHATSAPP_PROVIDER=%q no es un canal conocido (meta, local)", wa.Provider))
+	case wa.Provider == "meta" && (wa.AccessToken == "" || wa.AppSecret == ""):
+		*errs = append(*errs, errors.New("WHATSAPP_PROVIDER=meta necesita WHATSAPP_ACCESS_TOKEN y WHATSAPP_APP_SECRET"))
+	case wa.Provider == "local" && env == EnvProduction:
+		*errs = append(*errs, errors.New("WHATSAPP_PROVIDER=local (simulador) no se permite en producción"))
+	}
+	return wa, AI{Provider: get("AI_PROVIDER", "reglas"), APIKey: os.Getenv("AI_API_KEY"), Model: os.Getenv("AI_MODEL"),
 		MonthlyCapMicroUSD: int64(getInt("AI_MONTHLY_CAP_MICRO_USD", 5_000_000, errs))}
 }
 
@@ -99,7 +111,7 @@ func LoadAPI() (API, error) {
 		LoginPerMinute:   float64(getInt("LOGIN_RATE_PER_MINUTE", 10, &errs)),
 		StorageDir:       get("STORAGE_DIR", ".data/fotos"),
 	}
-	c.WhatsApp, c.AI = engine(&errs)
+	c.WhatsApp, c.AI = engine(c.Env, &errs)
 	if err := c.Env.validate(); err != nil {
 		errs = append(errs, err)
 	}
@@ -137,7 +149,7 @@ func LoadWorker() (Worker, error) {
 		BatchSize:    int32(getInt("OUTBOX_BATCH_SIZE", 50, &errs)),
 		LogLevel:     get("LOG_LEVEL", "info"),
 	}
-	c.WhatsApp, c.AI = engine(&errs)
+	c.WhatsApp, c.AI = engine(c.Env, &errs)
 	if err := c.Env.validate(); err != nil {
 		errs = append(errs, err)
 	}
