@@ -42,3 +42,40 @@ func TestWhatsAppProvider(t *testing.T) {
 		})
 	}
 }
+
+// AI_PROVIDER: reglas por defecto; openrouter necesita clave y modelo y no va a producción hasta AQ-09 (ADR-0026).
+func TestAIProvider(t *testing.T) {
+	cases := []struct {
+		name      string
+		env       Env
+		vars      map[string]string
+		errSubstr string
+	}{
+		{"sin nada: reglas", EnvProduction, nil, ""},
+		{"openrouter en local", EnvLocal, map[string]string{"AI_PROVIDER": "openrouter", "AI_API_KEY": "k", "AI_MODEL": "m"}, ""},
+		{"openrouter sin modelo", EnvLocal, map[string]string{"AI_PROVIDER": "openrouter", "AI_API_KEY": "k"}, "AI_MODEL"},
+		{"openrouter en producción", EnvProduction, map[string]string{"AI_PROVIDER": "openrouter", "AI_API_KEY": "k", "AI_MODEL": "m"}, "AQ-09"},
+		{"desconocido", EnvLocal, map[string]string{"AI_PROVIDER": "gpt"}, "no es un proveedor conocido"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, k := range []string{"AI_PROVIDER", "AI_API_KEY", "AI_MODEL", "WHATSAPP_PROVIDER", "WHATSAPP_ACCESS_TOKEN"} {
+				t.Setenv(k, tc.vars[k])
+			}
+			if tc.env == EnvProduction {
+				t.Setenv("WHATSAPP_PROVIDER", "meta")
+				t.Setenv("WHATSAPP_ACCESS_TOKEN", "t")
+				t.Setenv("WHATSAPP_APP_SECRET", "s")
+			}
+			var errs []error
+			_, ai := engine(tc.env, &errs)
+			got := ""
+			for _, e := range errs {
+				got += e.Error()
+			}
+			if (tc.errSubstr == "") != (got == "") || !strings.Contains(got, tc.errSubstr) {
+				t.Fatalf("error %q, esperaba que contuviera %q (proveedor %q)", got, tc.errSubstr, ai.Provider)
+			}
+		})
+	}
+}

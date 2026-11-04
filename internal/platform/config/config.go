@@ -52,11 +52,13 @@ type WhatsApp struct {
 	APIBase       string
 }
 
-// AI configura el proveedor del agente (D-08 abierta). "reglas" = clasificador local sin costo.
+// AI configura el intérprete del agente (D-08 abierta, ADR-0026). "reglas" = local sin costo; "openrouter" =
+// modelo de lenguaje por la API compatible con OpenAI, solo fuera de producción hasta cerrar AQ-09.
 type AI struct {
 	Provider           string
 	APIKey             string
 	Model              string
+	APIBase            string
 	MonthlyCapMicroUSD int64
 }
 
@@ -86,8 +88,17 @@ func engine(env Env, errs *[]error) (WhatsApp, AI) {
 	case wa.Provider == "local" && env == EnvProduction:
 		*errs = append(*errs, errors.New("WHATSAPP_PROVIDER=local (simulador) no se permite en producción"))
 	}
-	return wa, AI{Provider: get("AI_PROVIDER", "reglas"), APIKey: os.Getenv("AI_API_KEY"), Model: os.Getenv("AI_MODEL"),
-		MonthlyCapMicroUSD: int64(getInt("AI_MONTHLY_CAP_MICRO_USD", 5_000_000, errs))}
+	ai := AI{Provider: get("AI_PROVIDER", "reglas"), APIKey: os.Getenv("AI_API_KEY"), Model: os.Getenv("AI_MODEL"),
+		APIBase: get("AI_API_BASE", "https://openrouter.ai/api/v1"), MonthlyCapMicroUSD: int64(getInt("AI_MONTHLY_CAP_MICRO_USD", 5_000_000, errs))}
+	switch {
+	case ai.Provider != "reglas" && ai.Provider != "openrouter":
+		*errs = append(*errs, fmt.Errorf("AI_PROVIDER=%q no es un proveedor conocido (reglas, openrouter)", ai.Provider))
+	case ai.Provider == "openrouter" && (ai.APIKey == "" || ai.Model == ""):
+		*errs = append(*errs, errors.New("AI_PROVIDER=openrouter necesita AI_API_KEY y AI_MODEL"))
+	case ai.Provider == "openrouter" && env == EnvProduction:
+		*errs = append(*errs, errors.New("AI_PROVIDER=openrouter es solo para la demo: falta cerrar AQ-09 antes de producción"))
+	}
+	return wa, ai
 }
 
 // LoadAPI lee la configuración del api.

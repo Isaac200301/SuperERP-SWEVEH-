@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"sweveh/internal/assistant/adapters/out/llm/rules"
+	assistantapp "sweveh/internal/assistant/app"
 	"testing"
 	"time"
 
@@ -29,11 +31,20 @@ type wa struct {
 // whatsapp arma el lado del worker sobre el rol sweveh_worker. ch nil = canal local (simulador).
 func (e *env) whatsapp(t *testing.T, owner *client, ch messagingapp.Channel) *wa {
 	t.Helper()
+	return e.whatsappWith(t, owner, ch, nil)
+}
+
+// whatsappWith es whatsapp con un intérprete de IA de prueba (nil = reglas).
+func (e *env) whatsappWith(t *testing.T, owner *client, ch messagingapp.Channel, it assistantapp.Interpreter) *wa {
+	t.Helper()
+	if it == nil {
+		it = rules.Interpreter{}
+	}
 	m := server.Build(db.NewTxManager(e.db.Worker), e.st, e.clk, e.log)
 	if ch == nil {
 		ch = wire.Channel(config.WhatsApp{Provider: "local"})
 	}
-	s := wire.BuildWith(m, ch, config.AI{Provider: "reglas"})
+	s := wire.BuildWith(m, ch, it, config.AI{Provider: "reglas"})
 	d := outbox.NewDispatcher(e.db.Worker, e.clk, e.log, 100)
 	wire.Register(d, s)
 	return &wa{t: t, e: e, owner: owner, s: s, d: d}

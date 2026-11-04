@@ -209,14 +209,23 @@ func (t *taller) Catalog(ctx context.Context, tallerID shared.ID) ([]domain.Pric
 		return nil, nil, err
 	}
 	for _, i := range items {
-		sv = append(sv, domain.Priced{Name: i.Name, Price: i.Price, Kind: "servicio"})
+		sv = append(sv, domain.Priced{Name: i.Name, Price: i.Price, Kind: "servicio", Vehicle: i.Kind})
 	}
 	parts, err := t.s.M.Inventory.Search(ctx, tallerID, "", false, "")
 	for _, p := range parts {
 		price := p.Price
-		pt = append(pt, domain.Priced{Name: p.Name, Price: &price, Kind: "repuesto"})
+		pt = append(pt, domain.Priced{Name: p.Name, Price: &price, Kind: "repuesto", Vehicle: p.Kind})
 	}
 	return sv, pt, err
+}
+
+// Attends es lo que atiende el taller según su perfil (carro, moto o ambos; vacío = ambos).
+func (t *taller) Attends(ctx context.Context, tallerID shared.ID) (string, error) {
+	st, err := t.s.M.Admin.Get(ctx, tallerID)
+	if err != nil || st.Profile.Attends == "" {
+		return "ambos", err
+	}
+	return st.Profile.Attends, nil
 }
 
 var dayKeys = []string{"dom", "lun", "mar", "mie", "jue", "vie", "sab"}

@@ -5,6 +5,8 @@ package wire
 import (
 	"time"
 
+	"sweveh/internal/assistant/adapters/out/llm/openrouter"
+	"sweveh/internal/assistant/adapters/out/llm/rules"
 	assistantpg "sweveh/internal/assistant/adapters/out/postgres"
 	assistantapp "sweveh/internal/assistant/app"
 	automationspg "sweveh/internal/automations/adapters/out/postgres"
@@ -28,7 +30,15 @@ type Services struct {
 
 // Build arma los servicios del motor sobre los módulos ya cableados.
 func Build(m *server.Modules, wa config.WhatsApp, ai config.AI) *Services {
-	return BuildWith(m, Channel(wa), ai)
+	return BuildWith(m, Channel(wa), Interpreter(ai), ai)
+}
+
+// Interpreter elige el intérprete del agente según AI_PROVIDER (ADR-0026). config ya validó la combinación.
+func Interpreter(ai config.AI) assistantapp.Interpreter {
+	if ai.Provider == "openrouter" {
+		return openrouter.New(ai.APIBase, ai.APIKey, ai.Model, assistantapp.AITimeout)
+	}
+	return rules.Interpreter{}
 }
 
 // Channel elige el proveedor de WhatsApp según la configuración (WHATSAPP_PROVIDER). Los números del
@@ -44,8 +54,9 @@ func Channel(wa config.WhatsApp) messagingapp.Channel {
 // Parser interpreta el webhook del proveedor. Meta y el simulador comparten formato (meta.SimulatedBody).
 func Parser() messagingapp.InboundParser { return meta.Parser{} }
 
-// BuildWith es Build con el canal ya elegido: las pruebas inyectan uno que falla o que registra lo enviado.
-func BuildWith(m *server.Modules, ch messagingapp.Channel, ai config.AI) *Services {
+// BuildWith es Build con el canal y el intérprete ya elegidos: las pruebas inyectan un canal que falla o que
+// registra lo enviado, y una IA falsa.
+func BuildWith(m *server.Modules, ch messagingapp.Channel, it assistantapp.Interpreter, ai config.AI) *Services {
 	s := &Services{M: m}
 	s.Messaging = messagingapp.NewService(m.Tx, messagingpg.Repository{}, ch, Parser(), m.Events, m.Clock)
 	s.Automations = automationsapp.NewService(m.Tx, automationspg.Repository{}, autoOrders{m}, autoCustomers{m}, autoWorkshops{m},
@@ -54,6 +65,6 @@ func BuildWith(m *server.Modules, ch messagingapp.Channel, ai config.AI) *Servic
 	if cap <= 0 {
 		cap = 5_000_000
 	}
-	s.Assistant = assistantapp.NewService(m.Tx, assistantpg.Repository{}, &taller{s: s}, m.Audit, m.Clock, cap)
+	s.Assistant = assistantapp.NewService(m.Tx, assistantpg.Repository{}, &taller{s: s}, m.Audit, m.Clock, it, rules.Interpreter{}, cap)
 	return s
 }
