@@ -103,8 +103,9 @@ func TestDependencyRules(t *testing.T) {
 				}
 			}
 			// 5. Entre módulos, solo la fachada (raíz del módulo). El composition root (server y wire,
-			// que adapta los puertos de un módulo a los de otro) está exento.
-			if m != "" && m != "server" && m != "wire" && im != "" && im != m && (contains(businessModules, im) || contains(crossCutting, im)) {
+			// que adapta los puertos de un módulo a los de otro) está exento, y también demo: la carga del taller
+			// ficticio arma el sistema completo y crea el taller como el registro (HU-97, ADR-0031).
+			if m != "" && m != "server" && m != "wire" && m != "demo" && im != "" && im != m && (contains(businessModules, im) || contains(crossCutting, im)) {
 				if ilayer != "" {
 					t.Errorf("%s importa el interior de otro módulo: %s (solo se permite su fachada)", p.ImportPath, imp)
 				}
