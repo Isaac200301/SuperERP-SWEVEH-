@@ -32,7 +32,7 @@ var common = []string{
 
 // Front office: recepción y dueño (clientes completos, dinero, bandeja, conversaciones).
 var frontOffice = []string{
-	"order:cancel", "order:assign", "customer:read_all", "vehicle:change_owner", "quote:register_response",
+	"order:cancel", "order:assign", "customer:read_all", "vehicle:change_owner", "quote:register_response", "quote:discount",
 	"money:read", "inbox:manage", "conversation:read",
 }
 

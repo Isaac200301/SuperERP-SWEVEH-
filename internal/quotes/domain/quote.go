@@ -41,6 +41,8 @@ type Line struct {
 	NoStock     bool
 	Approved    *bool
 	FreePrice   bool // la persona puso el precio (ítem libre o servicio sin precio de lista): se puede corregir
+	DiscountPct int  // descuento de la línea, hasta el máximo del taller
+	HoursCent   *int // mano de obra por horas (150 = 1,5 h): el precio es horas × tarifa del taller
 }
 
 func (l Line) Subtotal() int64 { return int64(l.Qty) * l.UnitPrice }
@@ -57,19 +59,14 @@ type Quote struct {
 	Channel     *string
 	ResponseRef *string
 	Version     int
+
+	VATPct           int        // IVA copiado de los parámetros al crear la cotización
+	PricesIncludeVAT bool       // los precios de lista ya traen el IVA
+	ExpiresAt        *time.Time // vigencia, se fija al enviar
 }
 
-// Total en pesos sin decimales. Si hay respuesta ítem por ítem, solo cuenta lo aprobado.
-func (q Quote) Total() int64 {
-	var t int64
-	for _, l := range q.Lines {
-		if l.Approved != nil && !*l.Approved {
-			continue
-		}
-		t += l.Subtotal()
-	}
-	return t
-}
+// Total en pesos sin decimales, con descuentos e IVA (ver Totals). Si hay respuesta ítem por ítem, solo cuenta lo aprobado.
+func (q Quote) Total() int64 { return q.Totals().Total }
 
 func (q *Quote) AddLine(l Line) error {
 	if q.State != Draft {
@@ -131,8 +128,8 @@ func (q *Quote) RemoveLine(id shared.ID) error {
 	return ErrLineNotFound
 }
 
-// Send la deja esperando respuesta del cliente.
-func (q *Quote) Send(at time.Time) error {
+// Send la deja esperando respuesta del cliente, con la vigencia del taller (days = 0: sin vigencia).
+func (q *Quote) Send(at time.Time, days int) error {
 	if q.State != Draft {
 		return ErrNotEditable
 	}
@@ -140,6 +137,10 @@ func (q *Quote) Send(at time.Time) error {
 		return ErrEmpty
 	}
 	q.State, q.SentAt = Sent, &at
+	if days > 0 {
+		exp := at.AddDate(0, 0, days)
+		q.ExpiresAt = &exp
+	}
 	return nil
 }
 
@@ -156,6 +157,9 @@ type Response struct {
 func (q *Quote) Respond(r Response) (bool, error) {
 	if q.State != Sent && q.State != Doubts {
 		return false, ErrNotSent
+	}
+	if r.Decision == "aprobar" && q.Expired(r.At) {
+		return false, ErrExpired
 	}
 	ch, ref := r.Channel, r.Ref
 	q.Channel, q.RespondedAt = &ch, &r.At

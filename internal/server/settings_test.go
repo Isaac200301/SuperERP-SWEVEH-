@@ -126,3 +126,54 @@ func TestSettings_OptionalStatesInTheFlow(t *testing.T) {
 		t.Fatalf("historial: %v", pasos)
 	}
 }
+
+// Cotización real con los parámetros: IVA aparte, mano de obra por horas, descuento con tope y permiso, vigencia.
+func TestSettings_RealQuoteWithVATHoursDiscountValidity(t *testing.T) {
+	e := newEnv(t)
+	c := e.register("3105550360", "Pablo Rodríguez")
+	s := c.must(http.StatusOK, c.do("GET", "/api/v1/workshop/settings", nil)).body
+	s["preciosConIva"], s["tarifaHora"], s["descuentoMaxPct"], s["vigenciaDias"] = false, 80000, 10, 15
+	c.must(http.StatusOK, c.do("PUT", "/api/v1/workshop/settings", s))
+	id, pid := orderInDiagnosis(t, c, "IVA361", 5)
+	q := "/api/v1/orders/" + id + "/quote"
+
+	is4xx(t, "horas fuera de cuartos", c.do("POST", q+"/lines", map[string]any{"tipo": "servicio", "descripcion": "Mano de obra", "horas": 1.3}))
+	ls := lines(c.must(http.StatusOK, c.do("POST", q+"/lines", map[string]any{"tipo": "servicio", "descripcion": "Mano de obra frenos", "horas": 1.5})))
+	if ls[0]["precioUnitario"] != float64(120000) || ls[0]["horas"] != 1.5 {
+		t.Fatalf("1,5 h × 80.000: %v", ls[0])
+	}
+	if r := c.do("PATCH", q+"/lines/"+ls[0]["id"].(string), map[string]any{"precioUnitario": 1}); r.status < 400 {
+		t.Fatalf("la mano de obra por horas no se edita a mano: %d", r.status)
+	}
+	ls = lines(c.must(http.StatusOK, c.do("POST", q+"/lines", map[string]any{"tipo": "repuesto", "refId": pid, "cantidad": 2})))
+	part := ls[1]["id"].(string)
+	is4xx(t, "descuento sobre el máximo", c.do("PATCH", q+"/lines/"+part, map[string]any{"descuentoPct": 11}))
+	r := cot(c.must(http.StatusOK, c.do("PATCH", q+"/lines/"+part, map[string]any{"descuentoPct": 10})))
+	// 120.000 + 130.000 − 13.000 = 237.000; IVA 19 % = 45.030; total 282.030.
+	if r.body["subtotal"] != float64(250000) || r.body["descuento"] != float64(13000) || r.body["iva"] != float64(45030) || r.body["total"] != float64(282030) {
+		t.Fatalf("desglose: %v", r.body)
+	}
+
+	// Recepción no da descuentos salvo que el taller lo permita; el mecánico nunca.
+	c.must(http.StatusCreated, c.do("POST", "/api/v1/users", map[string]any{"celular": "3005550362", "nombre": "Recepción", "rol": "recepcion"}))
+	rec := e.login("3005550362")
+	if r := rec.do("PATCH", q+"/lines/"+part, map[string]any{"descuentoPct": 5}); r.status != http.StatusForbidden {
+		t.Fatalf("recepción sin permiso del taller: %d %v", r.status, r.body)
+	}
+	s = c.must(http.StatusOK, c.do("GET", "/api/v1/workshop/settings", nil)).body
+	s["descuentoRecepcion"] = true
+	c.must(http.StatusOK, c.do("PUT", "/api/v1/workshop/settings", s))
+	rec.must(http.StatusOK, rec.do("PATCH", q+"/lines/"+part, map[string]any{"descuentoPct": 5}))
+
+	// Enviar fija la vigencia; renovar la vuelve a contar. El IVA quedó copiado aunque el taller lo cambie.
+	r = cot(c.must(http.StatusOK, c.do("POST", q+"/send", nil)))
+	if r.body["venceEn"] == nil || r.body["vencida"] != false || r.body["ivaPct"] != float64(19) {
+		t.Fatalf("enviada: %v", r.body)
+	}
+	s = c.must(http.StatusOK, c.do("GET", "/api/v1/workshop/settings", nil)).body
+	s["ivaPct"] = 0
+	c.must(http.StatusOK, c.do("PUT", "/api/v1/workshop/settings", s))
+	if r := cot(c.must(http.StatusOK, c.do("POST", q+"/renew", nil))); r.body["ivaPct"] != float64(19) || r.body["venceEn"] == nil {
+		t.Fatalf("renovada conserva su IVA: %v", r.body)
+	}
+}

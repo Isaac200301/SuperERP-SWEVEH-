@@ -223,6 +223,45 @@ describe('QuotePanel (HU-27, HU-29)', () => {
   });
 });
 
+describe('QuotePanel con parámetros del taller (IVA, horas, descuento, vigencia)', () => {
+  const dueno = { ...owner, permisos: [...owner.permisos, 'quote:discount', 'quote:send', 'quote:edit'] };
+  it('muestra el desglose, descuenta por línea y cotiza mano de obra por horas', async () => {
+    const calls = mockApi({
+      'GET /me': dueno,
+      'GET /workshop/settings': { tarifaHora: 80000, usarEsperandoRepuesto: false, usarControlCalidad: false },
+      'GET /orders/{id}/quote': cotizacion({ subtotal: 130000, descuento: 13000, ivaPct: 19, iva: 22230, preciosConIva: false, total: 139230 }),
+      'GET /services': { servicios: [] },
+      'GET /parts': { repuestos: [] },
+      'PATCH /orders/{id}/quote/lines/{lineId}': cotizacion(),
+      'POST /orders/{id}/quote/lines': cotizacion(),
+    });
+    renderPage(<QuotePanel orden={o()} />);
+    expect(await screen.findByText('IVA 19 %')).toBeInTheDocument();
+    expect(screen.getByText(/−\$\s?13\.000/)).toBeInTheDocument();
+    const desc = screen.getByLabelText('Descuento de Pastillas (PF-20)');
+    await userEvent.type(desc, '10');
+    await userEvent.tab();
+    await userEvent.type(await screen.findByLabelText('Mano de obra u otro ítem'), 'Mano de obra frenos');
+    await userEvent.type(screen.getByLabelText('Horas'), '1,5');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar ítem' }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ tipo: 'servicio', descripcion: 'Mano de obra frenos', horas: 1.5, cantidad: 1 }));
+    expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({ descuentoPct: 10 });
+  });
+
+  it('una cotización vencida pide renovar la vigencia', async () => {
+    const calls = mockApi({
+      'GET /me': dueno,
+      'GET /workshop/settings': { tarifaHora: null },
+      'GET /orders/{id}/quote': cotizacion({ estado: 'enviada', venceEn: '2026-10-01T15:00:00Z', vencida: true }),
+      'POST /orders/{id}/quote/renew': cotizacion({ estado: 'enviada', venceEn: '2026-11-18T15:00:00Z', vencida: false }),
+    });
+    renderPage(<QuotePanel orden={o({ estado: 'esperando_aprobacion' })} />);
+    expect(await screen.findByText(/Venció el/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Renovar vigencia' }));
+    await waitFor(() => expect(calls.some((c) => c.path.endsWith('/quote/renew'))).toBe(true));
+  });
+});
+
 describe('FloorPage (HU-23)', () => {
   it('muestra las órdenes del mecánico y el estado vacío', async () => {
     mockApi({ 'GET /orders/mine': { ordenes: [orden({ fechaPrometida: '2026-11-03T17:00:00Z' }), orden({ id: 'o2', vehiculo: { ...orden().vehiculo, marca: null, linea: null, tipo: 'moto' } })] } });

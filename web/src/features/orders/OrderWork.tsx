@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 
 import { ApiError, type EstadoOrden, type Orden, type Schemas } from '../../shared/api/client';
 import { estados, flujoFor } from '../../shared/i18n/es-CO';
-import { formatoCOP, formatoHora } from '../../shared/lib/format';
+import { formatoCOP, formatoFechaHora, formatoHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { Field } from '../../shared/ui/Field';
@@ -360,32 +360,44 @@ function CatalogItem({ label, detalle, precio, pidePrecio, pideCantidad, busy, o
 }
 
 /** Mano de obra u otro ítem libre: el precio lo pone la persona (RF-17) y se puede corregir mientras es borrador. */
-function FreeItem({ busy, onAdd }: { busy: boolean; onAdd: (v: { descripcion: string; precioUnitario: number; cantidad: number }) => void }) {
+function FreeItem({ busy, tarifa, onAdd }: {
+  busy: boolean; tarifa: number | null | undefined;
+  onAdd: (v: { descripcion: string; cantidad: number } & ({ precioUnitario: number } | { horas: number })) => void;
+}) {
   const [desc, setDesc] = useState('');
   const [valor, setValor] = useState('');
   const [cant, setCant] = useState('1');
+  const [horas, setHoras] = useState('');
+  const porHoras = tarifa != null;
   const v = pesos(valor);
   const n = pesos(cant) ?? 0;
+  const h = horas.trim() === '' ? undefined : Number(horas.replace(',', '.'));
   let falta: string | undefined;
   if (!desc.trim()) falta = 'Describe el trabajo.';
-  else if (v === undefined) falta = 'Escribe el valor.';
+  else if (porHoras && h === undefined && v === undefined) falta = 'Escribe las horas o el valor.';
+  else if (!porHoras && v === undefined) falta = 'Escribe el valor.';
   else if (n < 1) falta = 'Escribe la cantidad.';
   return (
     <form
       className="grid gap-3 rounded-2xl bg-surface p-3 sm:grid-cols-4"
       onSubmit={(e) => {
         e.preventDefault();
-        if (falta || v === undefined) return;
-        onAdd({ descripcion: desc.trim(), precioUnitario: v, cantidad: n });
+        if (falta) return;
+        if (porHoras && h !== undefined) onAdd({ descripcion: desc.trim(), horas: h, cantidad: 1 });
+        else if (v !== undefined) onAdd({ descripcion: desc.trim(), precioUnitario: v, cantidad: n });
         setDesc('');
         setValor('');
         setCant('1');
+        setHoras('');
       }}
     >
       <div className="sm:col-span-2">
         <Field label="Mano de obra u otro ítem" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Mano de obra cambio de pastillas" />
       </div>
-      <Field label="Valor (COP)" inputMode="numeric" value={valor} onChange={(e) => setValor(e.target.value)} />
+      {porHoras ? (
+        <Field label="Horas" inputMode="decimal" value={horas} onChange={(e) => setHoras(e.target.value)} hint={`× ${formatoCOP(tarifa)} la hora`} placeholder="1,5" />
+      ) : null}
+      <Field label="Valor (COP)" inputMode="numeric" value={valor} onChange={(e) => setValor(e.target.value)} hint={porHoras ? 'O un valor fijo en vez de horas' : undefined} />
       <Field label="Cantidad del ítem" inputMode="numeric" value={cant} onChange={(e) => setCant(e.target.value)} />
       <div className="sm:col-span-4">
         <Button type="submit" variant="secondary" busy={busy} missing={falta}>
@@ -402,6 +414,9 @@ export function QuotePanel({ orden }: { orden: Orden }) {
   const act = useQuoteActions(orden.id);
   const puedeRegistrar = usePermission('quote:register_response');
   const permisoDevolver = usePermission('part:return');
+  const puedeDescontar = usePermission('quote:discount');
+  const puedeEnviar = usePermission('quote:send');
+  const params = useSettings().data;
   const [buscar, setBuscar] = useState('');
   const cat = useCatalog(buscar);
   const aprobada = q.data?.estado === 'aprobada';
@@ -417,7 +432,8 @@ export function QuotePanel({ orden }: { orden: Orden }) {
   // Sin cotización todavía: se arma una vacía; el primer ítem crea el borrador en el servidor.
   const cot = q.data ?? { numero: 1, estado: 'borrador' as const, total: 0, lineas: [] };
   const editable = cot.estado === 'borrador';
-  const err = act.add.error ?? act.remove.error ?? act.send.error ?? act.respond.error ?? act.giveBack.error ?? act.update.error;
+  const err = act.add.error ?? act.remove.error ?? act.send.error ?? act.respond.error ?? act.giveBack.error ?? act.update.error ?? act.renew.error;
+  const t = { subtotal: 0, descuento: 0, iva: 0, ivaPct: 0, preciosConIva: true, venceEn: null, vencida: false, ...cot };
   const devuelto = act.giveBack.data;
   const movPorRepuesto = new Map((movidos.data ?? []).map((m) => [m.repuestoId, m]));
 
@@ -442,7 +458,25 @@ export function QuotePanel({ orden }: { orden: Orden }) {
               <tr key={l.id} className="border-t border-line align-top">
                 <td className="py-2">
                   {l.descripcion}
+                  {l.horas != null ? <span className="ml-2 text-ink-2">({l.horas} h)</span> : null}
                   {l.sinStock ? <span className="ml-2 font-bold text-warn-ink">sin existencia</span> : null}
+                  {editable && puedeDescontar ? (
+                    <label className="mt-1 flex items-center gap-2 text-xs text-ink-2">
+                      Descuento %
+                      <input
+                        aria-label={`Descuento de ${l.descripcion}`}
+                        inputMode="numeric"
+                        className="w-14 rounded border border-line px-1"
+                        defaultValue={l.descuentoPct || ''}
+                        onBlur={(e) => {
+                          const v = pesos(e.target.value) ?? 0;
+                          if (v !== (l.descuentoPct ?? 0)) act.update.mutate({ lineId: l.id, descuentoPct: v });
+                        }}
+                      />
+                    </label>
+                  ) : l.descuentoPct ? (
+                    <span className="block text-xs text-ink-2">Descuento {l.descuentoPct} %</span>
+                  ) : null}
                   {mov ? (
                     <span className="block text-xs text-ink-2">
                       Descontado {mov.descontado} · Devuelto {mov.devuelto}
@@ -505,6 +539,27 @@ export function QuotePanel({ orden }: { orden: Orden }) {
           ) : null}
         </tbody>
         <tfoot>
+          {t.descuento || t.iva ? (
+            <>
+              <tr className="border-t border-line text-ink-2">
+                <td className="py-1" colSpan={2}>Subtotal</td>
+                <td className="text-right font-mono">{formatoCOP(t.subtotal)}</td>
+                <td />
+              </tr>
+              {t.descuento ? (
+                <tr className="text-ink-2">
+                  <td className="py-1" colSpan={2}>Descuentos</td>
+                  <td className="text-right font-mono">−{formatoCOP(t.descuento)}</td>
+                  <td />
+                </tr>
+              ) : null}
+              <tr className="text-ink-2">
+                <td className="py-1" colSpan={2}>IVA {t.ivaPct} %{t.preciosConIva ? ' (incluido)' : ''}</td>
+                <td className="text-right font-mono">{formatoCOP(t.iva)}</td>
+                <td />
+              </tr>
+            </>
+          ) : null}
           <tr className="border-t-2 border-ink font-extrabold">
             <td className="py-2" colSpan={2}>
               Total
@@ -514,6 +569,16 @@ export function QuotePanel({ orden }: { orden: Orden }) {
           </tr>
         </tfoot>
       </table>
+      {t.venceEn && (cot.estado === 'enviada' || cot.estado === 'dudas') ? (
+        <p className={`flex flex-wrap items-center gap-3 text-sm ${t.vencida ? 'font-bold text-err-ink' : 'text-ink-2'}`}>
+          {t.vencida ? `Venció el ${formatoFechaHora(t.venceEn)}: renueva la vigencia para registrar la respuesta.` : `Vence el ${formatoFechaHora(t.venceEn)}`}
+          {t.vencida && puedeEnviar ? (
+            <Button variant="secondary" busy={act.renew.isPending} onClick={() => act.renew.mutate()}>
+              Renovar vigencia
+            </Button>
+          ) : null}
+        </p>
+      ) : null}
       {devuelto ? (
         <p role="status" className="font-bold text-ok">
           Se devolvió {devuelto.devueltas} de {devuelto.nombre}. Quedan {devuelto.quedanPorDevolver} por devolver · {devuelto.existencia} en bodega.
@@ -548,7 +613,7 @@ export function QuotePanel({ orden }: { orden: Orden }) {
               />
             ))}
           </ul>
-          <FreeItem busy={act.add.isPending} onAdd={(v) => act.add.mutate({ tipo: 'servicio', ...v })} />
+          <FreeItem busy={act.add.isPending} tarifa={params?.tarifaHora} onAdd={(v) => act.add.mutate({ tipo: 'servicio', ...v })} />
           <Button
             missing={cot.lineas.length === 0 ? 'Agrega al menos un ítem para enviarla.' : undefined}
             busy={act.send.isPending}

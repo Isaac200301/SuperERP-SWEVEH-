@@ -599,6 +599,7 @@ paths:
                 descripcion: { type: string }
                 cantidad: { type: integer, minimum: 1 }
                 precioUnitario: { type: integer, format: int64, nullable: true, description: 'COP sin decimales' }
+                horas: { type: number, minimum: 0.25, maximum: 200, description: 'Mano de obra por horas: el precio es horas × tarifa del taller' }
       responses:
         '200': { $ref: '#/components/responses/Cotizacion' }
         '400': { $ref: '#/components/responses/Problem' }
@@ -622,6 +623,8 @@ paths:
               properties:
                 cantidad: { type: integer, minimum: 1 }
                 precioUnitario: { type: integer, format: int64, minimum: 0, description: 'Solo si la línea tiene precioLibre' }
+                horas: { type: number, minimum: 0.25, maximum: 200, description: 'Solo en líneas de mano de obra por horas' }
+                descuentoPct: { type: integer, minimum: 0, maximum: 100, description: 'Hasta el máximo del taller; permiso quote:discount' }
       responses:
         '200': { $ref: '#/components/responses/Cotizacion' }
         '400': { $ref: '#/components/responses/Problem' }
@@ -633,6 +636,16 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/Id' }
         - { name: lineId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/Cotizacion' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /orders/{id}/quote/renew:
+    post:
+      operationId: renewQuote
+      summary: Renovar la vigencia de una cotización enviada (parámetros del taller). Permiso quote:send
+      parameters: [{ $ref: '#/components/parameters/Id' }]
       responses:
         '200': { $ref: '#/components/responses/Cotizacion' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -1860,9 +1873,18 @@ components:
               sinStock: { type: boolean }
               precioLibre: { type: boolean, description: 'El precio lo puso una persona y se puede corregir' }
               aprobada: { type: boolean, nullable: true }
+              descuentoPct: { type: integer }
+              horas: { type: number, nullable: true, description: 'Mano de obra por horas × tarifa del taller' }
         enviadaEn: { type: string, format: date-time, nullable: true }
         respondidaEn: { type: string, format: date-time, nullable: true }
         canalRespuesta: { type: string, nullable: true }
+        subtotal: { type: integer, format: int64, description: 'Cantidad × precio, antes de descuentos' }
+        descuento: { type: integer, format: int64 }
+        ivaPct: { type: integer, description: 'Copiado de los parámetros al crear la cotización' }
+        iva: { type: integer, format: int64 }
+        preciosConIva: { type: boolean }
+        venceEn: { type: string, format: date-time, nullable: true }
+        vencida: { type: boolean }
 
     ResultadoVehiculo:
       type: object

@@ -113,7 +113,7 @@ export function useQuote(id: string, enabled = true) {
   });
 }
 
-export type LineInput = { tipo: 'servicio' | 'repuesto'; refId?: string; descripcion?: string; cantidad: number; precioUnitario?: number };
+export type LineInput = { tipo: 'servicio' | 'repuesto'; refId?: string; descripcion?: string; cantidad: number; precioUnitario?: number; horas?: number };
 
 export function useQuoteActions(id: string) {
   const invalidate = useInvalidateOrder(id);
@@ -138,13 +138,8 @@ export function useQuoteActions(id: string) {
   });
   // Cantidad y, solo en precio libre, el precio de un ítem del borrador.
   const update = useMutation({
-    mutationFn: async (v: { lineId: string; cantidad?: number; precioUnitario?: number }) =>
-      unwrap(
-        await api.PATCH('/orders/{id}/quote/lines/{lineId}', {
-          params: { path: { id, lineId: v.lineId } },
-          body: { ...(v.cantidad !== undefined ? { cantidad: v.cantidad } : {}), ...(v.precioUnitario !== undefined ? { precioUnitario: v.precioUnitario } : {}) },
-        }),
-      ),
+    mutationFn: async ({ lineId, ...body }: { lineId: string; cantidad?: number; precioUnitario?: number; horas?: number; descuentoPct?: number }) =>
+      unwrap(await api.PATCH('/orders/{id}/quote/lines/{lineId}', { params: { path: { id, lineId } }, body })),
     onSettled: invalidate,
   });
   // HU-38: devolver una unidad de un repuesto ya descontado; responde cuánto queda por devolver.
@@ -155,7 +150,11 @@ export function useQuoteActions(id: string) {
     }),
     onSettled: invalidate,
   });
-  return { add, remove, send, respond, giveBack, update };
+  const renew = useMutation({
+    mutationFn: async () => unwrap(await api.POST('/orders/{id}/quote/renew', { params: { path: { id } } })),
+    onSettled: invalidate,
+  });
+  return { add, remove, send, respond, giveBack, update, renew };
 }
 
 /** Por repuesto, lo que la orden descontó, devolvió y dejó pendiente (HU-33, HU-38). */

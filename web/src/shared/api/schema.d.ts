@@ -452,6 +452,23 @@ export interface paths {
         patch: operations["updateQuoteLine"];
         trace?: never;
     };
+    "/orders/{id}/quote/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Renovar la vigencia de una cotización enviada (parámetros del taller). Permiso quote:send */
+        post: operations["renewQuote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/orders/{id}/quote/send": {
         parameters: {
             query?: never;
@@ -1353,12 +1370,30 @@ export interface components {
                 /** @description El precio lo puso una persona y se puede corregir */
                 precioLibre?: boolean;
                 aprobada: boolean | null;
+                descuentoPct?: number;
+                /** @description Mano de obra por horas × tarifa del taller */
+                horas?: number | null;
             }[];
             /** Format: date-time */
             enviadaEn: string | null;
             /** Format: date-time */
             respondidaEn: string | null;
             canalRespuesta: string | null;
+            /**
+             * Format: int64
+             * @description Cantidad × precio, antes de descuentos
+             */
+            subtotal?: number;
+            /** Format: int64 */
+            descuento?: number;
+            /** @description Copiado de los parámetros al crear la cotización */
+            ivaPct?: number;
+            /** Format: int64 */
+            iva?: number;
+            preciosConIva?: boolean;
+            /** Format: date-time */
+            venceEn?: string | null;
+            vencida?: boolean;
         };
         ResultadoVehiculo: {
             /** Format: uuid */
@@ -2632,6 +2667,8 @@ export interface operations {
                      * @description COP sin decimales
                      */
                     precioUnitario?: number | null;
+                    /** @description Mano de obra por horas: el precio es horas × tarifa del taller */
+                    horas?: number;
                 };
             };
         };
@@ -2678,12 +2715,32 @@ export interface operations {
                      * @description Solo si la línea tiene precioLibre
                      */
                     precioUnitario?: number;
+                    /** @description Solo en líneas de mano de obra por horas */
+                    horas?: number;
+                    /** @description Hasta el máximo del taller; permiso quote:discount */
+                    descuentoPct?: number;
                 };
             };
         };
         responses: {
             200: components["responses"]["Cotizacion"];
             400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    renewQuote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Cotizacion"];
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };

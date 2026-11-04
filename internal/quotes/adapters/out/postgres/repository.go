@@ -23,6 +23,9 @@ type qRow struct {
 	Canal      *string    `db:"canal_respuesta"`
 	Ref        *string    `db:"respuesta_ref"`
 	Version    int        `db:"version"`
+	IVA        int        `db:"iva_pct"`
+	ConIVA     bool       `db:"precios_con_iva"`
+	VenceEn    *time.Time `db:"vence_en"`
 }
 
 type lRow struct {
@@ -35,18 +38,22 @@ type lRow struct {
 	SinStock    bool       `db:"sin_stock"`
 	Aprobada    *bool      `db:"aprobada"`
 	Libre       bool       `db:"precio_libre"`
+	Descuento   int        `db:"descuento_pct"`
+	Horas       *int       `db:"horas_cent"`
 }
 
-const qCols = `id, taller_id, orden_id, numero, estado, enviada_en, respondida_en, canal_respuesta, respuesta_ref, version`
+const qCols = `id, taller_id, orden_id, numero, estado, enviada_en, respondida_en, canal_respuesta, respuesta_ref, version,
+	iva_pct, precios_con_iva, vence_en`
 
 func (Repository) load(ctx context.Context, r qRow) (domain.Quote, error) {
 	q := domain.Quote{ID: r.ID, TallerID: r.TallerID, OrderID: r.OrdenID, Number: r.Numero, State: domain.State(r.Estado),
-		SentAt: r.EnviadaEn, RespondedAt: r.Respondida, Channel: r.Canal, ResponseRef: r.Ref, Version: r.Version}
-	lines, err := db.Many[lRow](ctx, `SELECT id, tipo, ref_id, descripcion, cantidad, precio_unitario, sin_stock, aprobada, precio_libre
-		FROM quotes.linea WHERE taller_id = $1 AND cotizacion_id = $2 ORDER BY created_at, id`, r.TallerID, r.ID)
+		SentAt: r.EnviadaEn, RespondedAt: r.Respondida, Channel: r.Canal, ResponseRef: r.Ref, Version: r.Version,
+		VATPct: r.IVA, PricesIncludeVAT: r.ConIVA, ExpiresAt: r.VenceEn}
+	lines, err := db.Many[lRow](ctx, `SELECT id, tipo, ref_id, descripcion, cantidad, precio_unitario, sin_stock, aprobada, precio_libre,
+		descuento_pct, horas_cent FROM quotes.linea WHERE taller_id = $1 AND cotizacion_id = $2 ORDER BY created_at, id`, r.TallerID, r.ID)
 	for _, l := range lines {
 		q.Lines = append(q.Lines, domain.Line{ID: l.ID, Kind: l.Tipo, RefID: l.RefID, Description: l.Descripcion, Qty: l.Cantidad,
-			UnitPrice: l.Precio, NoStock: l.SinStock, Approved: l.Aprobada, FreePrice: l.Libre})
+			UnitPrice: l.Precio, NoStock: l.SinStock, Approved: l.Aprobada, FreePrice: l.Libre, DiscountPct: l.Descuento, HoursCent: l.Horas})
 	}
 	return q, err
 }
@@ -78,16 +85,19 @@ func (r Repository) PendingByCustomerOrder(ctx context.Context, tallerID, orderI
 }
 
 func (Repository) Insert(ctx context.Context, q domain.Quote) error {
-	_, err := db.Exec(ctx, `INSERT INTO quotes.cotizacion (id, taller_id, orden_id, numero, estado, total)
-		VALUES ($1, $2, $3, $4, $5, 0)`, q.ID, q.TallerID, q.OrderID, q.Number, string(q.State))
+	_, err := db.Exec(ctx, `INSERT INTO quotes.cotizacion (id, taller_id, orden_id, numero, estado, total, iva_pct, precios_con_iva)
+		VALUES ($1, $2, $3, $4, $5, 0, $6, $7)`, q.ID, q.TallerID, q.OrderID, q.Number, string(q.State), q.VATPct, q.PricesIncludeVAT)
 	return err
 }
 
 // Save reemplaza la cabecera (con versión) y las líneas.
 func (Repository) Save(ctx context.Context, q domain.Quote, prev int) error {
+	t := q.Totals()
 	n, err := db.Exec(ctx, `UPDATE quotes.cotizacion SET estado = $3, total = $4, enviada_en = $5, respondida_en = $6,
-		canal_respuesta = $7, respuesta_ref = $8, version = $9 WHERE taller_id = $1 AND id = $2 AND version = $10`,
-		q.TallerID, q.ID, string(q.State), q.Total(), q.SentAt, q.RespondedAt, q.Channel, q.ResponseRef, q.Version, prev)
+		canal_respuesta = $7, respuesta_ref = $8, version = $9, subtotal = $11, descuento = $12, iva = $13, vence_en = $14
+		WHERE taller_id = $1 AND id = $2 AND version = $10`,
+		q.TallerID, q.ID, string(q.State), t.Total, q.SentAt, q.RespondedAt, q.Channel, q.ResponseRef, q.Version, prev,
+		t.Gross, t.Discount, t.VAT, q.ExpiresAt)
 	if err != nil {
 		return err
 	}
@@ -99,9 +109,10 @@ func (Repository) Save(ctx context.Context, q domain.Quote, prev int) error {
 	}
 	for i, l := range q.Lines {
 		if _, err := db.Exec(ctx, `INSERT INTO quotes.linea (id, taller_id, cotizacion_id, tipo, ref_id, descripcion, cantidad,
-			precio_unitario, sin_stock, aprobada, precio_libre, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now() + make_interval(secs => $12))`,
-			l.ID, q.TallerID, q.ID, l.Kind, l.RefID, l.Description, l.Qty, l.UnitPrice, l.NoStock, l.Approved, l.FreePrice, float64(i)/1000); err != nil {
+			precio_unitario, sin_stock, aprobada, precio_libre, descuento_pct, horas_cent, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now() + make_interval(secs => $14))`,
+			l.ID, q.TallerID, q.ID, l.Kind, l.RefID, l.Description, l.Qty, l.UnitPrice, l.NoStock, l.Approved, l.FreePrice,
+			l.DiscountPct, l.HoursCent, float64(i)/1000); err != nil {
 			return err
 		}
 	}

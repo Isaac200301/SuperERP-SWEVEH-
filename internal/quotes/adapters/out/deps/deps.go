@@ -8,8 +8,19 @@ import (
 	"sweveh/internal/inventory"
 	"sweveh/internal/orders"
 	"sweveh/internal/quotes/app"
+	"sweveh/internal/quotes/domain"
 	"sweveh/internal/shared"
+	"sweveh/internal/tenancy"
 )
+
+// Rules lee los parámetros de cotización del taller desde la fachada de tenancy.
+type Rules struct{ A *tenancy.Admin }
+
+func (r Rules) QuoteRules(ctx context.Context, tallerID shared.ID) (domain.Rules, error) {
+	p, err := r.A.ParametrosIn(ctx, tallerID)
+	return domain.Rules{VATPct: p.VATPct, PricesIncludeVAT: p.PricesIncludeVAT, HourlyRate: p.HourlyRate, MaxDiscountPct: p.MaxDiscountPct,
+		ReceptionDiscount: p.ReceptionDiscount, ValidityDays: p.ValidityDays}, err
+}
 
 type Orders struct{ O orders.Orders }
 

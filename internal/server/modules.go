@@ -90,6 +90,7 @@ func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger
 	m.Quotes = quotesapp.NewService(tx, quotespg.Repository{}, quotesdeps.Orders{O: m.OrdersF}, quotesdeps.Catalog{C: m.CatalogF},
 		quotesdeps.Inventory{I: m.InvF}, m.Audit, m.Events, clk)
 	m.QuotesF = quotes.New(m.Quotes)
+	m.Quotes.SetRules(quotesdeps.Rules{A: m.Admin})
 	m.Flow.SetQuoteReader(quotesdir.Reader{Q: m.QuotesF})
 	return m
 }
