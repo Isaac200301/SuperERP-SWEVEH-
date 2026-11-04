@@ -132,12 +132,31 @@ func Respond(ctx context.Context, chat func(context.Context, ChatRequest) (ChatM
 	text = domain.Tidy(text)
 	if gerr := domain.Guard(text, quoted); errors.Is(gerr, domain.ErrReplyPrice) {
 		req.Messages = append(msgs, ChatMessage{Role: "assistant", Content: text}, ChatMessage{Role: "system", Content: correction})
-		if text, _, err = Converse(ctx, chat, req, run); err != nil || text == "" {
+		if text, msgs, err = Converse(ctx, chat, req, run); err != nil || text == "" {
 			return "", err
 		}
 		text = domain.Tidy(text)
 	}
+	// Si promete que una persona le escribe y no pasó la conversación, se pasa aquí: lo que se le dice al cliente se
+	// cumple aunque el modelo olvide la tool.
+	if domain.PromisesPerson(text) && !called(msgs, "pasar_a_persona", "apartar_producto") {
+		run(ctx, "pasar_a_persona", `{"motivo":"el asesor le dijo al cliente que una persona le escribe"}`)
+	}
 	return text, domain.Guard(text, quoted)
+}
+
+// called dice si el modelo usó alguna de esas tools en la conversación.
+func called(msgs []ChatMessage, names ...string) bool {
+	for _, m := range msgs {
+		for _, c := range m.ToolCalls {
+			for _, n := range names {
+				if c.Name == n {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // Converse corre las rondas del asesor: el modelo pide tools, run las ejecuta y vuelve con los resultados, hasta que

@@ -211,3 +211,21 @@ func TestAdvisor_GuardsAndFallbacks(t *testing.T) {
 		t.Fatal("el asesor siguió con la conversación en manos de una persona")
 	}
 }
+
+// Si el asesor le dice al cliente que una persona le escribe pero olvida la tool, la conversación pasa igual a una
+// persona con alerta: lo que se le promete al cliente se cumple.
+func TestAdvisor_PromiseOfAPersonIsKept(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550702", "Rosa Pérez")
+	adv := &fakeAdvisor{}
+	w := e.advisorWA(t, owner, adv)
+	const laura = "3001234702"
+	w.customer(laura, "Laura Gómez")
+	adv.step = func(assistantapp.ChatRequest) (assistantapp.ChatMessage, error) {
+		return say("Te pido disculpas. Una persona del taller te va a escribir ya para darte el detalle."), nil
+	}
+	w.write(laura, "Laura Gómez", "llevo 3 días esperando, qué falta de seriedad")
+	if conv, _ := w.conversation(laura); conv["modo"] != "humano" || conv["pideHumano"] != true {
+		t.Fatalf("prometió una persona y no pasó la conversación: %v", conv)
+	}
+}

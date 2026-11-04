@@ -55,3 +55,8 @@ func Guard(text string, quoted map[int64]bool) error {
 	}
 	return nil
 }
+
+var rePerson = regexp.MustCompile(`(?i)(una persona|alguien|un asesor humano|el jefe de taller|un tecnico|un técnico)( del taller)? (te|le) (va a )?(escrib|llam|contact|respond)`)
+
+// PromisesPerson dice si el texto le promete al cliente que una persona del taller lo contacta.
+func PromisesPerson(text string) bool { return rePerson.MatchString(text) }

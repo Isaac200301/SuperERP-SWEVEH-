@@ -222,3 +222,17 @@ func TestTidy(t *testing.T) {
 		t.Fatalf("Tidy = %q; quiero %q", got, want)
 	}
 }
+
+func TestPromisesPerson(t *testing.T) {
+	for text, want := range map[string]bool{
+		"Una persona del taller te va a escribir ya para darte el detalle.": true,
+		"Una persona del taller le escribe en cuanto pueda.":                true,
+		"El jefe de taller te llama hoy.":                                   true,
+		"¿Quieres que te pase con una persona del taller?":                  false,
+		"El cambio de aceite cuesta $45.000.":                               false,
+	} {
+		if got := PromisesPerson(text); got != want {
+			t.Errorf("PromisesPerson(%q) = %v", text, got)
+		}
+	}
+}
