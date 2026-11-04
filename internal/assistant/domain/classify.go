@@ -3,6 +3,7 @@
 package domain
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"unicode"
@@ -10,10 +11,14 @@ import (
 
 // Intent es lo que el cliente pide.
 type Intent struct {
-	Kind    string // estado | cotizar | cita | humano | fuera_tema | saludo | otro
-	Plate   string
-	Wants   []string // palabras clave del servicio pedido
-	ForDate string   // "hoy" | "manana" | ""
+	Kind     string // ver Intents
+	Plate    string
+	Wants    []string // palabras clave del servicio pedido
+	ForDate  string   // "hoy" | "manana" | ""
+	Services []string // nombres exactos de servicios o repuestos de la lista del taller
+	Others   []string // lo pedido que no está en la lista
+	Vehicle  Vehicle
+	Symptom  string
 }
 
 // Normalize pasa a minúsculas y quita tildes para comparar.
@@ -54,7 +59,9 @@ func Classify(text string) Intent {
 	switch {
 	case has(t, "hablar con", "una persona", "asesor", "humano", "alguien que me"):
 		in.Kind = "humano"
-	case has(t, "ya esta", "esta listo", "como va", "como vamos", "ya quedo", "cuando esta", "cuando me lo", "estado de"):
+	case has(t, "que tiene mi", "que tiene la", "que tiene el", "que le pasa", "que sera", "diagnost"):
+		in.Kind = "diagnostico"
+	case has(t, "ya esta", "esta lista", "esta listo", "ya puedo ir", "ya puedo pasar", "puedo recoger", "como va", "como vamos", "ya quedo", "cuando esta", "cuando me lo", "estado de"):
 		in.Kind = "estado"
 	case has(t, "cuanto", "precio", "cobran", "vale", "valor", "cotiz", "costo"):
 		in.Kind = "cotizar"
@@ -73,12 +80,86 @@ func Classify(text string) Intent {
 		}
 	}
 	in.Wants = Stems(t)
+	in.Vehicle = VehicleIn(t)
 	return in
+}
+
+// Interpret es el intérprete por reglas (proveedor "reglas"): lo mismo que se le pide a la IA, sin costo y
+// determinista. Los servicios salen de la lista del taller por coincidencia de palabras (Matches).
+func Interpret(text string, catalog []string) Understanding {
+	in := Classify(text)
+	u := Understanding{Intent: in.Kind, Vehicle: in.Vehicle, Plate: in.Plate, ForDate: in.ForDate, Services: []string{}, Others: []string{}}
+	if in.Kind != "humano" && in.Kind != "fuera_tema" && in.Kind != "saludo" && in.Kind != "estado" {
+		u.Symptom = strings.TrimSpace(text)
+		if len([]rune(u.Symptom)) > 300 {
+			u.Symptom = string([]rune(u.Symptom)[:300])
+		}
+		for _, c := range catalog {
+			if Matches(c, in.Wants) {
+				u.Services = append(u.Services, c)
+			}
+		}
+	}
+	return u
+}
+
+// Modelos frecuentes en Colombia → marca y tipo (para reglas; la IA no depende de esta lista).
+var models = []struct{ word, brand, kind string }{
+	{"spark", "Chevrolet", "carro"}, {"aveo", "Chevrolet", "carro"}, {"sail", "Chevrolet", "carro"}, {"onix", "Chevrolet", "carro"},
+	{"logan", "Renault", "carro"}, {"sandero", "Renault", "carro"}, {"duster", "Renault", "carro"}, {"twingo", "Renault", "carro"},
+	{"picanto", "Kia", "carro"}, {"sportage", "Kia", "carro"}, {"mazda", "Mazda", "carro"}, {"corolla", "Toyota", "carro"},
+	{"hilux", "Toyota", "carro"}, {"fortuner", "Toyota", "carro"}, {"swift", "Suzuki", "carro"}, {"gol", "Volkswagen", "carro"},
+	{"nmax", "Yamaha", "moto"}, {"n-max", "Yamaha", "moto"}, {"bws", "Yamaha", "moto"}, {"biwis", "Yamaha", "moto"}, {"xtz", "Yamaha", "moto"},
+	{"crypton", "Yamaha", "moto"}, {"libero", "Yamaha", "moto"}, {"ybr", "Yamaha", "moto"}, {"fz", "Yamaha", "moto"},
+	{"pulsar", "Bajaj", "moto"}, {"boxer", "Bajaj", "moto"}, {"discover", "Bajaj", "moto"}, {"apache", "TVS", "moto"},
+	{"akt", "AKT", "moto"}, {"gixxer", "Suzuki", "moto"}, {"duke", "KTM", "moto"}, {"xr", "Honda", "moto"}, {"cb", "Honda", "moto"},
+}
+
+var lineSuffix = map[string]bool{"gt": true, "lt": true, "ls": true, "life": true, "sport": true, "ns": true, "rs": true,
+	"110": true, "125": true, "150": true, "160": true, "180": true, "190": true, "200": true, "250": true}
+
+var reYear = regexp.MustCompile(`\b(19[5-9][0-9]|20[0-4][0-9])\b`)
+
+// VehicleIn saca tipo, marca, línea y año de un texto ya normalizado (HU-52).
+func VehicleIn(t string) Vehicle {
+	var v Vehicle
+	words := strings.FieldsFunc(t, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '-' })
+	for i, w := range words {
+		for _, m := range models {
+			if w != m.word {
+				continue
+			}
+			v.Brand, v.Type, v.Line = m.brand, m.kind, Capitalize(w)
+			if strings.ToLower(m.brand) == w {
+				v.Line = ""
+			}
+			if i+1 < len(words) && lineSuffix[words[i+1]] {
+				v.Line = strings.TrimSpace(v.Line + " " + strings.ToUpper(words[i+1]))
+			}
+			break
+		}
+		if v.Brand != "" {
+			break
+		}
+	}
+	switch {
+	case has(t, "moto", "la nave", "scooter", "motico"):
+		v.Type = "moto"
+	case v.Type == "" && has(t, "carro", "camioneta", "campero", "automovil"):
+		v.Type = "carro"
+	}
+	if m := reYear.FindString(t); m != "" {
+		_, _ = fmt.Sscanf(m, "%d", &v.Year)
+	}
+	return v
 }
 
 var stop = map[string]bool{"cambio": true, "cambiar": true, "cuanto": true, "cobran": true, "puedo": true, "llevarlo": true,
 	"manana": true, "temprano": true, "cuando": true, "buenas": true, "hola": true, "esta": true, "para": true, "por": true,
 	"carro": true, "moto": true, "precio": true, "delanteras": false}
+
+// stemAlias junta raíces del mismo servicio ("frenar" → "freno", "llantas" → "llant").
+var stemAlias = map[string]string{"frena": "freno", "frene": "freno", "pasta": "pasti"}
 
 // Stems devuelve raíces de 5 letras de las palabras útiles ("pastillas" → "pasti", "freno" → "freno").
 func Stems(t string) []string {
@@ -90,6 +171,9 @@ func Stems(t string) []string {
 		s := w
 		if len(s) > 5 {
 			s = s[:5]
+		}
+		if a, ok := stemAlias[s]; ok {
+			s = a
 		}
 		dup := false
 		for _, o := range out {

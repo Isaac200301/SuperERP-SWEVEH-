@@ -1,0 +1,170 @@
+package domain
+
+import (
+	"encoding/json"
+	"errors"
+	"strings"
+	"testing"
+)
+
+func price(v int64) *int64 { return &v }
+
+var catalog = []Priced{
+	{Name: "Revisión de frenos", Price: price(60000), Kind: "servicio", Vehicle: "carro"},
+	{Name: "Cambio de pastillas", Price: price(80000), Kind: "servicio", Vehicle: "carro"},
+	{Name: "Cambio de amortiguadores", Kind: "servicio", Vehicle: "carro"},
+	{Name: "Ajuste de cadena", Price: price(15000), Kind: "servicio", Vehicle: "moto"},
+	{Name: "Cambio de aceite", Price: price(45000), Kind: "servicio", Vehicle: "carro"},
+	{Name: "Cambio de aceite", Price: price(25000), Kind: "servicio", Vehicle: "moto"},
+}
+
+func TestParseUnderstanding_ValidatesSchema(t *testing.T) {
+	names := Names(catalog)
+	ok := `{"intencion":"cotizar","vehiculo":{"tipo":"carro","marca":"Chevrolet","linea":"Spark GT","anio":2015},"placa":"",
+		"sintoma":"chilla al frenar","servicios":["revisión de frenos","Cambio de pastillas","Sincronización"],"otros":[],"fecha":"manana"}`
+	u, err := ParseUnderstanding([]byte(ok), "mi Spark GT 2015 chilla al frenar", names)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(u.Services, "|") != "Revisión de frenos|Cambio de pastillas" || strings.Join(u.Others, "|") != "Sincronización" {
+		t.Fatalf("servicios = %v, otros = %v", u.Services, u.Others)
+	}
+	if u.Vehicle.Year != 2015 || u.ForDate != "manana" {
+		t.Fatalf("%+v", u)
+	}
+
+	bad := map[string]string{
+		"no es JSON":          `hola`,
+		"campo desconocido":   `{"intencion":"cotizar","precio":45000}`,
+		"intención inventada": `{"intencion":"vender","vehiculo":{},"servicios":[],"otros":[]}`,
+		"tipo inventado":      `{"intencion":"otro","vehiculo":{"tipo":"bus"}}`,
+		"año imposible":       `{"intencion":"otro","vehiculo":{"anio":3015}}`,
+		"fecha libre":         `{"intencion":"cita","fecha":"el jueves"}`,
+		"dos objetos":         `{"intencion":"otro"}{"intencion":"otro"}`,
+		"tipo equivocado":     `{"intencion":"otro","servicios":"frenos"}`,
+	}
+	for name, raw := range bad {
+		if _, err := ParseUnderstanding([]byte(raw), "x", names); !errors.Is(err, ErrInvalidOutput) {
+			t.Errorf("%s: err = %v, quería ErrInvalidOutput", name, err)
+		}
+	}
+}
+
+func TestParseUnderstanding_PlateMustBeInTheMessage(t *testing.T) {
+	raw := `{"intencion":"otro","placa":"klm-482"}`
+	u, err := ParseUnderstanding([]byte(raw), "es la KLM482", nil)
+	if err != nil || u.Plate != "KLM482" {
+		t.Fatalf("placa = %q, %v", u.Plate, err)
+	}
+	u, _ = ParseUnderstanding([]byte(`{"intencion":"otro","placa":"ZZZ999"}`), "no tengo la placa a mano", nil)
+	if u.Plate != "" {
+		t.Fatalf("una placa que el cliente no escribió no se usa: %q", u.Plate)
+	}
+}
+
+func TestInterpret_Rules(t *testing.T) {
+	names := Names(catalog)
+	u := Interpret("Hola, mi Spark GT 2015 está chillando cuando freno, ¿puedo llevarlo mañana?", names)
+	if u.Vehicle != (Vehicle{Type: "carro", Brand: "Chevrolet", Line: "Spark GT", Year: 2015}) {
+		t.Fatalf("vehículo = %+v", u.Vehicle)
+	}
+	if u.ForDate != "manana" || !contains(u.Services, "Revisión de frenos") {
+		t.Fatalf("%+v", u)
+	}
+	for _, text := range []string{"mi NMAX hace ruido en la cadena", "la nave no prende", "cuánto el aceite de la moto"} {
+		if v := Interpret(text, names).Vehicle; v.Type != "moto" {
+			t.Errorf("%q: tipo = %q", text, v.Type)
+		}
+	}
+	for text, kind := range map[string]string{
+		"¿qué tiene mi carro? hace un ruido raro": "diagnostico",
+		"quiero hablar con una persona":           "humano",
+		"escríbeme un poema":                      "fuera_tema",
+		"ya puedo ir por la nave?":                "estado",
+	} {
+		if got := Interpret(text, names).Intent; got != kind {
+			t.Errorf("%q: intención %q, quería %q", text, got, kind)
+		}
+	}
+	// La salida de reglas cumple el mismo esquema que la de la IA.
+	if _, err := ParseUnderstanding(mustJSON(t, u), "Spark", names); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBuildDraft_OnlyWorkshopData(t *testing.T) {
+	in := DraftInput{CustomerName: "Laura Gómez", Services: catalog, Attends: "ambos", NextOpening: "mañana a las 7:30 a. m.",
+		Intent: Intent{Kind: "cotizar", ForDate: "manana", Services: []string{"Revisión de frenos", "Cambio de amortiguadores"},
+			Others: []string{"Sincronización"}, Vehicle: Vehicle{Type: "carro"}}}
+	d := BuildDraft(in)
+	for _, want := range []string{"¡Hola Laura!", "$60.000", "amortiguadores el taller te confirma el valor", "mañana a las 7:30", "placa"} {
+		if !strings.Contains(d.Text, want) {
+			t.Errorf("falta %q en %q", want, d.Text)
+		}
+	}
+	if err := Validate(d.Text, catalog); err != nil {
+		t.Fatal(err)
+	}
+	if !hasSource(d.Sources, "otro", "Sincronización") || !hasSource(d.Sources, "precio", "$60.000") {
+		t.Fatalf("fuentes = %+v", d.Sources)
+	}
+
+	// Moto: precios de moto (HU-51, criterio 3).
+	in.Intent = Intent{Kind: "cotizar", Services: []string{"Cambio de aceite"}, Vehicle: Vehicle{Type: "moto"}}
+	if d := BuildDraft(in); !strings.Contains(d.Text, "$25.000") || strings.Contains(d.Text, "$45.000") {
+		t.Fatalf("moto: %q", d.Text)
+	}
+	// Sin tipo: ambos precios, cada uno con su tipo.
+	in.Intent.Vehicle.Type = ""
+	if d := BuildDraft(in); !strings.Contains(d.Text, "(moto) cuesta $25.000") || !strings.Contains(d.Text, "(carro) cuesta $45.000") {
+		t.Fatalf("sin tipo: %q", d.Text)
+	}
+	// Moto en un taller que solo atiende carros (HU-52, criterio 3).
+	in.Attends, in.Intent.Vehicle.Type = "carro", "moto"
+	if d := BuildDraft(in); !strings.Contains(d.Text, "solo atiende carros") || strings.Contains(d.Text, "$") {
+		t.Fatalf("no atiende: %q", d.Text)
+	}
+	// Diagnóstico: no se diagnostica, se ofrece la revisión con precio de lista (HU-58, criterio 2).
+	in.Attends, in.Intent = "ambos", Intent{Kind: "diagnostico", Vehicle: Vehicle{Type: "carro"}}
+	if d := BuildDraft(in); !strings.Contains(d.Text, "no te podemos decir qué tiene") || !strings.Contains(d.Text, "$60.000") {
+		t.Fatalf("diagnóstico: %q", d.Text)
+	}
+}
+
+func TestValidate_RejectsPricesOutsideTheList(t *testing.T) {
+	if err := Validate("El cambio de aceite cuesta $45.000.", catalog); err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{"Cuesta $47.000.", "Cuesta $47000", "", strings.Repeat("a", 1001)} {
+		if Validate(text, catalog) == nil {
+			t.Errorf("%q debería fallar", text)
+		}
+	}
+}
+
+func contains(list []string, s string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSource(src []Source, field, value string) bool {
+	for _, s := range src {
+		if s.Field == field && s.Value == value {
+			return true
+		}
+	}
+	return false
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
