@@ -86,15 +86,49 @@ func (t *taller) SendMedia(ctx context.Context, tallerID shared.ID, phone, capti
 	return err == nil, err
 }
 
-// media resuelve las fotos que envía el canal: "repuesto:<id>" es la foto de la vitrina (ADR-0029).
+func (t *taller) LastClientPhoto(ctx context.Context, tallerID, orderID shared.ID) (string, error) {
+	var id *shared.ID
+	err := t.s.M.Tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		id, err = t.s.M.OrdersF.LastShownPhoto(ctx, tallerID, orderID)
+		return err
+	})
+	if err != nil || id == nil {
+		return "", err
+	}
+	return "evidencia:" + orderID.String() + ":" + id.String(), nil
+}
+
+// media resuelve las fotos que envía el canal: "repuesto:<id>" es la foto de la vitrina (ADR-0029) y
+// "evidencia:<orden>:<id>" una foto de la orden marcada para el cliente (HU-56).
 type media struct{ s *Services }
 
+var errNoPhoto = shared.NotFound("foto_no_encontrada", "No encontramos la foto.")
+
 func (m media) Media(ctx context.Context, tallerID shared.ID, ref string) (messagingapp.Image, error) {
-	id, err := shared.ParseID(strings.TrimPrefix(ref, "repuesto:"))
-	if err != nil || !strings.HasPrefix(ref, "repuesto:") {
-		return messagingapp.Image{}, shared.NotFound("foto_no_encontrada", "No encontramos la foto.")
+	var (
+		rc   io.ReadCloser
+		mime string
+		err  error
+	)
+	switch kind, rest, _ := strings.Cut(ref, ":"); kind {
+	case "repuesto":
+		id, perr := shared.ParseID(rest)
+		if perr != nil {
+			return messagingapp.Image{}, errNoPhoto
+		}
+		rc, mime, err = m.s.M.Inventory.OpenPhoto(ctx, tallerID, id)
+	case "evidencia":
+		o, e, _ := strings.Cut(rest, ":")
+		oid, oerr := shared.ParseID(o)
+		eid, eerr := shared.ParseID(e)
+		if oerr != nil || eerr != nil {
+			return messagingapp.Image{}, errNoPhoto
+		}
+		rc, mime, err = m.s.M.Flow.OpenPhoto(ctx, tallerID, oid, eid)
+	default:
+		return messagingapp.Image{}, errNoPhoto
 	}
-	rc, mime, err := m.s.M.Inventory.OpenPhoto(ctx, tallerID, id)
 	if err != nil {
 		return messagingapp.Image{}, err
 	}

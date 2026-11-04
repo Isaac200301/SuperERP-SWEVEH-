@@ -190,6 +190,23 @@ func TestAgent_StatusAndWhichVehicle(t *testing.T) {
 	if m := w.last(andres); m["automatizacion"] != "AU-05" || !strings.Contains(m["cuerpo"].(string), "KLM482") {
 		t.Fatalf("estado de la escogida: %v", m)
 	}
+
+	// HU-56, criterio 1: con una foto marcada para el cliente, el estado sale con la última foto (y no con una sin marcar).
+	base := "/api/v1/orders/" + first
+	owner.must(http.StatusCreated, owner.upload(base+"/evidence", map[string]string{"lado": "frente", "mostrarCliente": "true"}, jpg))
+	shown := owner.must(http.StatusOK, owner.do("GET", base+"/evidence", nil)).body["evidencias"].([]any)[0].(map[string]any)["id"].(string)
+	owner.must(http.StatusCreated, owner.upload(base+"/evidence", map[string]string{"lado": "trasera"}, jpg))
+	w.press(andres, "Andrés Ruiz", "estado:"+first, "KLM482")
+	var img map[string]any
+	for _, m := range w.sent(andres) {
+		if m["tipo"] == "imagen" {
+			img = m
+		}
+	}
+	if img == nil || img["payload"].(map[string]any)["imagen"] != "evidencia:"+first+":"+shown || img["estado"] != "enviado" ||
+		!strings.Contains(img["cuerpo"].(string), "KLM482") {
+		t.Fatalf("última foto para el cliente: %v", img)
+	}
 }
 
 // HU-59: "quiero hablar con alguien" → mensaje fijo, conversación para una persona, alerta en "Pendiente hoy" y

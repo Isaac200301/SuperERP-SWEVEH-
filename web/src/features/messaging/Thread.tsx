@@ -25,10 +25,12 @@ export function botones(m: Mensaje): Boton[] {
   return m.payload?.botones ?? [];
 }
 
-/** Foto enviada por el asesor: "repuesto:<id>" es la foto de la vitrina (ADR-0029). */
+/** Foto enviada: "repuesto:<id>" es la foto de la vitrina (ADR-0029); "evidencia:<orden>:<id>", una foto de la orden (HU-56). */
 function foto(m: Mensaje): string | null {
-  const ref = m.payload?.imagen ?? '';
-  return ref.startsWith('repuesto:') ? `/api/v1/parts/${ref.slice('repuesto:'.length)}/photo` : null;
+  const [tipo, a, b] = (m.payload?.imagen ?? '').split(':');
+  if (tipo === 'repuesto' && a) return `/api/v1/parts/${a}/photo`;
+  if (tipo === 'evidencia' && a && b) return `/api/v1/orders/${a}/evidence/${b}/file`;
+  return null;
 }
 
 /**

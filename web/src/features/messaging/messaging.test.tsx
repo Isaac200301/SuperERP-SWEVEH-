@@ -32,6 +32,11 @@ describe('Thread (HU-24)', () => {
     renderPage(<Thread mensajes={[msg({ tipo: 'imagen', origen: 'agente', cuerpo: 'Aceite 20W50 · $32.000', payload: { imagen: 'repuesto:p1' } })]} />);
     expect(screen.getByAltText('Aceite 20W50 · $32.000')).toHaveAttribute('src', '/api/v1/parts/p1/photo');
   });
+
+  it('HU-56: muestra la foto de la orden que acompaña el estado', () => {
+    renderPage(<Thread mensajes={[msg({ tipo: 'imagen', origen: 'agente', cuerpo: 'Así va tu Renault Logan ABC123', payload: { imagen: 'evidencia:o1:e1' } })]} />);
+    expect(screen.getByAltText('Así va tu Renault Logan ABC123')).toHaveAttribute('src', '/api/v1/orders/o1/evidence/e1/file');
+  });
 });
 
 describe('OrderMessages (HU-24)', () => {

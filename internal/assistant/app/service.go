@@ -53,7 +53,9 @@ type Taller interface {
 	Vehicles(ctx context.Context, tallerID, customerID shared.ID) ([]Vehicle, error)
 	History(ctx context.Context, tallerID, convID shared.ID, before time.Time, limit int) ([]Turn, error)
 	Showcase(ctx context.Context, tallerID shared.ID, q string) ([]Product, error)
-	// SendMedia envía una foto (ref "repuesto:<id>") con un pie opcional; false = ventana cerrada.
+	// LastClientPhoto es la referencia de la última foto de la orden marcada para el cliente ("" = no hay). HU-56.
+	LastClientPhoto(ctx context.Context, tallerID, orderID shared.ID) (string, error)
+	// SendMedia envía una foto (ref "repuesto:<id>" o "evidencia:<orden>:<id>") con un pie; false = ventana cerrada.
 	SendMedia(ctx context.Context, tallerID shared.ID, phone, caption, ref string) (bool, error)
 }
 
@@ -357,8 +359,24 @@ func (s *Service) status(ctx context.Context, tallerID shared.ID, in Inbound, c 
 		return s.saveDraft(ctx, tallerID, in, "estado", text, nil, nil, "plantilla")
 	}
 	oid := o.ID
-	_, err = s.taller.Send(ctx, tallerID, in.Phone, text, nil, "AU-05", &oid)
+	if _, err = s.taller.Send(ctx, tallerID, in.Phone, text, nil, "AU-05", &oid); err != nil {
+		return err
+	}
+	return s.sendLastPhoto(ctx, tallerID, in.Phone, o)
+}
+
+// sendLastPhoto manda, después del estado, la última foto de la orden marcada para el cliente (HU-56, criterio 1).
+func (s *Service) sendLastPhoto(ctx context.Context, tallerID shared.ID, phone string, o Order) error {
+	ref, err := s.taller.LastClientPhoto(ctx, tallerID, o.ID)
+	if err != nil || ref == "" {
+		return err
+	}
+	_, err = s.taller.SendMedia(ctx, tallerID, phone, photoCaption(o), ref)
 	return err
+}
+
+func photoCaption(o Order) string {
+	return strings.TrimSpace("Así va tu " + o.Vehicle + " " + o.Plate)
 }
 
 // process clasifica y responde: plantillas exactas salen solas; las respuestas armadas con datos del taller salen

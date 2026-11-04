@@ -1949,7 +1949,7 @@ components:
                   titulo: { type: string }
             boton: { type: string }
             nombre: { type: string }
-            imagen: { type: string, description: 'Foto enviada: "repuesto:<id>" es la foto de la vitrina (ADR-0029)' }
+            imagen: { type: string, description: 'Foto enviada: "repuesto:<id>" es la foto de la vitrina (ADR-0029); "evidencia:<orden>:<id>", una foto de la orden marcada para el cliente (HU-56)' }
         estado: { type: string }
         origen: { type: string }
         ordenId: { type: string, format: uuid, nullable: true }

@@ -159,6 +159,11 @@ func (t *turn) exec(ctx context.Context, name, kind, q, product, plate, symptom 
 		var list []map[string]any
 		for _, o := range orders {
 			item := map[string]any{"orden": o.Code, "placa": o.Plate, "vehiculo": o.Vehicle, "estado": stateText[o.State]}
+			// HU-56: la última foto marcada para el cliente sale después de la respuesta (una por orden, máx. 3).
+			if ref, err := t.taller.LastClientPhoto(ctx, t.tallerID, o.ID); err == nil && ref != "" && len(t.photos) < 3 && !t.hasPhoto(ref) {
+				t.photos = append(t.photos, photo{ref: ref, caption: photoCaption(o)})
+				item["foto"] = "se le envía la última foto del vehículo"
+			}
 			if o.PromisedAt != nil {
 				item["prometida_para"] = o.PromisedAt.Format("2006-01-02 15:04")
 			}
@@ -294,6 +299,15 @@ func (t *turn) product(ctx context.Context, ref string) (Product, bool) {
 	}
 	t.quoted[hit.Price] = true
 	return *hit, true
+}
+
+func (t *turn) hasPhoto(ref string) bool {
+	for _, p := range t.photos {
+		if p.ref == ref {
+			return true
+		}
+	}
+	return false
 }
 
 // compact deja el texto en mayúsculas sin espacios ni guiones, para buscar una placa escrita como "gno 667" o "GNO-667".
