@@ -24,6 +24,8 @@ type Repository interface {
 	Movements(ctx context.Context, tallerID, partID shared.ID, limit int) ([]domain.Movement, error)
 	ExistingRefs(ctx context.Context, tallerID shared.ID, refs []string) (map[string]bool, error)
 	OrderParts(ctx context.Context, tallerID, orderID shared.ID) ([]domain.OrderPart, error)
+	Showcase(ctx context.Context, tallerID shared.ID, q string, limit int) ([]domain.Part, error)
+	SetPhoto(ctx context.Context, tallerID, id shared.ID, key, mime string) error
 }
 
 // ReturnResult dice qué pasó con la devolución, para mostrarlo en la orden (HU-38).
@@ -67,6 +69,7 @@ type Service struct {
 	audit  AuditLog
 	events EventPublisher
 	clock  Clock
+	photos PhotoStore // vitrina de WhatsApp; se conecta con SetPhotoStore
 }
 
 func NewService(uow UnitOfWork, r Repository, a AuditLog, e EventPublisher, c Clock) *Service {
@@ -122,6 +125,7 @@ type Patch struct {
 	Category *string
 	Location *string
 	OEM      *string
+	Showcase *bool
 }
 
 // Update edita o desactiva (HU-32). Desactivado deja de salir al cotizar; el historial lo conserva.
@@ -146,6 +150,7 @@ func (s *Service) Update(ctx context.Context, actor shared.Actor, tallerID, id s
 		set(&next.Category, ch.Category)
 		set(&next.Location, ch.Location)
 		set(&next.OEM, ch.OEM)
+		set(&next.Showcase, ch.Showcase)
 		if err := next.Normalize(); err != nil {
 			return err
 		}
@@ -298,5 +303,6 @@ func set[T any](dst *T, v *T) {
 
 func view(p domain.Part) map[string]any {
 	return map[string]any{"referencia": p.Ref, "nombre": p.Name, "costo": p.Cost, "precio_venta": p.Price,
-		"minimo": p.Min, "activo": p.Active, "marca": p.Brand, "categoria": p.Category, "ubicacion": p.Location, "referencia_oem": p.OEM}
+		"minimo": p.Min, "activo": p.Active, "marca": p.Brand, "categoria": p.Category, "ubicacion": p.Location, "referencia_oem": p.OEM,
+		"ofrecer_whatsapp": p.Showcase}
 }

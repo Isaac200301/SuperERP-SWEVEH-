@@ -50,7 +50,12 @@ type NuevoRepuesto = {
   referencia: string; nombre: string; tipoVehiculo: string; costo: number; precioVenta: number; existencia: number; minimo: number;
   marca: string; categoria: string; ubicacion: string; referenciaOem: string;
 };
-export type CambioRepuesto = Partial<Omit<NuevoRepuesto, 'referencia' | 'existencia'>> & { activo?: boolean; version: number };
+export type CambioRepuesto = Partial<Omit<NuevoRepuesto, 'referencia' | 'existencia'>> & { activo?: boolean; ofrecerWhatsapp?: boolean; version: number };
+
+/** Foto del repuesto para la vitrina de WhatsApp (ADR-0029). v cambia la URL cuando se sube otra. */
+export function fotoRepuesto(id: string, v: number) {
+  return `/api/v1/parts/${id}/photo?v=${v}`;
+}
 
 export function usePartActions() {
   const qc = useQueryClient();
@@ -62,6 +67,21 @@ export function usePartActions() {
     create: useMutation({ mutationFn: async (b: NuevoRepuesto) => unwrap(await api.POST('/parts', { body: b })), onSuccess: done }),
     update: useMutation({
       mutationFn: async (v: { id: string; body: CambioRepuesto }) => unwrap(await api.PATCH('/parts/{id}', { params: { path: { id: v.id } }, body: v.body })),
+      onSettled: done,
+    }),
+    photo: useMutation({
+      mutationFn: async (v: { id: string; foto: File }) =>
+        unwrap(
+          await api.PUT('/parts/{id}/photo', {
+            params: { path: { id: v.id } },
+            body: { foto: '' },
+            bodySerializer: () => {
+              const fd = new FormData();
+              fd.append('foto', v.foto);
+              return fd;
+            },
+          }),
+        ),
       onSettled: done,
     }),
     entry: useMutation({

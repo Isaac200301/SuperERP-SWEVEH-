@@ -38,6 +38,8 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(h.guard.Require("part:read")).Get("/parts/{id}/movements", httpx.JSON(h.log, h.movements))
 	r.With(h.guard.Require("part:read")).Get("/orders/{id}/part-movements", httpx.JSON(h.log, h.orderParts))
 	r.With(h.guard.Require("import:run")).Post("/parts/import", httpx.JSON(h.log, h.importCSV))
+	r.With(h.guard.Require("part:manage")).Put("/parts/{id}/photo", httpx.JSON(h.log, h.setPhoto))
+	r.With(h.guard.Require("part:read")).Get("/parts/{id}/photo", h.photo)
 }
 
 type dto struct {
@@ -56,12 +58,14 @@ type dto struct {
 	Categoria  string `json:"categoria"`
 	Ubicacion  string `json:"ubicacion"`
 	OEM        string `json:"referenciaOem"`
+	Vitrina    bool   `json:"ofrecerWhatsapp"`
+	TieneFoto  bool   `json:"tieneFoto"`
 }
 
 func (h *Handler) toDTO(p domain.Part, pr reqctx.Principal) dto {
 	d := dto{ID: p.ID.String(), Referencia: p.Ref, Nombre: p.Name, Tipo: p.Kind, Precio: p.Price, Existencia: p.Stock,
 		Minimo: p.Min, BajoMinimo: p.LowStock(), Activo: p.Active, Version: p.Version,
-		Marca: p.Brand, Categoria: p.Category, Ubicacion: p.Location, OEM: p.OEM}
+		Marca: p.Brand, Categoria: p.Category, Ubicacion: p.Location, OEM: p.OEM, Vitrina: p.Showcase, TieneFoto: p.PhotoKey != ""}
 	if h.guard.Can(pr, "part:cost") {
 		c := p.Cost
 		d.Costo = &c
@@ -128,6 +132,7 @@ type patchReq struct {
 	Categ   *string `json:"categoria"`
 	Ubic    *string `json:"ubicacion"`
 	OEM     *string `json:"referenciaOem"`
+	Vitrina *bool   `json:"ofrecerWhatsapp"`
 }
 
 func (h *Handler) update(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -140,7 +145,7 @@ func (h *Handler) update(r *http.Request, p reqctx.Principal) (int, any, error) 
 		return 0, nil, err
 	}
 	part, err := h.svc.Update(r.Context(), p.Actor(), p.TallerID, id, q.Version, app.Patch{Name: q.Nombre, Kind: q.Tipo,
-		Cost: q.Costo, Price: q.Precio, Min: q.Minimo, Active: q.Activo, Brand: q.Marca, Category: q.Categ, Location: q.Ubic, OEM: q.OEM})
+		Cost: q.Costo, Price: q.Precio, Min: q.Minimo, Active: q.Activo, Brand: q.Marca, Category: q.Categ, Location: q.Ubic, OEM: q.OEM, Showcase: q.Vitrina})
 	return http.StatusOK, h.toDTO(part, p), err
 }
 
@@ -269,4 +274,42 @@ func (h *Handler) importCSV(r *http.Request, p reqctx.Principal) (int, any, erro
 		return http.StatusUnprocessableEntity, body, nil
 	}
 	return http.StatusOK, body, nil
+}
+
+// setPhoto recibe la foto del repuesto en multipart ("foto") para la vitrina de WhatsApp (ADR-0029).
+func (h *Handler) setPhoto(r *http.Request, p reqctx.Principal) (int, any, error) {
+	id, err := httpx.PathID(r, "id", domain.ErrNotFound)
+	if err != nil {
+		return 0, nil, err
+	}
+	r.Body = http.MaxBytesReader(nil, r.Body, app.MaxPhotoBytes+(64<<10))
+	file, _, err := r.FormFile("foto")
+	if err != nil {
+		return 0, nil, httpx.ErrBadJSON.WithMessage("Envía la foto como formulario (multipart), en el campo foto.")
+	}
+	defer func() { _ = file.Close() }()
+	part, err := h.svc.SetPhoto(r.Context(), p.Actor(), p.TallerID, id, file)
+	if err != nil {
+		return 0, nil, err
+	}
+	return http.StatusOK, h.toDTO(part, p), nil
+}
+
+func (h *Handler) photo(w http.ResponseWriter, r *http.Request) {
+	p, _ := reqctx.PrincipalFrom(r.Context())
+	id, err := httpx.PathID(r, "id", domain.ErrNotFound)
+	if err != nil {
+		httpx.WriteError(w, r, h.log, err)
+		return
+	}
+	rc, ct, err := h.svc.OpenPhoto(r.Context(), p.TallerID, id)
+	if err != nil {
+		httpx.WriteError(w, r, h.log, err)
+		return
+	}
+	defer func() { _ = rc.Close() }()
+	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	w.Header().Set("Content-Disposition", "inline")
+	_, _ = io.Copy(w, rc)
 }

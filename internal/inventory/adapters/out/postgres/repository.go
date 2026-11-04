@@ -30,6 +30,9 @@ type row struct {
 	Categoria  *string   `db:"categoria"`
 	Ubicacion  *string   `db:"ubicacion"`
 	OEM        *string   `db:"referencia_oem"`
+	Vitrina    bool      `db:"ofrecer_whatsapp"`
+	FotoClave  *string   `db:"foto_clave"`
+	FotoTipo   *string   `db:"foto_tipo"`
 }
 
 func str(p *string) string {
@@ -49,7 +52,8 @@ func null(s string) *string {
 func (r row) domain() domain.Part {
 	return domain.Part{ID: r.ID, TallerID: r.TallerID, Ref: r.Referencia, Name: r.Nombre, Kind: r.Tipo, Cost: r.Costo,
 		Price: r.Precio, Stock: r.Existencia, Min: r.Minimo, Active: r.Activo, Version: r.Version,
-		Brand: str(r.Marca), Category: str(r.Categoria), Location: str(r.Ubicacion), OEM: str(r.OEM)}
+		Brand: str(r.Marca), Category: str(r.Categoria), Location: str(r.Ubicacion), OEM: str(r.OEM),
+		Showcase: r.Vitrina, PhotoKey: str(r.FotoClave), PhotoType: str(r.FotoTipo)}
 }
 
 func list(rows []row, err error) ([]domain.Part, error) {
@@ -61,7 +65,7 @@ func list(rows []row, err error) ([]domain.Part, error) {
 }
 
 const cols = `id, taller_id, referencia, nombre, tipo_vehiculo, costo, precio_venta, existencia, minimo, activo, version,
-	marca, categoria, ubicacion, referencia_oem`
+	marca, categoria, ubicacion, referencia_oem, ofrecer_whatsapp, foto_clave, foto_tipo`
 
 // escapeLike evita que % y _ del usuario actúen como comodines.
 func escapeLike(s string) string {
@@ -99,11 +103,31 @@ func (Repository) Insert(ctx context.Context, p domain.Part) error {
 
 func (Repository) Update(ctx context.Context, p domain.Part, prev int) error {
 	n, err := db.Exec(ctx, `UPDATE inventory.articulo SET nombre = $3, tipo_vehiculo = $4, costo = $5, precio_venta = $6,
-		minimo = $7, activo = $8, marca = $10, categoria = $11, ubicacion = $12, referencia_oem = $13,
+		minimo = $7, activo = $8, marca = $10, categoria = $11, ubicacion = $12, referencia_oem = $13, ofrecer_whatsapp = $14,
 		version = version + 1, updated_at = now() WHERE taller_id = $1 AND id = $2 AND version = $9`,
-		p.TallerID, p.ID, p.Name, p.Kind, p.Cost, p.Price, p.Min, p.Active, prev, null(p.Brand), null(p.Category), null(p.Location), null(p.OEM))
+		p.TallerID, p.ID, p.Name, p.Kind, p.Cost, p.Price, p.Min, p.Active, prev, null(p.Brand), null(p.Category), null(p.Location), null(p.OEM),
+		p.Showcase)
 	if err == nil && n == 0 {
 		return shared.ErrVersionConflict
+	}
+	return err
+}
+
+// Showcase lista la vitrina de WhatsApp (ADR-0029): activos y marcados, con búsqueda opcional.
+func (Repository) Showcase(ctx context.Context, tallerID shared.ID, q string, limit int) ([]domain.Part, error) {
+	pat := "%" + escapeLike(strings.TrimSpace(q)) + "%"
+	return list(db.Many[row](ctx, `SELECT `+cols+` FROM inventory.articulo
+		WHERE taller_id = $1 AND activo AND ofrecer_whatsapp
+		  AND (nombre ILIKE $2 OR marca ILIKE $2 OR categoria ILIKE $2 OR referencia ILIKE $2)
+		ORDER BY existencia > 0 DESC, nombre LIMIT $3`, tallerID, pat, limit))
+}
+
+// SetPhoto cambia la foto del repuesto; no sube la versión (no es un cambio de la ficha).
+func (Repository) SetPhoto(ctx context.Context, tallerID, id shared.ID, key, mime string) error {
+	n, err := db.Exec(ctx, `UPDATE inventory.articulo SET foto_clave = $3, foto_tipo = $4, updated_at = now() WHERE taller_id = $1 AND id = $2`,
+		tallerID, id, key, mime)
+	if err == nil && n == 0 {
+		return domain.ErrNotFound
 	}
 	return err
 }

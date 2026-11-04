@@ -964,6 +964,7 @@ paths:
                 categoria: { type: string, description: 'Una de Categoria o vacío' }
                 ubicacion: { type: string, maxLength: 40 }
                 referenciaOem: { type: string, maxLength: 40 }
+                ofrecerWhatsapp: { type: boolean, description: 'Mostrarlo en la vitrina del asesor de WhatsApp (ADR-0029)' }
       responses:
         '200':
           description: OK
@@ -973,6 +974,40 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+
+  /parts/{id}/photo:
+    put:
+      operationId: setPartPhoto
+      summary: Foto del repuesto para la vitrina de WhatsApp (ADR-0029). JPG, PNG o WebP hasta 5 MB. Permiso part:manage
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [foto]
+              properties:
+                foto: { type: string, format: binary }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Repuesto' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    get:
+      operationId: getPartPhoto
+      summary: La foto del repuesto. Permiso part:read
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: La imagen
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/Problem' }
 
   /parts/{id}/entries:
     post:
@@ -2057,6 +2092,8 @@ components:
         categoria: { type: string, description: 'Una de Categoria o vacío' }
         ubicacion: { type: string }
         referenciaOem: { type: string, description: 'Referencia original o equivalente' }
+        ofrecerWhatsapp: { type: boolean, description: 'El asesor de WhatsApp lo ofrece (vitrina, ADR-0029)' }
+        tieneFoto: { type: boolean }
 
     Miembro:
       type: object

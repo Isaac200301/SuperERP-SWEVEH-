@@ -188,23 +188,26 @@ type IdentityUsuario struct {
 }
 
 type InventoryArticulo struct {
-	ID            uuid.UUID
-	TallerID      uuid.UUID
-	Referencia    string
-	Nombre        string
-	TipoVehiculo  string
-	Costo         int64
-	PrecioVenta   int64
-	Existencia    int32
-	Minimo        int32
-	Activo        bool
-	Version       int32
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	Marca         *string
-	Categoria     *string
-	Ubicacion     *string
-	ReferenciaOem *string
+	ID              uuid.UUID
+	TallerID        uuid.UUID
+	Referencia      string
+	Nombre          string
+	TipoVehiculo    string
+	Costo           int64
+	PrecioVenta     int64
+	Existencia      int32
+	Minimo          int32
+	Activo          bool
+	Version         int32
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Marca           *string
+	Categoria       *string
+	Ubicacion       *string
+	ReferenciaOem   *string
+	OfrecerWhatsapp bool
+	FotoClave       *string
+	FotoTipo        *string
 }
 
 type InventoryMovimiento struct {

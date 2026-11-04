@@ -11,6 +11,7 @@ import (
 	customerspg "sweveh/internal/customers/adapters/out/postgres"
 	customersapp "sweveh/internal/customers/app"
 	"sweveh/internal/inventory"
+	inventoryphotos "sweveh/internal/inventory/adapters/out/photos"
 	inventorypg "sweveh/internal/inventory/adapters/out/postgres"
 	inventoryapp "sweveh/internal/inventory/app"
 	"sweveh/internal/orders"
@@ -86,6 +87,7 @@ func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger
 	m.Findings = ordersapp.NewFindings(tx, flowRepo, orderspg.Findings{}, m.Audit, clk)
 
 	m.Inventory = inventoryapp.NewService(tx, inventorypg.Repository{}, m.Audit, m.Events, clk)
+	m.Inventory.SetPhotoStore(inventoryphotos.New(st))
 	m.InvF = inventory.New(m.Inventory)
 	m.Quotes = quotesapp.NewService(tx, quotespg.Repository{}, quotesdeps.Orders{O: m.OrdersF}, quotesdeps.Catalog{C: m.CatalogF},
 		quotesdeps.Inventory{I: m.InvF}, m.Audit, m.Events, clk)

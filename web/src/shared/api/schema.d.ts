@@ -676,6 +676,24 @@ export interface paths {
         patch: operations["updatePart"];
         trace?: never;
     };
+    "/parts/{id}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La foto del repuesto. Permiso part:read */
+        get: operations["getPartPhoto"];
+        /** Foto del repuesto para la vitrina de WhatsApp (ADR-0029). JPG, PNG o WebP hasta 5 MB. Permiso part:manage */
+        put: operations["setPartPhoto"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/parts/{id}/entries": {
         parameters: {
             query?: never;
@@ -1539,6 +1557,9 @@ export interface components {
             ubicacion?: string;
             /** @description Referencia original o equivalente */
             referenciaOem?: string;
+            /** @description El asesor de WhatsApp lo ofrece (vitrina, ADR-0029) */
+            ofrecerWhatsapp?: boolean;
+            tieneFoto?: boolean;
         };
         Miembro: {
             /** Format: uuid */
@@ -3253,6 +3274,8 @@ export interface operations {
                     categoria?: string;
                     ubicacion?: string;
                     referenciaOem?: string;
+                    /** @description Mostrarlo en la vitrina del asesor de WhatsApp (ADR-0029) */
+                    ofrecerWhatsapp?: boolean;
                 };
             };
         };
@@ -3269,6 +3292,60 @@ export interface operations {
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    getPartPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La imagen */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    setPartPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    foto: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Repuesto"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
         };
     };
     addPartEntry: {
