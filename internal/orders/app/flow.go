@@ -148,9 +148,17 @@ func (f *Flow) persistMove(ctx context.Context, o *domain.Order, prev domain.Sta
 	if err := f.repo.InsertHistory(ctx, o.TallerID, o.ID, &prev, o.State, actorID(actor), reason, now); err != nil {
 		return err
 	}
+	after := map[string]any{"estado": string(o.State), "motivo": reason, "recogido_por": o.PickedUpBy}
+	if o.State == domain.StateDelivered {
+		// HU-25: la constancia de la entrega dice qué se devolvió (lo que quedó en el checklist al recibir).
+		cl, _, err := f.repo.GetChecklist(ctx, o.TallerID, o.ID)
+		if err != nil {
+			return err
+		}
+		after["accesorios_devueltos"] = append([]string{}, cl.Accessories...)
+	}
 	if err := f.audit.Record(ctx, audit.Entry{TallerID: o.TallerID, Actor: actor, Action: "orden.estado", Entity: "orden",
-		EntityID: o.ID, Before: map[string]any{"estado": string(prev)},
-		After: map[string]any{"estado": string(o.State), "motivo": reason, "recogido_por": o.PickedUpBy}, OccurredAt: now}); err != nil {
+		EntityID: o.ID, Before: map[string]any{"estado": string(prev)}, After: after, OccurredAt: now}); err != nil {
 		return err
 	}
 	if err := f.events.Publish(ctx, o.TallerID, shared.Event{Type: "orders.estado_cambiado", AggregateID: o.ID, OccurredAt: now,

@@ -48,16 +48,36 @@ describe('OrderActions (HU-20, HU-25)', () => {
     expect(screen.getAllByLabelText(/Motivo si el cliente aprobó/)).toHaveLength(1);
   });
 
-  it('para entregar pide quién recoge y los accesorios; entregada no muestra acciones', async () => {
-    const calls = mockApi({ 'GET /me': owner, 'POST /orders/{id}/transition': orden() });
+  it('para entregar pide quién recoge y marcar cada accesorio que dejó; entregada no muestra acciones', async () => {
+    const calls = mockApi({
+      'GET /me': owner,
+      'GET /orders/{id}/checklist': { ...checklist, tipo: 'moto', accesorios: ['casco', 'documentos'] },
+      'POST /orders/{id}/transition': orden(),
+    });
     const { unmount } = renderPage(<OrderActions orden={o({ estado: 'listo' })} />);
-    await userEvent.type(screen.getByLabelText('¿Quién recoge?'), 'Laura');
-    await userEvent.click(screen.getByLabelText(/Revisé con el cliente/));
-    await userEvent.click(screen.getByRole('button', { name: 'Pasar a Entregado' }));
-    await waitFor(() => expect(calls.at(-1)?.body).toMatchObject({ recogidoPor: 'Laura', accesoriosConfirmados: true }));
+    const entregar = () => screen.getByRole('button', { name: /Pasar a Entregado/ });
+    expect(await screen.findByLabelText('Casco')).toBeInTheDocument();
+    expect(screen.getByText('Escribe quién recoge.')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('¿Quién recoge?'), ' Laura ');
+    await userEvent.click(screen.getByLabelText('Casco'));
+    expect(screen.getByText('Marca cada accesorio que devolviste.')).toBeInTheDocument();
+    expect(entregar()).toBeDisabled();
+    await userEvent.click(screen.getByLabelText('Documentos'));
+    await userEvent.click(entregar());
+    await waitFor(() => expect(calls.find((c) => c.method === 'POST')?.body).toMatchObject({ recogidoPor: 'Laura', accesoriosConfirmados: true }));
     unmount();
     renderPage(<OrderActions orden={o({ estado: 'entregado' })} />);
     expect(screen.queryByText('Mover la orden')).not.toBeInTheDocument();
+  });
+
+  it('si no dejó accesorios pide confirmarlo', async () => {
+    const calls = mockApi({ 'GET /me': owner, 'GET /orders/{id}/checklist': checklist, 'POST /orders/{id}/transition': orden() });
+    renderPage(<OrderActions orden={o({ estado: 'listo' })} />);
+    await userEvent.type(screen.getByLabelText('¿Quién recoge?'), 'Laura');
+    expect(await screen.findByText('Confirma que no dejó accesorios.')).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText('No dejó accesorios'));
+    await userEvent.click(screen.getByRole('button', { name: /Pasar a Entregado/ }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'POST')?.body).toMatchObject({ recogidoPor: 'Laura', accesoriosConfirmados: true }));
   });
 });
 

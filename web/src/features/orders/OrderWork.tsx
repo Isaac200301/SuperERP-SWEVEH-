@@ -62,9 +62,12 @@ export function OrderActions({ orden }: { orden: Orden }) {
   const puedeAnular = usePermission('order:override_approval');
   const [motivo, setMotivo] = useState('');
   const [recogido, setRecogido] = useState('');
-  const [accesorios, setAccesorios] = useState(false);
+  const [devueltos, setDevueltos] = useState<string[]>([]);
+  const [sinAccesorios, setSinAccesorios] = useState(false);
   const [falta, setFalta] = useState('');
   const settings = useSettings().data;
+  // Lo que el cliente dejó al recibir es lo que se devuelve al entregar (HU-25; casco en motos, HU-18).
+  const cl = useChecklist(orden.id, orden.estado === 'listo');
   const flujo = flujoFor(settings);
   const i = flujo.indexOf(orden.estado);
   if (orden.estado === 'entregado' || orden.estado === 'cancelada') return null;
@@ -77,6 +80,15 @@ export function OrderActions({ orden }: { orden: Orden }) {
   const sinAprobacion = siguiente === 'en_reparacion' && orden.estado !== 'esperando_repuesto';
   const entrega = siguiente === 'entregado';
   const puedeEsperar = orden.estado === 'en_reparacion' && settings?.usarEsperandoRepuesto === true;
+  const dejados = cl.data?.accesorios ?? [];
+  const accesoriosOK = dejados.length > 0 ? dejados.every((a) => devueltos.includes(a)) : sinAccesorios;
+  let faltaEntrega: string | undefined;
+  if (entrega) {
+    if (cl.isPending) faltaEntrega = 'Cargando los accesorios del checklist…';
+    else if (!recogido.trim()) faltaEntrega = 'Escribe quién recoge.';
+    else if (!accesoriosOK) faltaEntrega = dejados.length > 0 ? 'Marca cada accesorio que devolviste.' : 'Confirma que no dejó accesorios.';
+  }
+  const marcarDevuelto = (a: string, si: boolean) => setDevueltos(si ? [...devueltos, a] : devueltos.filter((x) => x !== a));
 
   return (
     <section className={card} aria-labelledby="acciones">
@@ -94,10 +106,22 @@ export function OrderActions({ orden }: { orden: Orden }) {
       {entrega ? (
         <>
           <Field label="¿Quién recoge?" value={recogido} onChange={(e) => setRecogido(e.target.value)} />
-          <label className="flex min-h-[44px] items-center gap-2">
-            <input type="checkbox" checked={accesorios} onChange={(e) => setAccesorios(e.target.checked)} />
-            Revisé con el cliente los accesorios del checklist
-          </label>
+          {dejados.length > 0 ? (
+            <fieldset className="flex flex-col gap-1">
+              <legend className="font-bold">Devuelve lo que dejó al recibir</legend>
+              {dejados.map((a) => (
+                <label key={a} className="flex min-h-[44px] items-center gap-2">
+                  <input type="checkbox" checked={devueltos.includes(a)} onChange={(e) => marcarDevuelto(a, e.target.checked)} />
+                  {a.charAt(0).toUpperCase() + a.slice(1)}
+                </label>
+              ))}
+            </fieldset>
+          ) : cl.isSuccess ? (
+            <label className="flex min-h-[44px] items-center gap-2">
+              <input type="checkbox" checked={sinAccesorios} onChange={(e) => setSinAccesorios(e.target.checked)} />
+              No dejó accesorios
+            </label>
+          ) : null}
         </>
       ) : null}
       {mover.isError ? <Alert>{errorText(mover.error)}</Alert> : null}
@@ -105,12 +129,13 @@ export function OrderActions({ orden }: { orden: Orden }) {
         {siguiente ? (
           <Button
             busy={mover.isPending}
+            missing={faltaEntrega}
             onClick={() =>
               mover.mutate({
                 estado: siguiente,
                 version: orden.version,
                 ...(motivo ? { motivo } : {}),
-                ...(entrega ? { recogidoPor: recogido, accesoriosConfirmados: accesorios } : {}),
+                ...(entrega ? { recogidoPor: recogido.trim(), accesoriosConfirmados: accesoriosOK } : {}),
               })
             }
           >
