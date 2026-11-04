@@ -147,7 +147,7 @@ func (t *taller) OpenOrders(ctx context.Context, tallerID, customerID shared.ID)
 		}
 		list, err := t.s.M.OrdersF.OpenByCustomer(ctx, tallerID, customerID, ids)
 		for _, i := range list {
-			out = append(out, assistantapp.Order{ID: i.ID, Code: i.Code, Plate: i.Plate, Vehicle: i.Vehicle, State: i.State, PromisedAt: i.PromisedAt})
+			out = append(out, assistantapp.Order{ID: i.ID, Code: i.Code, Plate: i.Plate, Vehicle: i.Vehicle, Kind: i.VehicleKind, State: i.State, PromisedAt: i.PromisedAt})
 		}
 		return err
 	})
@@ -158,7 +158,7 @@ func (t *taller) Order(ctx context.Context, tallerID, orderID shared.ID) (assist
 	var out assistantapp.Order
 	err := t.s.M.Tx.Do(ctx, func(ctx context.Context) error {
 		i, err := t.s.M.OrdersF.Info(ctx, tallerID, orderID)
-		out = assistantapp.Order{ID: i.ID, Code: i.Code, Plate: i.Plate, Vehicle: i.Vehicle, State: i.State, PromisedAt: i.PromisedAt}
+		out = assistantapp.Order{ID: i.ID, Code: i.Code, Plate: i.Plate, Vehicle: i.Vehicle, Kind: i.VehicleKind, State: i.State, PromisedAt: i.PromisedAt}
 		return err
 	})
 	return out, err
@@ -166,7 +166,7 @@ func (t *taller) Order(ctx context.Context, tallerID, orderID shared.ID) (assist
 
 func (t *taller) StatusReply(ctx context.Context, tallerID shared.ID, o assistantapp.Order, c assistantapp.Customer) (string, bool, error) {
 	return t.s.Automations.StatusReply(ctx, tallerID, automationsapp.OrderInfo{ID: o.ID, Code: o.Code, State: o.State, Plate: o.Plate,
-		Vehicle: o.Vehicle, PromisedAt: o.PromisedAt}, automationsapp.Customer{Name: c.Name, Phone: c.Phone, Consent: c.Consent})
+		Vehicle: o.Vehicle, Kind: o.Kind, PromisedAt: o.PromisedAt}, automationsapp.Customer{Name: c.Name, Phone: c.Phone, Consent: c.Consent})
 }
 
 func (t *taller) AgentOn(ctx context.Context, tallerID shared.ID) (bool, error) {
@@ -215,7 +215,7 @@ func (t *taller) plateOf(ctx context.Context, tallerID, customerID shared.ID, pl
 	}
 	i := open[0]
 	return assistantapp.PlateInfo{Owner: "propia", Code: i.Code, Open: &assistantapp.Order{ID: i.ID, Code: i.Code, Plate: i.Plate,
-		Vehicle: i.Vehicle, State: i.State, PromisedAt: i.PromisedAt}}, nil
+		Vehicle: i.Vehicle, Kind: i.VehicleKind, State: i.State, PromisedAt: i.PromisedAt}}, nil
 }
 
 func (t *taller) CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string, when *time.Time) (assistantapp.PlateInfo, error) {

@@ -83,6 +83,7 @@ type Order struct {
 	Code       string
 	Plate      string
 	Vehicle    string
+	Kind       string // carro | moto
 	State      string
 	PromisedAt *time.Time
 }

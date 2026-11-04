@@ -1295,6 +1295,8 @@ export interface components {
             detalle: string;
             /** @description Explicación en palabras del taller (HU-75) */
             queSignifica: string;
+            /** @description Calculado con los datos de ejemplo del registro (HU-71) */
+            ejemplo?: boolean;
         };
         Pendiente: {
             tipo: string;
@@ -1322,6 +1324,8 @@ export interface components {
             datos: string[] | null;
             ejecucionesSemana: number;
             costo: string;
+            /** @description Suele salir fuera de la ventana de 24 h: en producción cambiar el texto pide una plantilla nueva aprobada por Meta (HU-42, Q-17) */
+            fueraDeVentana?: boolean;
         };
         Borrador: {
             /** Format: uuid */
@@ -3741,7 +3745,10 @@ export interface operations {
     };
     getDashboard: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Solo carros o solo motos (HU-68, HU-70); vacío = todos */
+                tipo?: "carro" | "moto";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3759,6 +3766,10 @@ export interface operations {
                         porEstado: {
                             [key: string]: number;
                         };
+                        /** @description El taller aún no tiene órdenes propias: las cifras salen de los datos de ejemplo (HU-71) */
+                        ejemplo: boolean;
+                        /** @description Filtro aplicado: carro, moto o vacío */
+                        tipo: string;
                     };
                 };
             };

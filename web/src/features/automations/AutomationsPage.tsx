@@ -51,6 +51,12 @@ function Card({ a, canManage }: { a: Automatizacion; canManage: boolean }) {
           </label>
           <textarea id={`t-${a.codigo}`} rows={2} className="rounded-btn border-[1.5px] border-line p-3" value={texto} onChange={(e) => setTexto(e.target.value)} />
           {a.datos && a.datos.length > 0 ? <p className="text-sm text-ink-2">Datos que se llenan solos: {a.datos.join(', ')}</p> : null}
+          {a.fueraDeVentana ? (
+            <p role="note" className="rounded-2xl bg-warn-tint p-3 text-sm text-warn-ink">
+              Este aviso suele salir cuando el cliente no ha escrito en 24 horas. En producción WhatsApp exige que el texto sea una plantilla
+              aprobada por Meta: si lo cambias, el texto nuevo necesita esa aprobación antes de usarse.
+            </p>
+          ) : null}
           <div>
             <Button variant="secondary" disabled={texto === a.texto} busy={guardar.isPending} onClick={() => guardar.mutate({ texto })}>
               Guardar texto

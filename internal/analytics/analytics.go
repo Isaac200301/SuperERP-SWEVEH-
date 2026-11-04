@@ -28,7 +28,7 @@ type UnitOfWork interface {
 
 // Extra son lecturas de módulos que no tienen fachada en este paquete (mensajería, agente, inventario).
 type Extra interface {
-	ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error)
+	ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]ResponseTime, error)
 	PendingDrafts(ctx context.Context, tallerID shared.ID) (int, error)
 	LowStock(ctx context.Context, tallerID shared.ID) ([]inventory.Part, error)
 	CustomerNames(ctx context.Context, tallerID shared.ID, ids []shared.ID) (map[shared.ID]string, error)
@@ -36,6 +36,12 @@ type Extra interface {
 	FailedNotices(ctx context.Context, tallerID shared.ID, since time.Time) ([]FailedNotice, error)
 	// HumanRequests son las conversaciones en las que el cliente pidió una persona y nadie la ha cerrado (HU-59).
 	HumanRequests(ctx context.Context, tallerID shared.ID) ([]HumanRequest, error)
+}
+
+// ResponseTime es cuánto tardó la primera respuesta a un mensaje del cliente; Auto = respuesta automática de AU-05.
+type ResponseTime struct {
+	Minutes float64
+	Auto    bool
 }
 
 // HumanRequest es una conversación esperando a una persona del taller.
@@ -79,6 +85,7 @@ type KPI struct {
 	Display string   `json:"texto"`
 	Detail  string   `json:"detalle"`
 	Meaning string   `json:"queSignifica"`
+	Example bool     `json:"ejemplo"` // calculado con los datos de ejemplo del registro (HU-71)
 }
 
 func f(v float64) *float64 { return &v }
@@ -108,14 +115,27 @@ func money(v int64) string {
 	return "$" + out
 }
 
+// dashboard son los 6 números del taller (HU-68 a HU-73). ?tipo=carro|moto los separa por tipo de vehículo (HU-68 y
+// HU-70, Should). Mientras el taller no tenga órdenes propias, se calculan con las de ejemplo y van marcados "ejemplo"
+// (HU-71).
 func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, error) {
 	now := h.now()
+	kind := r.URL.Query().Get("tipo")
+	if kind != "carro" && kind != "moto" {
+		kind = ""
+	}
 	var kpis []KPI
 	var byState map[string]int
+	example := false
 	err := h.uow.Do(r.Context(), func(ctx context.Context) error {
 		st := h.orders.Stats()
-		var err error
-		if byState, err = st.StateCounts(ctx, p.TallerID); err != nil {
+		real, err := st.HasReal(ctx, p.TallerID)
+		if err != nil {
+			return err
+		}
+		example = !real
+		flt := orders.Filter{Kind: kind, Example: example}
+		if byState, err = st.StateCounts(ctx, p.TallerID, flt); err != nil {
 			return err
 		}
 		open := 0
@@ -130,25 +150,34 @@ func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, erro
 			return err
 		}
 		k := KPI{Code: "aprobaciones", Label: "Aprobaciones pendientes", Value: f(float64(len(pend))), Display: fmt.Sprintf("%d", len(pend)),
-			Meaning: "Cotizaciones que el cliente todavía no aprueba. Mientras esperan, el carro ocupa espacio y no se trabaja."}
-		if len(pend) > 0 {
-			k.Detail = fmt.Sprintf("la más antigua hace %d h", int(now.Sub(pend[0].SentAt).Hours()))
+			Meaning: "Cotizaciones que el cliente todavía no aprueba, y cuántas horas lleva esperando la más antigua. Mientras esperan, el vehículo ocupa espacio y no se trabaja."}
+		if len(pend) > 0 { // HU-69: "1 · 26 h"
+			hours := int(now.Sub(pend[0].SentAt).Hours())
+			k.Display, k.Detail = fmt.Sprintf("%d · %d h", len(pend), hours), fmt.Sprintf("la más antigua lleva %d h esperando", hours)
 		}
 		kpis = append(kpis, k)
 
-		days, n, err := st.AvgCycleDays(ctx, p.TallerID, now.AddDate(0, 0, -30))
+		cycles, err := st.Cycles(ctx, p.TallerID, now.AddDate(0, 0, -30), flt)
 		if err != nil {
 			return err
 		}
-		k = KPI{Code: "tiempo", Label: "Tiempo promedio por orden (30 días)", Value: days, Display: "sin datos",
-			Meaning: "Cuántos días pasan desde que se abre la orden hasta que se entrega el vehículo, en las entregas del último mes."}
-		if days != nil {
-			k.Display, k.Detail = fmt.Sprintf("%.1f días", *days), fmt.Sprintf("%d órdenes entregadas", n)
+		k = KPI{Code: "tiempo", Label: "Tiempo promedio por orden (30 días)", Display: "sin datos",
+			Meaning: "Cuánto pasa desde que se abre la orden hasta que se entrega el vehículo, en las entregas del último mes: en horas y en días hábiles (lunes a viernes)."}
+		if len(cycles) > 0 { // HU-70: horas y días hábiles
+			var hours, bdays float64
+			for _, c := range cycles {
+				hours += c.Closed.Sub(c.Opened).Hours()
+				bdays += BusinessDays(c.Opened, c.Closed)
+			}
+			n := float64(len(cycles))
+			k.Value = f(hours / n)
+			k.Display = fmt.Sprintf("%.0f h · %.1f días hábiles", hours/n, bdays/n)
+			k.Detail = fmt.Sprintf("%d órdenes entregadas", len(cycles))
 		}
 		kpis = append(kpis, k)
 
 		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-		ids, err := st.DeliveredSince(ctx, p.TallerID, monthStart)
+		ids, err := st.DeliveredSince(ctx, p.TallerID, monthStart, flt)
 		if err != nil {
 			return err
 		}
@@ -168,7 +197,7 @@ func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, erro
 		}
 		kpis = append(kpis, k)
 
-		back, total, err := st.Returning(ctx, p.TallerID, now.AddDate(-1, 0, 0))
+		back, total, err := st.Returning(ctx, p.TallerID, now.AddDate(-1, 0, 0), flt)
 		if err != nil {
 			return err
 		}
@@ -180,22 +209,55 @@ func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, erro
 		}
 		kpis = append(kpis, k)
 
-		mins, err := h.extra.ResponseMinutes(ctx, p.TallerID, now.AddDate(0, 0, -7))
+		times, err := h.extra.ResponseMinutes(ctx, p.TallerID, monthStart)
 		if err != nil {
 			return err
 		}
 		k = KPI{Code: "respuesta", Label: "Minutos hasta responder un WhatsApp", Display: "sin datos",
-			Meaning: "La mediana de minutos entre que el cliente escribe y alguien del taller (o el agente) le contesta, esta semana."}
-		if m := median(mins); m != nil {
+			Meaning: "La mediana de minutos entre que el cliente escribe y alguien del taller (o el asesor) le contesta, este mes. Las respuestas automáticas del estado del vehículo (AU-05) salen al instante y se cuentan aparte para no maquillar el número."}
+		var people, auto []float64
+		for _, t := range times {
+			if t.Auto {
+				auto = append(auto, t.Minutes)
+			} else {
+				people = append(people, t.Minutes)
+			}
+		}
+		if m := median(people); m != nil {
 			k.Value, k.Display = m, fmt.Sprintf("%.0f min", *m)
+		}
+		if len(auto) > 0 {
+			k.Detail = fmt.Sprintf("aparte, %d respuestas automáticas del estado (AU-05)", len(auto))
 		}
 		kpis = append(kpis, k)
 		return nil
 	})
+	for i := range kpis {
+		kpis[i].Example = example && kpis[i].Code != "aprobaciones" && kpis[i].Code != "respuesta"
+	}
 	if byState == nil {
 		byState = map[string]int{}
 	}
-	return http.StatusOK, map[string]any{"kpis": kpis, "porEstado": byState}, err
+	return http.StatusOK, map[string]any{"kpis": kpis, "porEstado": byState, "ejemplo": example, "tipo": kind}, err
+}
+
+// BusinessDays son los días hábiles (lunes a viernes) entre a y b, con fracción: un fin de semana en medio no cuenta.
+func BusinessDays(a, b time.Time) float64 {
+	if !b.After(a) {
+		return 0
+	}
+	var total time.Duration
+	for t := a; t.Before(b); {
+		next := time.Date(t.Year(), t.Month(), t.Day()+1, 0, 0, 0, 0, t.Location())
+		if next.After(b) {
+			next = b
+		}
+		if wd := t.Weekday(); wd != time.Saturday && wd != time.Sunday {
+			total += next.Sub(t)
+		}
+		t = next
+	}
+	return total.Hours() / 24
 }
 
 // Pending es un pendiente del día (HU-76).

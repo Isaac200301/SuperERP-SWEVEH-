@@ -1302,6 +1302,8 @@ paths:
     get:
       operationId: getDashboard
       summary: Los 6 KPIs del taller y las órdenes abiertas por estado (HU-68…73). Permiso kpi:read
+      parameters:
+        - { name: tipo, in: query, description: 'Solo carros o solo motos (HU-68, HU-70); vacío = todos', schema: { type: string, enum: [carro, moto] } }
       responses:
         '200':
           description: OK
@@ -1309,10 +1311,12 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [kpis, porEstado]
+                required: [kpis, porEstado, ejemplo, tipo]
                 properties:
                   kpis: { type: array, items: { $ref: '#/components/schemas/Kpi' } }
                   porEstado: { type: object, additionalProperties: { type: integer } }
+                  ejemplo: { type: boolean, description: 'El taller aún no tiene órdenes propias: las cifras salen de los datos de ejemplo (HU-71)' }
+                  tipo: { type: string, description: 'Filtro aplicado: carro, moto o vacío' }
 
   /today:
     get:
@@ -1857,6 +1861,7 @@ components:
         texto: { type: string, description: 'Valor ya formateado en español de Colombia' }
         detalle: { type: string }
         queSignifica: { type: string, description: 'Explicación en palabras del taller (HU-75)' }
+        ejemplo: { type: boolean, description: 'Calculado con los datos de ejemplo del registro (HU-71)' }
 
     Pendiente:
       type: object
@@ -1884,6 +1889,7 @@ components:
         datos: { type: array, items: { type: string }, nullable: true }
         ejecucionesSemana: { type: integer }
         costo: { type: string }
+        fueraDeVentana: { type: boolean, description: 'Suele salir fuera de la ventana de 24 h: en producción cambiar el texto pide una plantilla nueva aprobada por Meta (HU-42, Q-17)' }
 
     Borrador:
       type: object

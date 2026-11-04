@@ -45,7 +45,8 @@ type OrderInfo struct {
 	Code        string
 	State       string
 	Plate       string
-	Vehicle     string
+	Vehicle     string // marca y línea ("Yamaha NMAX")
+	Kind        string // "carro" | "moto"
 	CustomerID  shared.ID
 	PromisedAt  *time.Time
 	Example     bool

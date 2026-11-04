@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"sweveh/internal/orders/app"
@@ -10,16 +11,21 @@ import (
 )
 
 // Stats implementa app.Stats: cifras de órdenes para los KPIs (HU-68, HU-70, HU-72) y avisos (AU-07).
-// Las órdenes de ejemplo del registro (HU-05) no cuentan.
+// Las órdenes de ejemplo del registro (HU-05) solo cuentan con Filter.Example (el tablero las marca, HU-71).
 type Stats struct{}
 
-func (Stats) StateCounts(ctx context.Context, tallerID shared.ID) (map[string]int, error) {
+// filtro: las órdenes de ejemplo o las reales, y solo un tipo de vehículo si viene (HU-68, HU-70, HU-71).
+const filtro = ` AND ejemplo = $%d AND ($%d = '' OR tipo_vehiculo = $%d)`
+
+func where(n int) string { return fmt.Sprintf(filtro, n, n+1, n+1) }
+
+func (Stats) StateCounts(ctx context.Context, tallerID shared.ID, f app.Filter) (map[string]int, error) {
 	type r struct {
 		Estado string `db:"estado"`
 		N      int    `db:"n"`
 	}
-	rows, err := db.Many[r](ctx, `SELECT estado, count(*)::int AS n FROM orders.orden WHERE taller_id = $1 AND NOT ejemplo
-		AND estado NOT IN ('entregado', 'cancelada') GROUP BY estado`, tallerID)
+	rows, err := db.Many[r](ctx, `SELECT estado, count(*)::int AS n FROM orders.orden WHERE taller_id = $1`+where(2)+`
+		AND estado NOT IN ('entregado', 'cancelada') GROUP BY estado`, tallerID, f.Example, f.Kind)
 	out := map[string]int{}
 	for _, x := range rows {
 		out[x.Estado] = x.N
@@ -27,44 +33,49 @@ func (Stats) StateCounts(ctx context.Context, tallerID shared.ID) (map[string]in
 	return out, err
 }
 
-func (Stats) AvgCycleDays(ctx context.Context, tallerID shared.ID, since time.Time) (*float64, int, error) {
+func (Stats) Cycles(ctx context.Context, tallerID shared.ID, since time.Time, f app.Filter) ([]app.Cycle, error) {
 	type r struct {
-		Dias *float64 `db:"dias"`
-		N    int      `db:"n"`
+		Abierta time.Time `db:"created_at"`
+		Cerrada time.Time `db:"cerrada_en"`
 	}
-	rows, err := db.Many[r](ctx, `SELECT avg(EXTRACT(EPOCH FROM (cerrada_en - created_at)) / 86400) AS dias, count(*)::int AS n
-		FROM orders.orden WHERE taller_id = $1 AND NOT ejemplo AND estado = 'entregado' AND cerrada_en >= $2`, tallerID, since)
-	if err != nil || len(rows) == 0 {
-		return nil, 0, err
+	rows, err := db.Many[r](ctx, `SELECT created_at, cerrada_en FROM orders.orden WHERE taller_id = $1 AND estado = 'entregado'
+		AND cerrada_en >= $2`+where(3), tallerID, since, f.Example, f.Kind)
+	out := make([]app.Cycle, 0, len(rows))
+	for _, x := range rows {
+		out = append(out, app.Cycle{Opened: x.Abierta, Closed: x.Cerrada})
 	}
-	return rows[0].Dias, rows[0].N, nil
+	return out, err
 }
 
-func (Stats) Returning(ctx context.Context, tallerID shared.ID, since time.Time) (int, int, error) {
+func (Stats) Returning(ctx context.Context, tallerID shared.ID, since time.Time, f app.Filter) (int, int, error) {
 	type r struct {
 		Vuelven int `db:"vuelven"`
 		Total   int `db:"total"`
 	}
 	rows, err := db.Many[r](ctx, `SELECT count(*) FILTER (WHERE n >= 2)::int AS vuelven, count(*)::int AS total FROM (
-		SELECT vehiculo_id, count(*) AS n FROM orders.orden WHERE taller_id = $1 AND NOT ejemplo AND estado <> 'cancelada'
-		AND created_at >= $2 GROUP BY vehiculo_id) x`, tallerID, since)
+		SELECT vehiculo_id, count(*) AS n FROM orders.orden WHERE taller_id = $1 AND estado <> 'cancelada'
+		AND created_at >= $2`+where(3)+` GROUP BY vehiculo_id) x`, tallerID, since, f.Example, f.Kind)
 	if err != nil || len(rows) == 0 {
 		return 0, 0, err
 	}
 	return rows[0].Vuelven, rows[0].Total, nil
 }
 
-func (Stats) DeliveredSince(ctx context.Context, tallerID shared.ID, since time.Time) ([]shared.ID, error) {
+func (Stats) DeliveredSince(ctx context.Context, tallerID shared.ID, since time.Time, f app.Filter) ([]shared.ID, error) {
 	type r struct {
 		ID shared.ID `db:"id"`
 	}
-	rows, err := db.Many[r](ctx, `SELECT id FROM orders.orden WHERE taller_id = $1 AND NOT ejemplo AND estado = 'entregado' AND cerrada_en >= $2`,
-		tallerID, since)
+	rows, err := db.Many[r](ctx, `SELECT id FROM orders.orden WHERE taller_id = $1 AND estado = 'entregado' AND cerrada_en >= $2`+where(3),
+		tallerID, since, f.Example, f.Kind)
 	out := make([]shared.ID, 0, len(rows))
 	for _, x := range rows {
 		out = append(out, x.ID)
 	}
 	return out, err
+}
+
+func (Stats) HasReal(ctx context.Context, tallerID shared.ID) (bool, error) {
+	return db.Scalar[bool](ctx, `SELECT EXISTS (SELECT 1 FROM orders.orden WHERE taller_id = $1 AND NOT ejemplo)`, tallerID)
 }
 
 // StateSince devuelve desde cuándo cada orden abierta del estado dado está en él.

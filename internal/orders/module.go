@@ -137,6 +137,9 @@ func (o Orders) OpenByCustomer(ctx context.Context, tallerID, customerID shared.
 	return out, nil
 }
 
+// Filter acota las cifras del tablero por tipo de vehículo y datos de ejemplo (HU-68, HU-70, HU-71).
+type Filter = app.Filter
+
 // LastShownPhoto devuelve la última foto marcada "mostrar al cliente" (AU-05, HU-21).
 func (o Orders) LastShownPhoto(ctx context.Context, tallerID, orderID shared.ID) (*shared.ID, error) {
 	return o.flow.LastShownPhoto(ctx, tallerID, orderID)

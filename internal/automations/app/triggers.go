@@ -63,8 +63,15 @@ func (s *Service) fire(ctx context.Context, tallerID shared.ID, code, key string
 	})
 }
 
+// base son los datos comunes de los avisos. {vehiculo} es el tipo, para que diga "tu moto" o "tu carro" (HU-42);
+// {modelo}, la marca y línea.
 func (s *Service) base(w Workshop, c Customer, o OrderInfo) map[string]string {
-	return map[string]string{"cliente": firstName(c.Name), "taller": w.Name, "vehiculo": o.Vehicle, "placa": o.Plate, "orden": o.Code}
+	kind := o.Kind
+	if kind == "" {
+		kind = o.Vehicle
+	}
+	return map[string]string{"cliente": firstName(c.Name), "taller": w.Name, "vehiculo": kind, "modelo": o.Vehicle, "placa": o.Plate,
+		"orden": o.Code}
 }
 
 func firstName(n string) string {

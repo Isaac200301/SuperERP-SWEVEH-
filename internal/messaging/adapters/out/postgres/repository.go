@@ -220,18 +220,22 @@ func (Repository) Conversations(ctx context.Context, tallerID shared.ID, limit i
 }
 
 // ResponseMinutes: por cada mensaje del cliente, minutos hasta la siguiente respuesta del taller (HU-73).
-func (Repository) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error) {
+// ResponseMinutes son los minutos entre cada mensaje del cliente y la primera respuesta (persona o agente). Auto marca
+// las respuestas automáticas (el estado de AU-05 y la autorización de datos), que el tablero cuenta aparte (HU-73).
+func (Repository) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]app.ResponseTime, error) {
 	type row struct {
-		Min float64 `db:"minutos"`
+		Min  float64 `db:"minutos"`
+		Auto bool    `db:"auto"`
 	}
-	rows, err := db.Many[row](ctx, `SELECT EXTRACT(EPOCH FROM (r.created_at - e.created_at)) / 60 AS minutos
+	rows, err := db.Many[row](ctx, `SELECT EXTRACT(EPOCH FROM (r.created_at - e.created_at)) / 60 AS minutos, r.auto
 		FROM messaging.mensaje e
-		JOIN LATERAL (SELECT created_at FROM messaging.mensaje s WHERE s.taller_id = e.taller_id AND s.conversacion_id = e.conversacion_id
+		JOIN LATERAL (SELECT created_at, COALESCE(automatizacion IN ('AU-05', 'consentimiento'), false) AS auto FROM messaging.mensaje s
+			WHERE s.taller_id = e.taller_id AND s.conversacion_id = e.conversacion_id
 			AND s.direccion = 'saliente' AND s.origen IN ('persona', 'agente') AND s.created_at > e.created_at ORDER BY s.created_at LIMIT 1) r ON true
 		WHERE e.taller_id = $1 AND e.direccion = 'entrante' AND e.created_at >= $2`, tallerID, since)
-	out := make([]float64, 0, len(rows))
+	out := make([]app.ResponseTime, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, r.Min)
+		out = append(out, app.ResponseTime{Minutes: r.Min, Auto: r.Auto})
 	}
 	return out, err
 }

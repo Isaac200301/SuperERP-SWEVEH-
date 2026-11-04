@@ -343,7 +343,7 @@ func (h *handler) cards(r *http.Request, p reqctx.Principal) (int, any, error) {
 	for _, c := range cards {
 		out = append(out, map[string]any{"codigo": c.Code, "nombre": c.Name, "disparador": c.Trigger, "activa": c.Active,
 			"proximamente": c.ComingSoon, "enviaMensaje": c.SendsMessage, "editable": c.Editable, "texto": c.Text,
-			"datos": c.Placeholders, "ejecucionesSemana": c.WeekCount,
+			"datos": c.Placeholders, "ejecucionesSemana": c.WeekCount, "fueraDeVentana": c.OutsideWindow,
 			"costo": map[bool]string{true: "1 mensaje por envío", false: "No cuesta mensajes"}[c.SendsMessage]})
 	}
 	return http.StatusOK, map[string]any{"automatizaciones": out}, err
@@ -472,8 +472,13 @@ func (h *handler) audit(r *http.Request, p reqctx.Principal) (int, any, error) {
 // extra implementa analytics.Extra.
 type extra struct{ s *Services }
 
-func (e extra) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error) {
-	return e.s.Messaging.ResponseMinutes(ctx, tallerID, since)
+func (e extra) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]analytics.ResponseTime, error) {
+	rs, err := e.s.Messaging.ResponseMinutes(ctx, tallerID, since)
+	out := make([]analytics.ResponseTime, 0, len(rs))
+	for _, r := range rs {
+		out = append(out, analytics.ResponseTime{Minutes: r.Minutes, Auto: r.Auto})
+	}
+	return out, err
 }
 
 func (e extra) FailedNotices(ctx context.Context, tallerID shared.ID, since time.Time) ([]analytics.FailedNotice, error) {

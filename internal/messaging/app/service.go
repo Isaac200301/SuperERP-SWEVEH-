@@ -70,7 +70,7 @@ type Repository interface {
 	Messages(ctx context.Context, tallerID, convID shared.ID, limit int) ([]Message, error)
 	MessagesByOrder(ctx context.Context, tallerID, orderID shared.ID) ([]Message, error)
 	Conversations(ctx context.Context, tallerID shared.ID, limit int) ([]ConversationSummary, error)
-	ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error)
+	ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]ResponseTime, error)
 }
 
 // WebhookEvent es un cuerpo crudo recibido del proveedor de WhatsApp.
@@ -504,8 +504,14 @@ func (s *Service) LinkCustomer(ctx context.Context, tallerID, convID, customerID
 }
 
 // ResponseMinutes devuelve los minutos que tardó el taller en contestar cada mensaje (HU-73).
-func (s *Service) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error) {
-	var out []float64
+// ResponseTime es cuánto tardó la primera respuesta a un mensaje del cliente; Auto = respuesta automática de AU-05.
+type ResponseTime struct {
+	Minutes float64
+	Auto    bool
+}
+
+func (s *Service) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]ResponseTime, error) {
+	var out []ResponseTime
 	err := s.tx.Do(ctx, func(ctx context.Context) error {
 		var err error
 		out, err = s.repo.ResponseMinutes(ctx, tallerID, since)
