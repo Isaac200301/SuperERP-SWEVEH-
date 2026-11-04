@@ -297,7 +297,7 @@ func (l *loader) call(want int, method, path string, body any) (map[string]any, 
 		raw, _ := json.Marshal(b)
 		rd, ctype = bytes.NewReader(raw), "application/json"
 	}
-	req := httptest.NewRequest(method, origin+path, rd)
+	req := httptest.NewRequestWithContext(context.Background(), method, origin+path, rd)
 	if ctype != "" {
 		req.Header.Set("Content-Type", ctype)
 	}
@@ -332,7 +332,7 @@ func (l *loader) upload(orderID, side string) error {
 	fw, _ := mw.CreateFormFile("foto", "trabajo.png")
 	_, _ = fw.Write(l.photo)
 	_ = mw.Close()
-	req := httptest.NewRequest("POST", origin+"/api/v1/orders/"+orderID+"/evidence", &buf)
+	req := httptest.NewRequestWithContext(context.Background(), "POST", origin+"/api/v1/orders/"+orderID+"/evidence", &buf)
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	_, err := l.send(http.StatusCreated, req)
 	return err
