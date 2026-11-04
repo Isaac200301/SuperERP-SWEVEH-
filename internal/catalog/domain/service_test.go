@@ -33,7 +33,7 @@ func TestPreload_BySpecialtyAndVehicleKind(t *testing.T) {
 
 // HU-93: una fila leída de la foto se limpia antes de quedar por revisar.
 func TestRowClean(t *testing.T) {
-	neg, ok := int64(-5), true
+	neg := int64(-5)
 	r, ok := Row{Name: "  Cambio   de aceite ", Kind: "bus", Price: &neg}.Clean()
 	if !ok || r.Name != "Cambio de aceite" || r.Kind != "ambos" || r.Price != nil {
 		t.Fatalf("limpieza: %+v %v", r, ok)

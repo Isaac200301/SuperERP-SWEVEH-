@@ -22,4 +22,6 @@ func (a Adapter) Put(ctx context.Context, key string, r io.Reader, max int64) er
 	return err
 }
 
-func (a Adapter) Open(ctx context.Context, key string) (io.ReadCloser, error) { return a.s.Open(ctx, key) }
+func (a Adapter) Open(ctx context.Context, key string) (io.ReadCloser, error) {
+	return a.s.Open(ctx, key)
+}
