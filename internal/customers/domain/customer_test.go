@@ -55,7 +55,7 @@ func TestIsPlaceholderName(t *testing.T) {
 			t.Errorf("IsPlaceholderName(%q) = %v", name, got)
 		}
 	}
-	if _, err := CleanName("   "); err != ErrNameRequired {
+	if _, err := CleanName("   "); !errors.Is(err, ErrNameRequired) {
 		t.Errorf("vacío: %v", err)
 	}
 	if n, err := CleanName("  Carlos   Ruiz "); err != nil || n != "Carlos Ruiz" {

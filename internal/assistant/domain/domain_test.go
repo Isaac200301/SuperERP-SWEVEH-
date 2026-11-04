@@ -251,7 +251,7 @@ func TestParseWhen(t *testing.T) {
 	}{
 		{"2026-11-04", "08:00", ErrWhenPast}, {"2026-12-20", "09:00", ErrWhenFar}, {"7/11/2026", "9am", ErrWhenFormat},
 	} {
-		if _, err := ParseWhen(tc.d, tc.h, now); err != tc.want {
+		if _, err := ParseWhen(tc.d, tc.h, now); !errors.Is(err, tc.want) {
 			t.Errorf("%s %s: %v", tc.d, tc.h, err)
 		}
 	}

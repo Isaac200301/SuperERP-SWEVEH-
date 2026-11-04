@@ -106,7 +106,9 @@ func TestAdvisor_BooksWithDateTimeAndName(t *testing.T) {
 	tid := tallerOf(t, owner)
 	e.clk.Advance(later.Sub(e.clk.Now()) - 7*time.Hour)
 	w.owner = e.login("3105550703") // pasaron dos días: la sesión del dueño venció
-	adv.step = func(assistantapp.ChatRequest) (assistantapp.ChatMessage, error) { return say("¡Te esperamos hoy!"), nil }
+	adv.step = func(assistantapp.ChatRequest) (assistantapp.ChatMessage, error) {
+		return say("¡Te esperamos hoy!"), nil
+	}
 	w.write(phone, "Carlos Ruiz", "hoy voy para allá")
 	if err := w.s.Automations.Daily(context.Background(), []shared.ID{tid}, reqctx.WithTenant); err != nil {
 		t.Fatal(err)
