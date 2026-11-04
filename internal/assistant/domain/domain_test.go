@@ -215,3 +215,10 @@ func TestGuard(t *testing.T) {
 		}
 	}
 }
+
+func TestTidy(t *testing.T) {
+	got := Tidy("## Precio\n\nEl **cambio de aceite** cuesta $45.000.\n\n\n\n¿Te agendo?")
+	if want := "Precio\n\nEl *cambio de aceite* cuesta $45.000.\n\n¿Te agendo?"; got != want {
+		t.Fatalf("Tidy = %q; quiero %q", got, want)
+	}
+}

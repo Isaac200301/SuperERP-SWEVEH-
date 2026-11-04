@@ -51,7 +51,7 @@ var AdvisorTools = []ToolSpec{
 
 // turn es el estado de una respuesta del asesor: lo que consultó (para los guardias) y lo que debe enviar aparte.
 type turn struct {
-	s        *Service
+	taller   Taller
 	tallerID shared.ID
 	in       Inbound
 	c        Customer
@@ -59,6 +59,7 @@ type turn struct {
 	photos   []photo        // fotos a enviar después del texto
 	handed   bool           // la conversación pasó a una persona
 	products map[string]Product
+	said     string // lo que el cliente escribió en la conversación: agendar solo usa placas que estén ahí (HU-55)
 }
 
 func (t *turn) run(ctx context.Context, name, args string) string {
@@ -89,7 +90,7 @@ func result(v any) string {
 func (t *turn) exec(ctx context.Context, name, kind, q, product, plate, symptom string, qty int, reason string) (any, error) {
 	switch name {
 	case "servicios":
-		services, _, err := t.s.taller.Catalog(ctx, t.tallerID)
+		services, _, err := t.taller.Catalog(ctx, t.tallerID)
 		if err != nil {
 			return nil, err
 		}
@@ -107,7 +108,7 @@ func (t *turn) exec(ctx context.Context, name, kind, q, product, plate, symptom 
 		}
 		return map[string]any{"servicios": list}, nil
 	case "productos":
-		ps, err := t.s.taller.Showcase(ctx, t.tallerID, q)
+		ps, err := t.taller.Showcase(ctx, t.tallerID, q)
 		if err != nil {
 			return nil, err
 		}
@@ -121,7 +122,10 @@ func (t *turn) exec(ctx context.Context, name, kind, q, product, plate, symptom 
 		return map[string]any{"productos": list}, nil
 	case "enviar_foto":
 		p, ok := t.product(ctx, product)
-		if !ok || !p.HasPhoto {
+		switch {
+		case !ok:
+			return map[string]any{"enviada": false, "motivo": "no encontré ese producto en la vitrina; usa la referencia que devolvió productos"}, nil
+		case !p.HasPhoto:
 			return map[string]any{"enviada": false, "motivo": "ese producto no tiene foto"}, nil
 		}
 		if len(t.photos) < 3 {
@@ -129,14 +133,14 @@ func (t *turn) exec(ctx context.Context, name, kind, q, product, plate, symptom 
 		}
 		return map[string]any{"enviada": true}, nil
 	case "horario":
-		prof, err := t.s.taller.Profile(ctx, t.tallerID)
+		prof, err := t.taller.Profile(ctx, t.tallerID)
 		if err != nil {
 			return nil, err
 		}
-		_, open, next, err := t.s.taller.Workshop(ctx, t.tallerID)
+		_, open, next, err := t.taller.Workshop(ctx, t.tallerID)
 		return map[string]any{"horario": prof.Hours, "abierto_ahora": open, "proxima_apertura": next}, err
 	case "mis_ordenes":
-		orders, err := t.s.taller.OpenOrders(ctx, t.tallerID, t.c.ID)
+		orders, err := t.taller.OpenOrders(ctx, t.tallerID, t.c.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -148,21 +152,25 @@ func (t *turn) exec(ctx context.Context, name, kind, q, product, plate, symptom 
 			}
 			list = append(list, item)
 		}
-		return map[string]any{"ordenes": list}, nil
+		return map[string]any{"ordenes": list,
+			"nota": "si el cliente reclama por la demora o está molesto, discúlpate y usa pasar_a_persona; no prometas llamadas ni tiempos"}, nil
 	case "agendar":
 		p := domain.FindPlate(plate)
 		if p == "" {
 			return map[string]any{"resultado": "placa_invalida", "nota": "pide la placa de nuevo, con letras y números"}, nil
 		}
-		info, err := t.s.taller.CreateOrderFromPlate(ctx, t.tallerID, t.c.ID, p, symptom)
+		if !strings.Contains(compact(t.said), p) { // HU-55: la placa la escribe el cliente, no la deduce la IA
+			return map[string]any{"resultado": "placa_no_confirmada", "nota": "pídele al cliente que escriba la placa del vehículo que va a traer"}, nil
+		}
+		info, err := t.taller.CreateOrderFromPlate(ctx, t.tallerID, t.c.ID, p, symptom)
 		if err != nil {
 			return nil, err
 		}
 		switch {
 		case info.Owner == "ajena": // de otro cliente: no se dice nada del vehículo y lo revisa una persona (HU-12)
 			t.handed = true
-			return map[string]any{"resultado": "revision", "nota": "una persona del taller revisa esa placa y le escribe; no des más detalles"},
-				t.s.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true)
+			return map[string]any{"resultado": "revision", "nota": "di solo que una persona del taller le escribe para confirmar"},
+				t.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true)
 		case info.Open != nil:
 			return map[string]any{"resultado": "ya_tenia_orden", "orden": info.Code, "estado": stateText[info.Open.State]}, nil
 		}
@@ -173,7 +181,7 @@ func (t *turn) exec(ctx context.Context, name, kind, q, product, plate, symptom 
 			return map[string]any{"apartado": false, "motivo": "ese producto no está en la vitrina"}, nil
 		}
 		t.handed = true
-		if err := t.s.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true); err != nil {
+		if err := t.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true); err != nil {
 			return nil, err
 		}
 		return map[string]any{"apartado": true, "producto": p.Name, "cantidad": max(qty, 1),
@@ -181,7 +189,7 @@ func (t *turn) exec(ctx context.Context, name, kind, q, product, plate, symptom 
 	case "pasar_a_persona":
 		t.handed = true
 		return map[string]any{"ok": true, "nota": "dile que una persona del taller le escribe en cuanto pueda"},
-			t.s.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true)
+			t.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true)
 	}
 	return map[string]any{"error": fmt.Sprintf("no existe la tool %q", name)}, nil
 }
@@ -191,22 +199,60 @@ func (t *turn) product(ctx context.Context, ref string) (Product, bool) {
 	if p, ok := t.products[ref]; ok {
 		return p, true
 	}
-	ps, err := t.s.taller.Showcase(ctx, t.tallerID, "")
+	ps, err := t.taller.Showcase(ctx, t.tallerID, "")
 	if err != nil {
 		return Product{}, false
 	}
-	for _, p := range ps {
+	want := domain.Normalize(ref)
+	var hit *Product
+	for i, p := range ps {
 		t.products[p.Ref] = p
-		if strings.EqualFold(p.Ref, ref) || strings.EqualFold(p.Name, ref) {
-			t.quoted[p.Price] = true
-			return p, true
+		name := domain.Normalize(p.Brand + " " + p.Name)
+		if strings.EqualFold(p.Ref, ref) || domain.Normalize(p.Name) == want {
+			hit = &ps[i]
+			break
+		}
+		if want != "" && (strings.Contains(name, want) || strings.Contains(want, domain.Normalize(p.Name))) && hit == nil {
+			hit = &ps[i]
 		}
 	}
-	return Product{}, false
+	if hit == nil {
+		return Product{}, false
+	}
+	t.quoted[hit.Price] = true
+	return *hit, true
+}
+
+// compact deja el texto en mayúsculas sin espacios ni guiones, para buscar una placa escrita como "gno 667" o "GNO-667".
+func compact(s string) string {
+	return strings.ToUpper(strings.NewReplacer(" ", "", "-", "", ".", "").Replace(s))
 }
 
 // photo es una foto de la vitrina con su pie (nombre y precio de la lista).
 type photo struct{ ref, caption string }
+
+// Tools ejecuta las tools del asesor para un cliente fuera del servicio (cmd/agent-eval con un taller de prueba).
+type Tools struct{ t *turn }
+
+// said es lo que el cliente escribió en la conversación (agendar solo usa placas que estén ahí).
+func NewTools(tl Taller, tallerID shared.ID, c Customer, in Inbound, said string) *Tools {
+	return &Tools{t: &turn{taller: tl, tallerID: tallerID, in: in, c: c, quoted: map[int64]bool{}, products: map[string]Product{}, said: said}}
+}
+
+func (x *Tools) Run(ctx context.Context, name, args string) string { return x.t.run(ctx, name, args) }
+
+// Catalog trae servicios y vitrina antes de llamar al modelo, para el prompt (ver turn.catalog).
+func (x *Tools) Catalog(ctx context.Context) string { return x.t.catalog(ctx) }
+
+// catalog consulta servicios y vitrina con las mismas tools y lo devuelve como texto para el prompt: así el asesor
+// siempre sabe qué ofrece el taller y no tiene que adivinarlo, y esos precios quedan como consultados.
+func (t *turn) catalog(ctx context.Context) string {
+	return "Servicios del taller (consulta de hoy): " + t.run(ctx, "servicios", "{}") +
+		"\nVitrina de productos (consulta de hoy): " + t.run(ctx, "productos", "{}")
+}
+
+// Quoted son los precios que devolvieron las tools: los únicos que el texto puede decir (domain.Guard).
+func (x *Tools) Quoted() map[int64]bool { return x.t.quoted }
 
 var stateText = map[string]string{"por_recibir": "por recibir", "recibido": "recibido", "en_diagnostico": "en diagnóstico",
 	"esperando_aprobacion": "esperando tu aprobación de la cotización", "en_reparacion": "en reparación", "esperando_repuesto": "esperando un repuesto",

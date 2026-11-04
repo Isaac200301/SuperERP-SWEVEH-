@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"sweveh/internal/assistant/domain"
@@ -93,36 +94,76 @@ func (s *Service) advise(ctx context.Context, tallerID shared.ID, in Inbound, c 
 		return false, false, err
 	}
 	msgs := make([]ChatMessage, 0, len(history)+1)
+	said := in.Text
 	for _, h := range history {
 		role := "assistant"
 		if h.FromCustomer {
-			role = "user"
+			role, said = "user", said+" "+h.Text
 		}
 		msgs = append(msgs, ChatMessage{Role: role, Content: h.Text})
 	}
 	msgs = append(msgs, ChatMessage{Role: "user", Content: in.Text})
 
-	t := &turn{s: s, tallerID: tallerID, in: in, c: c, quoted: map[int64]bool{}, products: map[string]Product{}}
+	t := &turn{taller: s.taller, tallerID: tallerID, in: in, c: c, quoted: map[int64]bool{}, products: map[string]Product{}, said: said}
 	cctx, cancel := context.WithTimeout(ctx, advisorTimeout)
 	defer cancel()
-	req := ChatRequest{System: actx.System(), Messages: msgs, Tools: AdvisorTools}
+	chat := func(ctx context.Context, req ChatRequest) (ChatMessage, error) { return s.chat(ctx, tallerID, in, req) }
+	system := actx.System() + "\n\n" + t.catalog(cctx)
+	text, err := Respond(cctx, chat, ChatRequest{System: system, Messages: msgs, Tools: AdvisorTools}, t.run, t.quoted)
+	if err != nil || text == "" {
+		return t.handed, true, s.afterHandoff(ctx, tallerID, in, t, err)
+	}
+	return true, true, s.reply(ctx, tallerID, in, t, text)
+}
+
+// correction es lo que se le dice al modelo cuando su texto trae un precio que no consultó.
+const correction = "Tu respuesta trae un precio que no salió de una consulta. Consulta \"servicios\" o \"productos\" y " +
+	"responde de nuevo usando solo esos precios; si no está en la lista, di que el taller confirma el valor."
+
+// Respond corre la conversación (Converse), deja el texto en formato de WhatsApp y, si dice un precio que no salió
+// de una tool, le da al modelo una sola ronda para corregir. Devuelve el texto o el error del guardia. La usan el
+// servicio y la evaluación.
+func Respond(ctx context.Context, chat func(context.Context, ChatRequest) (ChatMessage, error), req ChatRequest,
+	run func(ctx context.Context, name, args string) string, quoted map[int64]bool) (string, error) {
+	text, msgs, err := Converse(ctx, chat, req, run)
+	if err != nil || text == "" {
+		return "", err
+	}
+	text = domain.Tidy(text)
+	if gerr := domain.Guard(text, quoted); errors.Is(gerr, domain.ErrReplyPrice) {
+		req.Messages = append(msgs, ChatMessage{Role: "assistant", Content: text}, ChatMessage{Role: "system", Content: correction})
+		if text, _, err = Converse(ctx, chat, req, run); err != nil || text == "" {
+			return "", err
+		}
+		text = domain.Tidy(text)
+	}
+	return text, domain.Guard(text, quoted)
+}
+
+// Converse corre las rondas del asesor: el modelo pide tools, run las ejecuta y vuelve con los resultados, hasta que
+// responda con texto (máximo maxRounds; en la última ya no tiene tools). text="" si no cerró. Devuelve también la
+// conversación con las tools, para poder seguirla.
+func Converse(ctx context.Context, chat func(context.Context, ChatRequest) (ChatMessage, error), req ChatRequest,
+	run func(ctx context.Context, name, args string) string) (string, []ChatMessage, error) {
+	tools := req.Tools
 	for round := 0; round < maxRounds; round++ {
+		req.Tools = tools
 		if round == maxRounds-1 {
 			req.Tools = nil // última ronda: tiene que responder
 		}
-		res, err := s.chat(cctx, tallerID, in, req)
+		res, err := chat(ctx, req)
 		if err != nil {
-			return t.handed, true, s.afterHandoff(ctx, tallerID, in, t, err)
+			return "", req.Messages, err
 		}
 		if len(res.ToolCalls) == 0 {
-			return true, true, s.reply(ctx, tallerID, in, t, res.Content)
+			return res.Content, req.Messages, nil
 		}
 		req.Messages = append(req.Messages, res)
 		for _, call := range res.ToolCalls {
-			req.Messages = append(req.Messages, ChatMessage{Role: "tool", ToolCallID: call.ID, Content: t.run(cctx, call.Name, call.Args)})
+			req.Messages = append(req.Messages, ChatMessage{Role: "tool", ToolCallID: call.ID, Content: run(ctx, call.Name, call.Args)})
 		}
 	}
-	return t.handed, true, s.afterHandoff(ctx, tallerID, in, t, nil)
+	return "", req.Messages, nil
 }
 
 // afterHandoff: la IA falló o no cerró. Si ya pasó la conversación a una persona, se avisa al cliente con el texto fijo;
@@ -140,7 +181,7 @@ func (s *Service) afterHandoff(ctx context.Context, tallerID shared.ID, in Inbou
 
 // reply aplica los guardias y envía. Si el texto no pasa, sale la respuesta segura de las reglas.
 func (s *Service) reply(ctx context.Context, tallerID shared.ID, in Inbound, t *turn, text string) error {
-	if err := domain.Guard(text, t.quoted); err != nil {
+	if err := domain.Guard(text, t.quoted); err != nil { // Respond ya lo revisó; se repite por si cambió algo
 		if t.handed {
 			_, err := s.taller.Send(ctx, tallerID, in.Phone, humanText, nil, "AU-04", nil)
 			return err
