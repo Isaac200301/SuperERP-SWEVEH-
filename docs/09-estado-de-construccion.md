@@ -16,12 +16,13 @@
 
 ## Qué sigue (lo escribe el agente al cerrar cada sesión)
 
-1. Isaac/Pablo: revisar y hacer merge del PR #8 (`dev/pablo`) con el CI en verde (jobs backend, frontend, security y e2e, que ahora levanta también el worker).
-2. **T2 quedó completo en código y probado con el canal local** (`internal/server/whatsapp_test.go` y `web/e2e/whatsapp.spec.ts`). Falta validarlo contra WhatsApp real: **número de prueba de Meta** + URL pública del webhook (`WHATSAPP_PROVIDER=meta`, ADR-0025).
-3. **Supabase staging (pedido de Pablo, 4-nov):** borrar el proyecto "weveh" y crear `sweveh-staging` en `sa-east-1`. Bloqueado: el conector de Supabase solo ve "Isaac200301's Org"; hay que reconectarlo con la cuenta de weveh. Luego roles (`db/bootstrap/roles.sql`), migraciones y `rls_test.go` contra el pooler.
-4. Demo (al final, decisión de Pablo): WAHA como canal no oficial y OpenRouter como proveedor de IA, cada uno como adaptador detrás de su puerto (ADR-0025 para el canal; el puerto de IA llega con el T3).
-5. Siguiente tramo: **T3 (agente)**. Cobertura de `messaging/app` 72 %, `automations/app` 50 % y `assistant/app` 37 %: todavía fuera de la lista vigilada de R-11.
-6. Decidir Q-33 (¿devolver al inventario después de entregar?) y validar el checklist de moto con 2 talleres (Q-02). AQ-10 antes de datos reales.
+1. Isaac/Pablo: revisar y hacer merge del PR #8 (`dev/pablo`) con el CI en verde.
+2. **T3 quedó en código y probado con reglas** (`internal/server/agent_test.go`, `internal/assistant/eval`). Para la demo: una clave de **OpenRouter** y un modelo; correr `AI_PROVIDER=openrouter AI_API_KEY=… AI_MODEL=… make agent-eval` y anotar el resultado en D-08 (las reglas dan 28/30).
+3. WhatsApp real: número de prueba de Meta + URL pública del webhook (ADR-0025). Para la demo, el adaptador de **WAHA** (pendiente).
+4. **Supabase staging:** borrar "weveh" y crear `sweveh-staging` en `sa-east-1`. Bloqueado: el conector de Supabase solo ve "Isaac200301's Org"; hay que reconectarlo con la cuenta de weveh.
+5. Siguiente tramo: **T4 (números y catálogo)**. HU-99 tiene el registro por llamada; la vista del costo va con el medidor del administrador (HU-40).
+6. Pendientes del T3: fecha deseada en la orden creada por la placa (HU-55), última foto marcada para el cliente en el estado (HU-56), mensajes reales anonimizados para HU-102. Cobertura de `assistant/app` 79,6 % (no entra todavía a la lista vigilada; `assistant/domain` sí, 96 %).
+7. Decidir Q-33 y validar el checklist de moto con 2 talleres (Q-02). AQ-10 antes de datos reales.
 
 ## Estado por historia
 
@@ -29,6 +30,7 @@
 
 | HU | Título | Tramo | Demo | Estado | PR | Notas |
 |---|---|---|---|---|---|---|
+| 2026-11-04 | Claude (rama `dev/pablo`) | **T3 con reglas.** Puerto de IA (ADR-0026): la IA solo interpreta y el código redacta y valida; adaptadores de reglas y OpenRouter (contra una API falsa), llamada fuera de la transacción con 30 s, tope mensual y registro por mensaje (migración 00021). Borrador por tipo de vehículo, "no atendemos motos", diagnóstico → revisión, "otro" para lo que no está en la lista. HU-59 con pantalla Conversaciones y alerta; HU-57 con lista de Meta. Juego de 30 mensajes (HU-102) y `make agent-eval`: reglas 28/30. Bug encontrado: "motor" se tomaba por "moto". **Verde:** `go test ./...` (sin `-race`: sin gcc local), cobertura vigilada ≥ 80 % (total 81,6 %, `assistant/domain` entra a la lista), Vitest, `tsc`, ESLint | Modelo real con OpenRouter (D-08); WAHA; Supabase staging; T4 |
 | 2026-11-04 | Claude (rama `dev/pablo`) | **T2 con el canal local.** Canal de WhatsApp por proveedor (ADR-0025: Meta modular con pruebas contra una Graph API falsa, simulador, `WHATSAPP_PROVIDER`). Arnés de pruebas del circuito completo (simulador → worker → respuesta) que encontró **4 bugs**: aprobar desde WhatsApp fallaba por permisos del worker (migración 00019 + `TestWorkerHasAPIPrivileges`), AU-03 se repetía, tras "Acepto" se perdía la pregunta original, y los envíos fallidos quedaban "enviado" sin reintento. HU-19 constancia con botones (00020), HU-43 siguiente día hábil, HU-24 conversación en la orden, simulador en la web, fuentes del borrador (HU-64, otro bug). e2e con api y worker: 2 recorridos. **Verde:** `go test ./...` (sin `-race`: sin gcc local), cobertura vigilada ≥ 80 % (total 76,9 %), golangci-lint (solo CRLF locales), Vitest 58, `tsc`, ESLint, build, e2e 2/2. Supabase: no se tocó nada (el conector no ve la cuenta de weveh) | WhatsApp real (Meta); Supabase staging; T3 |
 | 2026-11-03 | Claude (rama `dev/pablo`) | **Accesorios fuera** (decisión de Pablo): se quitan el campo de accesorios y los botones de moto de la recepción (carro y moto) y la lista por accesorio de la entrega; lo que deja el cliente va como nota con foto (pista junto a "Nota") y la entrega pide una casilla de revisión. Se quitan `accesorios_devueltos` de la bitácora y `MotoAccessories`. Columna y campo de contrato quedan sin uso, por limpiar (`docs/07`). **Verde:** Go (pruebas y cobertura ≥ 80 %, gofmt), Vitest 53, `tsc`, ESLint, e2e | Limpiar la columna `accesorios` cuando el equipo confirme; T2 |
 | 2026-11-03 | Claude (rama `dev/pablo`) | **Cierre del T1.** CI del PR #8 en verde (modelos sqlc al día, gofmt, errcheck, cobertura de `quotes/app` 84 %). **HU-25:** la entrega lista los accesorios del checklist y pide marcar cada uno; bitácora con `accesorios_devueltos`; prueba HTTP nueva. **HU-18:** accesorios de moto de un toque y "no aplica" solo en moto; prueba HTTP de la recepción de moto. **HU-91:** verificada sin código nuevo. **E2E en CI:** `scripts/e2e.sh` (api sirviendo la SPA, OTP del log) en el job `e2e` y en `make e2e`; el recorrido termina entregando. **HU-23:** PWA con `vite-plugin-pwa` 1.3.0; el api sirve el manifest como `application/manifest+json` y revalida `sw.js`. `npm audit`: 0 altas; 20 moderadas y 2 bajas (antes 13 moderadas), las nuevas son de `workbox-build`, solo en build. **Verde:** `go test ./...` y cobertura ≥ 80 % (sin `-race`: sin gcc local), golangci-lint (solo avisos CRLF locales), Vitest 54, `tsc`, ESLint, build, e2e | T2 (WhatsApp); Q-33 |
@@ -92,21 +94,21 @@
 | HU-48 | Enviar el aviso correcto al cambiar el estado | T2 | sí | 🟦 En curso | #8 | AU-01 y AU-03 salen con datos reales. **Bug corregido (criterio 2):** AU-03 se repetía al volver a Listo; ahora una vez por orden. Falta: reenvío manual del dueño y WhatsApp real |
 | HU-49 | Seguimiento de garantía y garantía por orden | T7 | no | ⬜ Pendiente | | |
 | HU-50 | Recordatorio de técnico-mecánica por tipo de vehículo | — | — | ⛔ Cancelada | | |
-| HU-51 | Escribirle al taller en mis palabras | T3 | sí | ⬜ Pendiente | | |
-| HU-52 | Entender qué pide el cliente | T3 | sí | ⬜ Pendiente | | |
-| HU-53 | Redactar el borrador solo con datos del taller | T3 | sí | ⬜ Pendiente | | |
-| HU-54 | Validar todo lo que sale de la IA | T3 | no | ⬜ Pendiente | | |
-| HU-55 | Crear la orden cuando llega la placa | T3 | sí | ⬜ Pendiente | | |
-| HU-56 | Preguntar "¿ya está mi carro?" o "¿ya está mi moto?" | T3 | sí | ⬜ Pendiente | | |
-| HU-57 | Preguntar cuál vehículo si hay más de uno | T3 | no | ⬜ Pendiente | | |
-| HU-58 | Hablar solo del taller | T3 | no | ⬜ Pendiente | | |
-| HU-59 | Pedir hablar con una persona | T3 | no | ⬜ Pendiente | | |
+| HU-51 | Escribirle al taller en mis palabras | T3 | sí | 🟦 En curso | #8 | Autorización primero; el borrador con precios de la lista queda en "Por revisar" y sale al enviarlo; moto usa precios de moto (`TestAgent_QuoteDraftThenPlateCreatesTheOrder`, `domain_test.go`). Falta: medir el tiempo de 30 s con un modelo real y WhatsApp real |
+| HU-52 | Entender qué pide el cliente | T3 | sí | 🟦 En curso | #8 | Intención, tipo, marca, línea, año, placa, síntoma, servicios y fecha en un JSON validado (ADR-0026). Moto por palabra o modelo; taller que no atiende motos lo dice; lo que no está en la lista queda como "otro". Reglas: 28/30 en el juego de HU-102. Falta: modelo real (D-08) |
+| HU-53 | Redactar el borrador solo con datos del taller | T3 | sí | 🟦 En curso | #8 | El texto lo arma el código con la lista; sin precio dice "el taller te confirma el valor"; `Validate` descarta precios fuera de lista (`domain_test.go`). 0 precios fuera de lista en los 30 mensajes |
+| HU-54 | Validar todo lo que sale de la IA | T3 | no | 🟦 En curso | #8 | Esquema estricto; salida inválida, error del proveedor o 30 s vencidos dejan "Responde tú", registran el resultado y no envían nada (`TestAgent_AIFailuresLeaveTheCardToTheOwner`, pruebas del adaptador). Falta: disyuntor si el proveedor cae seguido |
+| HU-55 | Crear la orden cuando llega la placa | T3 | sí | 🟦 En curso | #8 | Al enviar el borrador de la placa se crean vehículo (motor pendiente) y orden "Por recibir" con el síntoma; placa de moto crea moto; la placa debe venir escrita por el cliente. Falta: fecha deseada en la orden |
+| HU-56 | Preguntar "¿ya está mi carro?" o "¿ya está mi moto?" | T3 | sí | 🟦 En curso | #8 | AU-05 responde al instante con el estado real (plantilla); apagada queda como borrador (`TestAgent_StatusAndWhichVehicle`, `TestAgent_OwnerDecisionsAndStatusOff`). Formas de preguntar de moto en el juego de HU-102. Falta: la última foto marcada para el cliente |
+| HU-57 | Preguntar cuál vehículo si hay más de uno | T3 | no | 🟦 En curso | #8 | Botones con las placas y luego el estado de la escogida; de 4 a 10 el canal de Meta manda una lista y entiende `list_reply` (pruebas del adaptador). Falta: WhatsApp real |
+| HU-58 | Hablar solo del taller | T3 | no | 🟦 En curso | #8 | Lo ajeno queda como borrador "Solo puedo ayudarte…"; el diagnóstico ofrece la revisión con precio de lista (`TestAgent_OffTopicAndDiagnosis`). El prompt trata el texto del cliente como dato |
+| HU-59 | Pedir hablar con una persona | T3 | no | 🟦 En curso | #8 | Mensaje "Te comunico con una persona", alerta en "Pendiente hoy" con enlace, pantalla **Conversaciones** para responder y "Devolver al asistente" (`TestAgent_HumanRequestAndHandBack`, Vitest). Falta: WhatsApp real |
 | HU-60 | Mandar notas de voz | T6 | no | ⬜ Pendiente | | |
 | HU-61 | Respuesta fuera de horario | T6 | no | ⬜ Pendiente | | |
-| HU-62 | Revisar y enviar el borrador | T3 | sí | 🟦 En curso | #8 | Vitest de Por revisar (enviar con texto editado) y e2e: el borrador llega tras la autorización. Falta: T3 |
-| HU-63 | Editar el borrador antes de enviarlo | T3 | no | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
-| HU-64 | Saber de dónde salió cada dato | T3 | no | 🟦 En curso | #8 | **Bug corregido:** mostraba "[object Object]"; contrato y pantalla con {campo, valor, origen}. Falta: T3 |
-| HU-65 | Ver qué tan seguido edito los borradores | T3 | no | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
+| HU-62 | Revisar y enviar el borrador | T3 | sí | 🟦 En curso | #8 | Enviar, Lo contesto yo, Descartar; resuelto una sola vez; nada sale sin pulsar Enviar (pruebas del agente, Vitest, e2e). Falta: WhatsApp real |
+| HU-63 | Editar el borrador antes de enviarlo | T3 | no | 🟦 En curso | #8 | Sale el texto editado y queda "editado_enviado" (`TestAgent_QuoteDraftThenPlateCreatesTheOrder`, Vitest). Falta: WhatsApp real |
+| HU-64 | Saber de dónde salió cada dato | T3 | no | 🟦 En curso | #8 | Fuentes con campo, valor y origen (precio, horario, "otro" que no está en la lista, lo que atiende el taller); probadas de punta a punta |
+| HU-65 | Ver qué tan seguido edito los borradores | T3 | no | 🟦 En curso | #8 | `GET /inbox/stats` cuenta enviados y editados (prueba de punta a punta). Falta: revisar la pantalla con el mockup |
 | HU-66 | Enterarme de que hay algo por revisar | T6 | no | ⬜ Pendiente | | |
 | HU-67 | Auto-envío para respuestas exactas | T7 | no | ⬜ Pendiente | | |
 | HU-68 | Ver órdenes abiertas por estado | T4 | sí | 🟦 En curso | | Backend existente + pantalla (2026-11-02). Falta: pruebas y WhatsApp real |
@@ -140,10 +142,10 @@
 | HU-96 | Traer cuadernos completos y chats viejos | T7 | no | ⬜ Pendiente | | |
 | HU-97 | Reiniciar el taller ficticio entre demos | T5 | sí | ⬜ Pendiente | | |
 | HU-98 | Agregar una moto al taller ficticio | T5 | sí | ⬜ Pendiente | | |
-| HU-99 | Ver costo, tokens y latencia de cada llamada a la IA | T3 | sí | ⬜ Pendiente | | |
+| HU-99 | Ver costo, tokens y latencia de cada llamada a la IA | T3 | sí | 🟦 En curso | #8 | Cada llamada en `llamada_ia` con proveedor, modelo, tokens, costo, latencia, resultado y mensaje (migración 00021); tope mensual con respaldo de reglas. Falta: la vista para el administrador (con HU-40, T4) |
 | HU-100 | Ver el registro técnico de mensajes | T6 | no | ⬜ Pendiente | | |
 | HU-101 | Cambiar del número de prueba al número del taller | T6 | no | ⬜ Pendiente | | |
-| HU-102 | Probar el agente con 30 mensajes reales de estilo | T3 | no | ⬜ Pendiente | | |
+| HU-102 | Probar el agente con 30 mensajes reales de estilo | T3 | no | 🟦 En curso | #8 | Juego de 30 (10 de moto) y `make agent-eval`; con reglas 28/30 servicios y 0 precios fuera de lista (prueba en CI). Falta: medir un modelo real y usar mensajes reales anonimizados |
 | HU-103 | Registrar el diagnóstico en la orden (propuesta de Pablo, 3-nov) | T1 | no | 🟦 En curso | | Tabla `orders.hallazgo` con RLS (migración 00012), `GET/POST/DELETE /orders/{id}/findings`, permiso `order:diagnose` para todos los roles, panel "Diagnóstico" con "Cotizar esto". Pruebas: dominio, HTTP con aislamiento y bitácora, Vitest. Provisional: no bloquea enviar la cotización. Falta: confirmar alcance con Isaac |
 
 ## Bitácora de sesiones (la más reciente arriba)
