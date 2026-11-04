@@ -1625,6 +1625,13 @@ export interface components {
             motivoCancelacion?: string;
             /** Format: date-time */
             cerradaEn?: string | null;
+            /**
+             * @description Respuesta del cliente a la constancia de recibo por WhatsApp (HU-19)
+             * @enum {string|null}
+             */
+            constancia?: "conforme" | "observado" | null;
+            /** Format: date-time */
+            constanciaEn?: string | null;
             vehiculo?: {
                 /** Format: uuid */
                 id: string;

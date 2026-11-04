@@ -182,6 +182,10 @@ func (t *taller) RespondQuote(ctx context.Context, tallerID, orderID shared.ID, 
 	return t.s.M.QuotesF.Respond(ctx, tallerID, orderID, decision, "whatsapp", ref, agent)
 }
 
+func (t *taller) AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, ok bool, ref string) (bool, error) {
+	return t.s.M.OrdersF.AnswerReceipt(ctx, tallerID, orderID, agent, ok, ref)
+}
+
 // CreateOrderFromPlate crea vehículo (motor pendiente) y orden "Por recibir" (HU-55, HU-91).
 func (t *taller) CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string) (string, error) {
 	var code string

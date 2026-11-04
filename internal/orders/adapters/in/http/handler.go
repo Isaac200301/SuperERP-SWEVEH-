@@ -87,6 +87,9 @@ type orderDTO struct {
 	RecogidoPor    string     `json:"recogidoPor,omitempty"`
 	MotivoCancel   string     `json:"motivoCancelacion,omitempty"`
 	CerradaEn      *time.Time `json:"cerradaEn"`
+	// Respuesta del cliente a la constancia de recibo (HU-19): conforme u observado.
+	Constancia   *string    `json:"constancia"`
+	ConstanciaEn *time.Time `json:"constanciaEn"`
 }
 
 func toDTO(v app.OrderView) orderDTO {
@@ -94,7 +97,10 @@ func toDTO(v app.OrderView) orderDTO {
 	d := orderDTO{
 		ID: o.ID.String(), Numero: o.Number, Codigo: o.Code(), Placa: o.Plate, Estado: string(o.State),
 		Sintoma: o.Symptom, Version: o.Version, CreadoEn: o.CreatedAt, FechaPrometida: o.PromisedAt, Ejemplo: o.Example,
-		RecogidoPor: o.PickedUpBy, MotivoCancel: o.CancelReason, CerradaEn: o.ClosedAt,
+		RecogidoPor: o.PickedUpBy, MotivoCancel: o.CancelReason, CerradaEn: o.ClosedAt, ConstanciaEn: o.ReceiptAnsweredAt,
+	}
+	if o.ReceiptAnswer != "" {
+		d.Constancia = &o.ReceiptAnswer
 	}
 	if o.MechanicID != nil {
 		s := o.MechanicID.String()

@@ -48,6 +48,11 @@ func (o Orders) Move(ctx context.Context, tallerID, id shared.ID, to string, act
 }
 
 // OpenByVehicle devuelve las órdenes abiertas de un vehículo (agente, búsqueda).
+// AnswerReceipt registra "Está bien" (ok) o "Algo no cuadra" a la constancia de recibo (HU-19).
+func (o Orders) AnswerReceipt(ctx context.Context, tallerID, id shared.ID, actor shared.Actor, ok bool, ref string) (bool, error) {
+	return o.flow.AnswerReceipt(ctx, tallerID, id, actor, ok, ref)
+}
+
 func (o Orders) OpenByVehicle(ctx context.Context, tallerID, vehicleID shared.ID) ([]Summary, error) {
 	views, err := o.flow.ListIn(ctx, tallerID, &vehicleID, true)
 	out := make([]Summary, 0, len(views))
@@ -65,10 +70,31 @@ type Info struct {
 	Exceptions  []string
 	Accessories []string
 	StateSince  time.Time
+	// Receipt es la respuesta a la constancia: "", conforme u observado (HU-19).
+	Receipt string
 }
 
 func info(i app.Info) Info {
-	return Info{Summary: summary(i.Order), Vehicle: i.Vehicle, Km: i.Km, Exceptions: i.Exceptions, Accessories: i.Accessories, StateSince: i.StateSince}
+	return Info{Summary: summary(i.Order), Vehicle: i.Vehicle, Km: i.Km, Exceptions: i.Exceptions, Accessories: i.Accessories,
+		StateSince: i.StateSince, Receipt: i.Order.ReceiptAnswer}
+}
+
+// ObservedReceipts son las órdenes abiertas cuyo cliente dijo "Algo no cuadra" en la constancia (HU-19).
+func (o Orders) ObservedReceipts(ctx context.Context, tallerID shared.ID) ([]Info, error) {
+	var out []Info
+	for _, st := range []domain.State{domain.StateReceived, domain.StateDiagnosis, domain.StateAwaitingOK, domain.StateRepair,
+		domain.StateAwaitingParts, domain.StateQuality, domain.StateReady} {
+		list, err := o.InState(ctx, tallerID, string(st))
+		if err != nil {
+			return nil, err
+		}
+		for _, i := range list {
+			if i.Receipt == domain.ReceiptObserved {
+				out = append(out, i)
+			}
+		}
+	}
+	return out, nil
 }
 
 func (o Orders) Info(ctx context.Context, tallerID, id shared.ID) (Info, error) {

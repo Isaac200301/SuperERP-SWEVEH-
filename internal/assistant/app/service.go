@@ -30,6 +30,8 @@ type Taller interface {
 	StatusReply(ctx context.Context, tallerID shared.ID, o Order, c Customer) (string, bool, error) // texto, AU-05 encendida
 	AgentOn(ctx context.Context, tallerID shared.ID) (bool, error)
 	RespondQuote(ctx context.Context, tallerID, orderID shared.ID, decision, ref string) error
+	// AnswerReceipt guarda "Está bien" (ok) o "Algo no cuadra" de la constancia; false si ya había respuesta.
+	AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, ok bool, ref string) (bool, error)
 	CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string) (string, error)
 
 	Catalog(ctx context.Context, tallerID shared.ID) ([]domain.Priced, []domain.Priced, error) // servicios, repuestos
@@ -142,6 +144,8 @@ const (
 	quoteOK     = "¡Listo! Quedó aprobada la cotización. Empezamos con tu vehículo y te avisamos cuando esté."
 	quoteAsk    = "Claro, una persona del taller te escribe para resolver tus dudas sobre la cotización."
 	whichText   = "¿Sobre cuál vehículo me preguntas?"
+	receiptOK   = "¡Gracias! Quedó registrado que el recibo está bien. Te avisamos cada avance."
+	receiptAsk  = "Gracias por avisarnos. Una persona del taller te escribe para revisarlo contigo."
 )
 
 // HandleInbound procesa un mensaje entrante (lo llama el worker al recibir "messaging.mensaje_recibido").
@@ -235,6 +239,8 @@ func (s *Service) button(ctx context.Context, tallerID shared.ID, in Inbound, c 
 		}
 		_, err = s.taller.Send(ctx, tallerID, in.Phone, reply, nil, "AU-02", &oid)
 		return err
+	case strings.HasPrefix(in.ButtonID, "recibo:ok:") || strings.HasPrefix(in.ButtonID, "recibo:revisar:"):
+		return s.receipt(ctx, tallerID, in, c)
 	case strings.HasPrefix(in.ButtonID, "estado:"):
 		oid, err := shared.ParseID(strings.TrimPrefix(in.ButtonID, "estado:"))
 		if err != nil || c == nil {
@@ -249,6 +255,29 @@ func (s *Service) button(ctx context.Context, tallerID shared.ID, in Inbound, c 
 		return s.human(ctx, tallerID, in)
 	}
 	return nil
+}
+
+// receipt registra la respuesta a la constancia (HU-19). "Algo no cuadra" pasa la conversación a una persona y la
+// orden queda marcada para el dueño. Si el cliente ya había respondido, no se repite nada.
+func (s *Service) receipt(ctx context.Context, tallerID shared.ID, in Inbound, c *Customer) error {
+	ok := strings.HasPrefix(in.ButtonID, "recibo:ok:")
+	oid, err := shared.ParseID(in.ButtonID[strings.LastIndex(in.ButtonID, ":")+1:])
+	if err != nil || c == nil {
+		return nil
+	}
+	changed, err := s.taller.AnswerReceipt(ctx, tallerID, oid, ok, in.ID.String())
+	if err != nil || !changed {
+		return err
+	}
+	reply := receiptOK
+	if !ok {
+		reply = receiptAsk
+		if err := s.taller.SetMode(ctx, tallerID, in.ConversationID, "humano", true); err != nil {
+			return err
+		}
+	}
+	_, err = s.taller.Send(ctx, tallerID, in.Phone, reply, nil, "AU-01", &oid)
+	return err
 }
 
 func (s *Service) human(ctx context.Context, tallerID shared.ID, in Inbound) error {

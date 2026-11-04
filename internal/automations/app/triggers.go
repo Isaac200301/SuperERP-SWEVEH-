@@ -98,7 +98,9 @@ func (s *Service) OnStateChanged(ctx context.Context, tallerID, orderID shared.I
 			if len(o.Exceptions) > 0 {
 				d["salvedades"] = "Anotamos: " + strings.Join(o.Exceptions, "; ") + ". "
 			}
-			return domain.Render(t, d), nil, nil
+			// HU-19: el cliente confirma la constancia o avisa que algo no cuadra (máx. 20 caracteres, DR-08).
+			id := orderID.String()
+			return domain.Render(t, d), []Button{{ID: "recibo:ok:" + id, Title: "Está bien"}, {ID: "recibo:revisar:" + id, Title: "Algo no cuadra"}}, nil
 		})
 	case "listo":
 		return s.fire(ctx, tallerID, "AU-03", key, o, func(w Workshop, c Customer, t string) (string, []Button, error) {

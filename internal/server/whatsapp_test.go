@@ -377,3 +377,47 @@ func TestWhatsApp_WebhookSignature(t *testing.T) {
 		t.Fatalf("token malo: %d", s)
 	}
 }
+
+// HU-19: la constancia (AU-01) trae "Está bien" / "Algo no cuadra". "Está bien" guarda la aceptación con fecha y
+// hora; la primera respuesta manda. "Algo no cuadra" marca la orden, pasa a una persona y alerta al dueño.
+func TestWhatsApp_ReceiptConfirmation(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550450", "Pablo Rodríguez")
+	w := e.whatsapp(t, owner, nil)
+	cid := w.customer("3001234450", "Laura Gómez")
+
+	id, _ := w.orderFor(cid, "REC450")
+	w.move(id, "recibido", nil)
+	au1 := w.sentBy("3001234450", "AU-01")
+	if len(au1) != 1 || !hasPrefix(buttons(au1[0]), "recibo:ok:"+id) || !hasPrefix(buttons(au1[0]), "recibo:revisar:"+id) {
+		t.Fatalf("constancia con botones: %v", au1)
+	}
+	w.press("3001234450", "Laura Gómez", "recibo:ok:"+id, "Está bien")
+	o := owner.must(http.StatusOK, owner.do("GET", "/api/v1/orders/"+id, nil)).body
+	if o["constancia"] != "conforme" || o["constanciaEn"] == nil || !strings.Contains(w.last("3001234450")["cuerpo"].(string), "recibo está bien") {
+		t.Fatalf("conforme: %v %v", o["constancia"], w.last("3001234450"))
+	}
+	n := len(w.sent("3001234450"))
+	w.press("3001234450", "Laura Gómez", "recibo:revisar:"+id, "Algo no cuadra") // cambia de opinión: no cambia nada
+	if o := owner.must(http.StatusOK, owner.do("GET", "/api/v1/orders/"+id, nil)).body; o["constancia"] != "conforme" || len(w.sent("3001234450")) != n {
+		t.Fatalf("la primera respuesta manda: %v", o["constancia"])
+	}
+
+	id2, _ := w.orderFor(cid, "REC451")
+	w.move(id2, "recibido", nil)
+	w.press("3001234450", "Laura Gómez", "recibo:revisar:"+id2, "Algo no cuadra")
+	conv, _ := w.conversation("3001234450")
+	o2 := owner.must(http.StatusOK, owner.do("GET", "/api/v1/orders/"+id2, nil)).body
+	if o2["constancia"] != "observado" || conv["modo"] != "humano" || !strings.Contains(w.last("3001234450")["cuerpo"].(string), "Una persona del taller") {
+		t.Fatalf("observado: %v %v %v", o2["constancia"], conv["modo"], w.last("3001234450"))
+	}
+	alert := false
+	for _, p := range owner.must(http.StatusOK, owner.do("GET", "/api/v1/today", nil)).body["pendientes"].([]any) {
+		if m := p.(map[string]any); m["tipo"] == "constancia_observada" && m["ordenId"] == id2 {
+			alert = true
+		}
+	}
+	if !alert {
+		t.Fatal("el dueño no ve la alerta de la constancia observada")
+	}
+}

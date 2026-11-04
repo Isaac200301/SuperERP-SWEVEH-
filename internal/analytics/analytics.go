@@ -247,6 +247,15 @@ func (h *Handler) today(r *http.Request, p reqctx.Principal) (int, any, error) {
 				out = append(out, Pending{Kind: "borradores", Title: fmt.Sprintf("%d borradores por revisar", n), Detail: "Respuestas del agente esperando tu revisión", Tone: "info"})
 			}
 		}
+		observed, err := h.orders.ObservedReceipts(ctx, p.TallerID)
+		if err != nil {
+			return err
+		}
+		for _, o := range observed {
+			id := o.ID.String()
+			out = append(out, Pending{Kind: "constancia_observada", Title: fmt.Sprintf("%s: el cliente dice que algo no cuadra", o.Plate),
+				Detail: fmt.Sprintf("%s · revisa el recibo con el cliente", o.Code), OrderID: &id, Tone: "err"})
+		}
 		failed, err := h.extra.FailedNotices(ctx, p.TallerID, now.AddDate(0, 0, -7))
 		if err != nil {
 			return err
