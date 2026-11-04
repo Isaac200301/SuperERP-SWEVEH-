@@ -606,6 +606,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/services/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pasar la lista de precios con una foto (HU-93, ADR-0032): la IA lee la foto y cada fila queda por revisar; nada se vuelve servicio sin aprobación. JPG, PNG o WebP hasta 8 MB. Sin IA responde 422 lista_sin_ia. Permiso service:manage */
+        post: operations["importPriceListPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Filas de la lista de precios por revisar (HU-93); ?todas=1 incluye las resueltas. Permiso service:manage */
+        get: operations["listPriceListProposals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/proposals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Aprobar (con las correcciones del dueño: crea el servicio) o descartar una fila (HU-93). Permiso service:manage */
+        post: operations["resolvePriceListProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/proposals/{id}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La foto de la lista de esa fila, para verla al lado (HU-93). Permiso service:manage */
+        get: operations["getPriceListProposalPhoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/services/{id}": {
         parameters: {
             query?: never;
@@ -1536,6 +1604,25 @@ export interface components {
             ordenAbiertaId: string | null;
             ordenAbierta: string | null;
             estadoOrden: components["schemas"]["EstadoOrden"] | null;
+        };
+        /** @description Una fila leída de la foto de la lista de precios (HU-93) */
+        PropuestaServicio: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Las filas de la misma foto comparten lote
+             */
+            loteId: string;
+            nombre: string;
+            /** Format: int64 */
+            precio: number | null;
+            /** @enum {string} */
+            tipoVehiculo: "carro" | "moto" | "ambos";
+            /** @enum {string} */
+            estado: "pendiente" | "aprobada" | "descartada";
+            /** Format: uuid */
+            servicioId: string | null;
         };
         Servicio: {
             /** Format: uuid */
@@ -3141,6 +3228,121 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+        };
+    };
+    importPriceListPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    foto: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Filas leídas, por revisar */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        propuestas: components["schemas"]["PropuestaServicio"][];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listPriceListProposals: {
+        parameters: {
+            query?: {
+                todas?: "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        propuestas: components["schemas"]["PropuestaServicio"][];
+                    };
+                };
+            };
+        };
+    };
+    resolvePriceListProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "aprobar" | "descartar";
+                    nombre?: string;
+                    /** Format: int64 */
+                    precio?: number | null;
+                    /** @enum {string} */
+                    tipoVehiculo?: "carro" | "moto" | "ambos";
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropuestaServicio"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getPriceListProposalPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La imagen */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            404: components["responses"]["Problem"];
         };
     };
     deleteService: {

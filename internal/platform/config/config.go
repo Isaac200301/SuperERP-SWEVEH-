@@ -84,6 +84,8 @@ type AI struct {
 	Model              string
 	APIBase            string
 	MonthlyCapMicroUSD int64
+	// VisionModel lee la foto de la lista de precios (HU-93, ADR-0032): uno o varios modelos con imagen, por coma.
+	VisionModel string
 }
 
 // Worker es la configuración del proceso worker.
@@ -126,7 +128,8 @@ func engine(env Env, errs *[]error) (WhatsApp, AI) {
 
 func aiConfig(env Env, errs *[]error) AI {
 	ai := AI{Provider: get("AI_PROVIDER", "reglas"), APIKey: os.Getenv("AI_API_KEY"), Model: os.Getenv("AI_MODEL"),
-		APIBase: get("AI_API_BASE", "https://openrouter.ai/api/v1"), MonthlyCapMicroUSD: int64(getInt("AI_MONTHLY_CAP_MICRO_USD", 5_000_000, errs))}
+		APIBase: get("AI_API_BASE", "https://openrouter.ai/api/v1"), MonthlyCapMicroUSD: int64(getInt("AI_MONTHLY_CAP_MICRO_USD", 5_000_000, errs)),
+		VisionModel: get("AI_VISION_MODEL", "google/gemma-4-31b-it:free,nvidia/nemotron-3.5-super-vl:free")}
 	switch {
 	case ai.Provider != "reglas" && ai.Provider != "openrouter":
 		*errs = append(*errs, fmt.Errorf("AI_PROVIDER=%q no es un proveedor conocido (reglas, openrouter)", ai.Provider))

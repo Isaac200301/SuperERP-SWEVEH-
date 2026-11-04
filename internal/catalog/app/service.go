@@ -34,6 +34,11 @@ type Service struct {
 	repo  Repository
 	audit AuditLog
 	clock Clock
+
+	// Lista de precios por foto (HU-93); nil = no configurada.
+	reader    PriceListReader
+	photos    PhotoStore
+	proposals ProposalRepository
 }
 
 func NewService(uow UnitOfWork, r Repository, a AuditLog, c Clock) *Service {

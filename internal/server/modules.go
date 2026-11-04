@@ -6,6 +6,7 @@ import (
 
 	"sweveh/internal/audit"
 	"sweveh/internal/catalog"
+	catalogphotos "sweveh/internal/catalog/adapters/out/photos"
 	catalogpg "sweveh/internal/catalog/adapters/out/postgres"
 	catalogapp "sweveh/internal/catalog/app"
 	"sweveh/internal/customers"
@@ -72,6 +73,7 @@ func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger
 	m := &Modules{Tx: tx, Audit: audit.NewLog(), Events: outbox.NewPublisher(), Clock: clk, Log: log}
 	m.Workshops = tenancy.NewWorkshops(tenancypg.NewRepository(), m.Audit)
 	m.Catalog = catalogapp.NewService(tx, catalogpg.Repository{}, m.Audit, clk)
+	m.Catalog.SetPriceList(catalogphotos.New(st), catalogpg.Proposals{}) // HU-93; el lector lo pone wire si hay IA
 	m.CatalogF = catalog.New(m.Catalog)
 	m.Admin = tenancy.NewAdmin(tx, m.CatalogF, m.Audit, clk)
 

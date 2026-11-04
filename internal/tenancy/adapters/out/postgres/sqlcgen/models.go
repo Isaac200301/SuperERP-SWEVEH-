@@ -86,6 +86,22 @@ type AutomationRegla struct {
 	UpdatedAt time.Time
 }
 
+type CatalogPropuestum struct {
+	ID           uuid.UUID
+	TallerID     uuid.UUID
+	LoteID       uuid.UUID
+	FotoClave    string
+	FotoTipo     string
+	Nombre       string
+	Precio       *int64
+	TipoVehiculo string
+	Estado       string
+	ServicioID   *uuid.UUID
+	CreatedAt    time.Time
+	ResueltoEn   *time.Time
+	ResueltoPor  *uuid.UUID
+}
+
 type CatalogServicio struct {
 	ID           uuid.UUID
 	TallerID     uuid.UUID

@@ -11,6 +11,7 @@ import (
 	assistantapp "sweveh/internal/assistant/app"
 	automationspg "sweveh/internal/automations/adapters/out/postgres"
 	automationsapp "sweveh/internal/automations/app"
+	"sweveh/internal/catalog/adapters/out/vision"
 	messagingpg "sweveh/internal/messaging/adapters/out/postgres"
 	"sweveh/internal/messaging/adapters/out/whatsapp"
 	"sweveh/internal/messaging/adapters/out/whatsapp/local"
@@ -34,6 +35,8 @@ func Build(m *server.Modules, wa config.WhatsApp, ai config.AI) *Services {
 	s := BuildWith(m, Channel(wa), Interpreter(ai), ai)
 	if ai.Provider == "openrouter" { // el asesor con tools necesita un modelo; con reglas queda el flujo de plantillas
 		s.Assistant.SetAdvisor(openrouter.New(ai.APIBase, ai.APIKey, ai.Model, 20*time.Second))
+		// HU-93: la lista de precios por foto se lee con un modelo de visión (ADR-0032).
+		m.Catalog.SetPriceReader(vision.New(ai.APIBase, ai.APIKey, ai.VisionModel, 60*time.Second))
 	}
 	return s
 }
