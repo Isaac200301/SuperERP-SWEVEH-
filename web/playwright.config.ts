@@ -1,8 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Recorrido en navegador real contra el entorno local (`make dev`: api en :8080 con OTP_SENDER=consola y Vite en
- * :5173). No corre en el CI todavía (docs/07). El código del registro se lee del log del api: SWEVEH_API_LOG.
+ * Recorrido en navegador real. `make e2e` (y el job e2e del CI) compila la web, levanta el api sirviendo la SPA con
+ * OTP_SENDER=consola y define SWEVEH_WEB_URL y SWEVEH_API_LOG (scripts/e2e.sh). Contra `make dev` también sirve:
+ * Vite en :5173 y SWEVEH_API_LOG apuntando al log de `go run ./cmd/api`.
  */
 export default defineConfig({
   testDir: './e2e',

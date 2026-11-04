@@ -80,8 +80,8 @@ build: ## Compila los binarios y el frontend
 image: ## Construye la imagen de contenedor
 	docker build -f deploy/Dockerfile -t sweveh:local .
 
-e2e: ## Playwright (pendiente: llega con el recorrido de la demo, T5)
-	@echo "make e2e todavía no existe: las pruebas Playwright llegan con el guion de la demo (docs/05, T5)." >&2; exit 1
+e2e: migrate ## Playwright: la orden de punta a punta con el api sirviendo la SPA (scripts/e2e.sh)
+	sh scripts/e2e.sh
 
 seed-demo: ## Taller ficticio (pendiente: HU-97/HU-98)
 	@echo "make seed-demo todavía no existe: llega con HU-97 y HU-98 (T5)." >&2; exit 1
