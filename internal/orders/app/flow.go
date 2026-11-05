@@ -27,7 +27,16 @@ type Flow struct {
 	clock    ports.Clock
 	stats    Stats
 	settings ports.SettingsReader
+	parts    PartsReturner // HU-26: al cancelar vuelven a bodega los repuestos descontados
 }
+
+// PartsReturner devuelve a bodega lo que una orden descontó y no se usó (fachada de inventory).
+type PartsReturner interface {
+	ReturnAll(ctx context.Context, tallerID, orderID shared.ID, by shared.Actor) (int, error)
+}
+
+// SetPartsReturner conecta la devolución de repuestos al cancelar (composition root).
+func (f *Flow) SetPartsReturner(p PartsReturner) { f.parts = p }
 
 // SetSettings conecta los parámetros del taller (tenancy). Sin lector se usan los valores por defecto.
 func (f *Flow) SetSettings(r ports.SettingsReader) { f.settings = r }
@@ -184,7 +193,15 @@ func (f *Flow) Cancel(ctx context.Context, tallerID, orderID shared.ID, actor sh
 		if err != nil {
 			return err
 		}
-		return f.persistMove(ctx, &o, prev, pv, actor, reason, &out)
+		if err := f.persistMove(ctx, &o, prev, pv, actor, reason, &out); err != nil {
+			return err
+		}
+		if f.parts == nil {
+			return nil
+		}
+		// HU-26: si ya se había aprobado y descontado, los repuestos vuelven a bodega con su movimiento.
+		_, err = f.parts.ReturnAll(ctx, tallerID, orderID, actor)
+		return err
 	})
 	return out, err
 }
@@ -205,6 +222,27 @@ func (f *Flow) Assign(ctx context.Context, tallerID, orderID shared.ID, actor sh
 		out = o
 		return f.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "orden.asignar", Entity: "orden", EntityID: o.ID,
 			Before: before, After: map[string]any{"mecanico_id": mechanic, "fecha_prometida": promised}, OccurredAt: f.clock.Now()})
+	})
+	return out, err
+}
+
+// SetPromise cambia solo la fecha prometida, sin tocar el mecánico. En una orden "Por recibir" es la fecha de la cita:
+// la agenda el asesor de WhatsApp (ADR-0029) y AU-06 recuerda al cliente ese día.
+func (f *Flow) SetPromise(ctx context.Context, tallerID, orderID shared.ID, actor shared.Actor, when *time.Time) (domain.Order, error) {
+	var out domain.Order
+	err := f.uow.Do(ctx, func(ctx context.Context) error {
+		o, err := f.repo.Load(ctx, tallerID, orderID)
+		if err != nil {
+			return err
+		}
+		before := o.PromisedAt
+		o.PromisedAt = when
+		if err := f.repo.SaveAssignment(ctx, o); err != nil {
+			return err
+		}
+		out = o
+		return f.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "orden.reagendar", Entity: "orden", EntityID: o.ID,
+			Before: map[string]any{"fecha_prometida": before}, After: map[string]any{"fecha_prometida": when}, OccurredAt: f.clock.Now()})
 	})
 	return out, err
 }
@@ -564,4 +602,39 @@ func mergeItems(base, in []domain.ItemCheck) []domain.ItemCheck {
 		out = append(out, b)
 	}
 	return out
+}
+
+// MoveCustomer pasa las órdenes del cliente repetido al que se conserva (HU-15): el historial de la persona queda
+// junto. Corre en la transacción de la unión; la bitácora la escribe customers.
+func (f *Flow) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	var n int
+	err := f.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = f.repo.MoveCustomer(ctx, tallerID, from, to)
+		return err
+	})
+	return n, err
+}
+
+// AnonymizeCustomer quita de las órdenes lo que identifica al titular (HU-87): la placa (la nueva del vehículo) y el
+// nombre de quien recogió. Las órdenes, sus estados y montos se conservan.
+func (f *Flow) AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID, plates map[shared.ID]string) (int, error) {
+	var n int
+	err := f.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = f.repo.AnonymizeCustomer(ctx, tallerID, customerID, plates)
+		return err
+	})
+	return n, err
+}
+
+// ByCustomer son todas las órdenes del cliente, la más reciente primero (copia de sus datos, HU-87).
+func (f *Flow) ByCustomer(ctx context.Context, tallerID, customerID shared.ID) ([]domain.Order, error) {
+	var out []domain.Order
+	err := f.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = f.repo.ByCustomer(ctx, tallerID, customerID)
+		return err
+	})
+	return out, err
 }

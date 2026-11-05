@@ -46,6 +46,10 @@ type Part struct {
 	Category string
 	Location string
 	OEM      string // referencia original o equivalente, para buscar al cotizar
+
+	Showcase  bool   // el asesor de WhatsApp lo ofrece (vitrina, ADR-0029)
+	PhotoKey  string // foto en el almacenamiento; "" = sin foto
+	PhotoType string
 }
 
 // LowStock indica si está en el mínimo o por debajo (HU-36).

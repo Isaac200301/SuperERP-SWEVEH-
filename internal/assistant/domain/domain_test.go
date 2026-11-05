@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func price(v int64) *int64 { return &v }
@@ -175,4 +176,103 @@ func mustJSON(t *testing.T, v any) []byte {
 		t.Fatal(err)
 	}
 	return b
+}
+
+func TestGreetSkipsPlaceholderNames(t *testing.T) {
+	for name, want := range map[string]string{"Laura Gómez": "¡Hola Laura!", "Cliente de prueba": "¡Hola!", "Cliente WhatsApp": "¡Hola!",
+		"": "¡Hola!", "J": "¡Hola!", "+573001234567": "¡Hola!"} {
+		if got := Greet("¡Hola", name); got != want {
+			t.Errorf("Greet(%q) = %q; quiero %q", name, got, want)
+		}
+	}
+}
+
+// "hola" se responde con lo que hace el asistente; lo que no se entiende no pide la placa.
+func TestBuildDraft_GreetingAndUnknown(t *testing.T) {
+	d := BuildDraft(DraftInput{CustomerName: "Laura Gómez", Workshop: "Taller El Pistón", Intent: Intent{Kind: "saludo"}})
+	if !strings.Contains(d.Text, "¡Hola Laura! Te escribe el asistente de Taller El Pistón") || strings.Contains(d.Text, "placa") {
+		t.Fatalf("saludo: %q", d.Text)
+	}
+	d = BuildDraft(DraftInput{Intent: Intent{Kind: "otro"}})
+	if !strings.Contains(d.Text, "no te entendí") || strings.Contains(d.Text, "placa") {
+		t.Fatalf("otro: %q", d.Text)
+	}
+}
+
+// ADR-0029: el texto del asesor solo puede decir precios que trajo una tool, sin enlaces y corto.
+func TestGuard(t *testing.T) {
+	quoted := map[int64]bool{45000: true, 32000: true}
+	for text, ok := range map[string]bool{
+		"El cambio de aceite cuesta $45.000 y el aceite $32000.": true,
+		"Te sale en $39.000.":              false,
+		"Mira www.otrotaller.com":          false,
+		"Escríbenos a https://wa.me/57300": false,
+		"":                                 false,
+		strings.Repeat("a", MaxReply+1):    false,
+		"¡Hola! ¿En qué te ayudo con tu vehículo?": true,
+	} {
+		if err := Guard(text, quoted); (err == nil) != ok {
+			t.Errorf("Guard(%.40q) = %v; ok esperado %v", text, err, ok)
+		}
+	}
+}
+
+func TestTidy(t *testing.T) {
+	got := Tidy("## Precio\n\nEl **cambio de aceite** cuesta $45.000.\n\n\n\n¿Te agendo?")
+	if want := "Precio\n\nEl *cambio de aceite* cuesta $45.000.\n\n¿Te agendo?"; got != want {
+		t.Fatalf("Tidy = %q; quiero %q", got, want)
+	}
+}
+
+func TestPromisesPerson(t *testing.T) {
+	for text, want := range map[string]bool{
+		"Una persona del taller te va a escribir ya para darte el detalle.": true,
+		"Una persona del taller le escribe en cuanto pueda.":                true,
+		"El jefe de taller te llama hoy.":                                   true,
+		"¿Quieres que te pase con una persona del taller?":                  false,
+		"El cambio de aceite cuesta $45.000.":                               false,
+	} {
+		if got := PromisesPerson(text); got != want {
+			t.Errorf("PromisesPerson(%q) = %v", text, got)
+		}
+	}
+}
+
+// ADR-0029: agendar solo crea la cita si el último mensaje del cliente dice que sí.
+func TestIsAffirmative(t *testing.T) {
+	for text, want := range map[string]bool{"sí": true, "Si, confirmo": true, "dale, el lunes": true, "¡Listo!": true, "ok": true,
+		"De acuerdo.": true, "agéndame la KMX123": false, "el sábado a las 9": false, "sinceramente no": false, "no": false,
+		"va a ir mi hermano": false} {
+		if got := IsAffirmative(text); got != want {
+			t.Errorf("IsAffirmative(%q) = %v", text, got)
+		}
+	}
+}
+
+// ADR-0029: la cita se arma en hora de Colombia y no puede quedar en el pasado ni a más de 30 días.
+func TestParseWhen(t *testing.T) {
+	now := time.Date(2026, 11, 4, 14, 20, 0, 0, Bogota) // miércoles
+	got, err := ParseWhen("2026-11-07", "09:00", now)
+	if err != nil || !got.Equal(time.Date(2026, 11, 7, 9, 0, 0, 0, Bogota)) {
+		t.Fatalf("sábado 9:00: %v %v", got, err)
+	}
+	for _, tc := range []struct {
+		d, h string
+		want error
+	}{
+		{"2026-11-04", "08:00", ErrWhenPast}, {"2026-12-20", "09:00", ErrWhenFar}, {"7/11/2026", "9am", ErrWhenFormat},
+	} {
+		if _, err := ParseWhen(tc.d, tc.h, now); !errors.Is(err, tc.want) {
+			t.Errorf("%s %s: %v", tc.d, tc.h, err)
+		}
+	}
+	if s := FormatWhen(got); s != "sábado 7 de noviembre, 9:00 a. m." {
+		t.Errorf("FormatWhen = %q", s)
+	}
+	if s := FormatToday(now); s != "miércoles 4 de noviembre de 2026, 2:20 p. m." {
+		t.Errorf("FormatToday = %q", s)
+	}
+	if s := Clock12(time.Date(2026, 1, 1, 0, 5, 0, 0, Bogota)); s != "12:05 a. m." {
+		t.Errorf("Clock12 = %q", s)
+	}
 }

@@ -27,6 +27,16 @@ describe('Thread (HU-24)', () => {
     expect(screen.getByText(/No se entregó/)).toBeInTheDocument();
     expect(screen.getByText(/código 131026/)).toBeInTheDocument();
   });
+
+  it('ADR-0029: muestra la foto de la vitrina que envió el asesor', () => {
+    renderPage(<Thread mensajes={[msg({ tipo: 'imagen', origen: 'agente', cuerpo: 'Aceite 20W50 · $32.000', payload: { imagen: 'repuesto:p1' } })]} />);
+    expect(screen.getByAltText('Aceite 20W50 · $32.000')).toHaveAttribute('src', '/api/v1/parts/p1/photo');
+  });
+
+  it('HU-56: muestra la foto de la orden que acompaña el estado', () => {
+    renderPage(<Thread mensajes={[msg({ tipo: 'imagen', origen: 'agente', cuerpo: 'Así va tu Renault Logan ABC123', payload: { imagen: 'evidencia:o1:e1' } })]} />);
+    expect(screen.getByAltText('Así va tu Renault Logan ABC123')).toHaveAttribute('src', '/api/v1/orders/o1/evidence/e1/file');
+  });
 });
 
 describe('OrderMessages (HU-24)', () => {
@@ -74,5 +84,17 @@ describe('SimulatorPage', () => {
     await userEvent.type(cel, '12345');
     expect(screen.getByText(/10 dígitos/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Enviar' })).toBeDisabled();
+  });
+});
+
+describe('Thread (HU-60)', () => {
+  it('muestra la nota de voz con su reproductor y la transcripción', () => {
+    renderPage(
+      <Thread conversacionId="c1" mensajes={[{ id: 'm1', direccion: 'entrante', tipo: 'audio', cuerpo: 'Hola, ¿tienen cupo mañana?', estado: 'recibido',
+        origen: 'cliente', creadoEn: '2026-11-05T15:00:00Z' } as Mensaje]} />,
+    );
+    expect(screen.getByText('Hola, ¿tienen cupo mañana?')).toBeInTheDocument();
+    expect(screen.getByText('Nota de voz · transcripción')).toBeInTheDocument();
+    expect(screen.getByLabelText('Escuchar la nota de voz')).toHaveAttribute('src', '/api/v1/conversations/c1/messages/m1/audio');
   });
 });

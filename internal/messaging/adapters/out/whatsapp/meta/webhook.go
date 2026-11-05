@@ -96,6 +96,10 @@ type message struct {
 		Payload string `json:"payload"`
 		Text    string `json:"text"`
 	} `json:"button"`
+	Audio struct { // nota de voz: se descarga por su id (HU-60)
+		ID       string `json:"id"`
+		MimeType string `json:"mime_type"`
+	} `json:"audio"`
 }
 
 var states = map[string]string{"sent": "enviado", "delivered": "entregado", "read": "leido", "failed": "fallido"}
@@ -145,7 +149,7 @@ func inbound(pnid, name string, m message) (app.Inbound, bool) {
 	case "button":
 		in.Kind, in.ButtonID, in.Text = "respuesta_boton", m.Button.Payload, m.Button.Text
 	case "audio":
-		in.Kind = "audio"
+		in.Kind, in.Media, in.Mime = "audio", m.Audio.ID, m.Audio.MimeType
 	case "image":
 		in.Kind = "imagen"
 	default:

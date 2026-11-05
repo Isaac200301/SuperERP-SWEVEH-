@@ -101,4 +101,25 @@ describe('ServicesPage (HU-07)', () => {
     await waitFor(() => expect(calls.some((c) => c.method === 'PATCH')).toBe(true));
     expect(body(calls, 'POST', '/services')).toEqual({ nombre: 'Cambio de aceite', tipoVehiculo: 'ambos', precio: 80000, categoria: 'lubricantes', garantiaDias: 15 });
   });
+
+  it('ADR-0029: marca el repuesto para la vitrina de WhatsApp y sube su foto', async () => {
+    const calls = mockApi({
+      'GET /me': dueno,
+      'GET /parts': { repuestos: [{ ...pastillas, ofrecerWhatsapp: true, tieneFoto: false }] },
+      'PATCH /parts/{id}': pastillas,
+      'PUT /parts/{id}/photo': { ...pastillas, tieneFoto: true },
+      'GET /parts/{id}/movements': { movimientos: [] },
+    });
+    renderPage(<PartsPage />);
+    expect(await screen.findByText(/en vitrina/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Pastillas/ }));
+    const sw = await screen.findByRole('switch', { name: 'Ofrecer por WhatsApp' });
+    expect(sw).toBeChecked();
+    await userEvent.click(sw);
+    await waitFor(() => expect(body(calls, 'PATCH', '/parts/')).toEqual({ ofrecerWhatsapp: false, version: 3 }));
+
+    const foto = new File([new Uint8Array([0xff, 0xd8, 0xff])], 'pastillas.jpg', { type: 'image/jpeg' });
+    await userEvent.upload(screen.getByLabelText(/Foto para WhatsApp/), foto);
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT' && c.path.endsWith('/photo'))).toBe(true));
+  });
 });

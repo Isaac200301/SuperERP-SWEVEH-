@@ -31,10 +31,13 @@ import (
 
 // DB es una base de prueba con un pool por rol.
 type DB struct {
-	Name   string
-	API    *pgxpool.Pool // rol sweveh_api
-	Worker *pgxpool.Pool // rol sweveh_worker
-	Tx     *db.TxManager
+	Name string
+	API  *pgxpool.Pool // rol sweveh_api
+	// Migrator es el rol dueño de las tablas (sweveh_migrator), sujeto a RLS: lo usan las cargas de datos
+	// controladas, como el taller ficticio de la demo (HU-97).
+	Migrator *pgxpool.Pool
+	Worker   *pgxpool.Pool // rol sweveh_worker
+	Tx       *db.TxManager
 }
 
 // New crea la base y registra su limpieza al terminar la prueba.
@@ -81,6 +84,7 @@ func New(t testing.TB) *DB {
 	migrate(t, roleURL(t, adminURL, "sweveh_migrator", pw, name))
 	d := &DB{Name: name}
 	d.API = pool(t, roleURL(t, adminURL, "sweveh_api", pw, name))
+	d.Migrator = pool(t, roleURL(t, adminURL, "sweveh_migrator", pw, name))
 	d.Worker = pool(t, roleURL(t, adminURL, "sweveh_worker", pw, name))
 	d.Tx = db.NewTxManager(d.API)
 	return d

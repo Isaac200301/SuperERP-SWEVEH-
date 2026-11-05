@@ -175,7 +175,7 @@ Una pantalla con tarjetas. Cada tarjeta dice qué hace, cuándo se dispara, qué
 | AU-03 | Aviso "vehículo listo" con total y horario de entrega. | La orden pasa a Listo. | `[Must]` | Metro Frenos lo hace a mano |
 | AU-04 | **Agente de WhatsApp**: lee el mensaje, extrae vehículo, síntoma, servicio y fecha, redacta borrador con los precios del taller y crea la orden "Por recibir" al aprobar. | Llega un mensaje de alguien que no tiene orden abierta. | `[Must]` | H-03; flujo v0 |
 | AU-05 | Respuesta a "¿ya está mi carro?" con el estado real, la fecha prometida y la última foto. | Llega un mensaje de un cliente con orden abierta y la intención es "estado". | `[Must]` | H-04, R-06 |
-| AU-06 | Recordatorio de cita la mañana del día. | Orden "Por recibir" con fecha de hoy. | `[Should]` | Flujo v0 |
+| AU-06 | Recordatorio de cita la mañana del día (desde las 7:00 a. m., con la hora de la cita y la dirección del taller). | Orden "Por recibir" con fecha de hoy. | `[Should]` | Flujo v0 |
 | AU-07 | Vehículo listo sin recoger. | Orden en Listo hace 3 días (configurable). | `[Should]` | H-05, N-05 |
 | AU-08 | Alerta interna de repuesto bajo el mínimo (al dueño, dentro de la app; no cuesta mensajes). | El inventario baja del mínimo. | `[Should]` | M4 |
 | AU-09 | Seguimiento de garantía. | N días después de Entregado. | `[Later]` | H-05 |
@@ -278,7 +278,7 @@ Versión condensada de las funciones Must, escrita para poder marcarla como cump
 | RF-15 | Ante un mensaje de cliente sin orden abierta, generar extracción y borrador (AU-04) usando solo precios y horarios del taller. | M5 |
 | RF-16 | Ante "¿ya está mi carro?" de un cliente con orden abierta, responder con el estado real de la base de datos (AU-05). | M5 |
 | RF-17 | Descartar cualquier salida de la IA que no cumpla el esquema o cite un precio que no está en la lista, y mandarla al humano. | M5, M6 |
-| RF-18 | No enviar nada redactado por la IA sin que el dueño pulse Enviar (salvo AU-05, que no redacta: llena una plantilla con datos). | M6 |
+| RF-18 | No enviar nada redactado por la IA sin que el dueño pulse Enviar. Las plantillas con datos del taller (AU-05 y las respuestas del agente, que solo interpreta) salen solas con el envío automático encendido (ADR-0028). | M6 |
 | RF-19 | Guardar el origen de cada dato propuesto por la IA y cada edición del dueño. | M6 |
 | RF-20 | Calcular los KPIs Must y el medidor de mensajes y costo a partir de los datos registrados. | M7 |
 | RF-21 | Aislar los datos de cada taller y limitar al mecánico a sus funciones. | M9 |
@@ -296,7 +296,7 @@ Nota sobre RF-16: la respuesta de estado se arma con una plantilla y datos de la
 | RNF-02 | Celular primero | Todas las pantallas del mecánico usables a 400 px de ancho, con una mano | `[Propuesta]`; Tuulapp se usa desde móvil (ficha) |
 | RNF-03 | Velocidad del borrador | Tarjeta en "Por revisar" en menos de 30 s desde que llega el mensaje | `[Propuesta]`; no hay línea base |
 | RNF-04 | Velocidad de avisos | Aviso de cambio de estado enviado en menos de 1 minuto | `[Propuesta]` |
-| RNF-05 | IA acotada | Una llamada al modelo por mensaje; salida JSON validada por código; cero precios fuera de lista | `[Equipo]` reglas en código; flujo v0 |
+| RNF-05 | IA acotada | Una llamada al modelo por mensaje; salida JSON validada por código; cero precios fuera de lista. **ADR-0029:** el asesor usa hasta 4 rondas con tools (más una de corrección); los precios del texto deben salir de una tool y las reglas viven en las tools | `[Equipo]` reglas en código; flujo v0 |
 | RNF-06 | IA intercambiable | Proveedor detrás de una interfaz propia; costo y tokens registrados por conversación | `[Equipo]` capa multi-proveedor |
 | RNF-07 | Canal intercambiable | WhatsApp detrás de una interfaz `CanalMensajeria` para pasar del número de prueba al número del taller sin tocar el resto | `[Propuesta]` del artifact Arranque |
 | RNF-08 | Uso permitido por Meta | El agente responde solo sobre el taller; nunca como asistente general | `[Tercero]` política desde 15-ene-2026[7] |
@@ -591,7 +591,7 @@ Dos grupos. Los técnicos dicen si la demo funciona; los de validación dicen si
 | CA-06 | Cuando el cliente aprueba, el inventario baja exactamente lo usado y el movimiento apunta a la orden. |
 | CA-07 | Los KPIs coinciden con un conteo manual sobre los datos de ejemplo. |
 | CA-08 | El medidor de mensajes coincide con el número de mensajes registrados en la base. |
-| CA-09 | Ningún texto redactado por la IA sale sin una aprobación registrada. |
+| CA-09 | Ningún texto redactado por la IA sale sin una aprobación registrada. Lo que sale solo es plantilla con datos y queda registrado como `auto_enviado` (ADR-0028). |
 | CA-10 | Un usuario del taller B no puede ver ni por URL ni por API datos del taller A. |
 | CA-11 | Las pantallas del mecánico funcionan en un celular de gama media a 400 px. |
 | CA-12 | Las 10 escenas corren de principio a fin en menos de 17 minutos, dos veces seguidas, sin tocar código ni la base. |

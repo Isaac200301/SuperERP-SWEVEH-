@@ -16,7 +16,7 @@ import (
 type autoOrders struct{ m *server.Modules }
 
 func orderInfo(i orders.Info) automationsapp.OrderInfo {
-	return automationsapp.OrderInfo{ID: i.ID, Code: i.Code, State: i.State, Plate: i.Plate, Vehicle: i.Vehicle, CustomerID: i.CustomerID,
+	return automationsapp.OrderInfo{ID: i.ID, Code: i.Code, State: i.State, Plate: i.Plate, Vehicle: i.Vehicle, Kind: i.VehicleKind, CustomerID: i.CustomerID,
 		PromisedAt: i.PromisedAt, Example: i.Example, Km: i.Km, Exceptions: i.Exceptions, Accessories: i.Accessories, StateSince: i.StateSince}
 }
 
@@ -45,7 +45,7 @@ type autoWorkshops struct{ m *server.Modules }
 
 func (a autoWorkshops) Get(ctx context.Context, tallerID shared.ID) (automationsapp.Workshop, error) {
 	s, err := a.m.Admin.LoadIn(ctx, tallerID)
-	w := automationsapp.Workshop{Name: s.Name, Schedule: map[string]*[2]string{}}
+	w := automationsapp.Workshop{Name: s.Name, Address: s.Profile.Address, Schedule: map[string]*[2]string{}}
 	for d, sl := range s.Schedule {
 		if sl != nil {
 			w.Schedule[d] = &[2]string{sl.Opens, sl.Closes}

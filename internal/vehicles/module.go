@@ -84,3 +84,13 @@ func snapshot(v domain.Vehicle) Snapshot {
 		EnginePending: v.Engine.Pending(v.Kind),
 	}
 }
+
+// MoveCustomer pasa los vehículos de un cliente a otro al unir clientes repetidos (HU-15).
+func (d Directory) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	return d.svc.MoveCustomer(ctx, tallerID, from, to)
+}
+
+// AnonymizeCustomer cambia la placa de los vehículos del cliente por una que no lo identifica (HU-87).
+func (d Directory) AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID) (map[shared.ID]string, error) {
+	return d.svc.AnonymizeCustomer(ctx, tallerID, customerID)
+}

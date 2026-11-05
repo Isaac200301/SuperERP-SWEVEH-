@@ -16,6 +16,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
+	"net/url"
 	"strings"
 	"time"
 
@@ -206,4 +207,48 @@ func (c *Client) do(ctx context.Context, path, contentType string, body io.Reade
 		return errors.New("whatsapp: respuesta que no es JSON")
 	}
 	return nil
+}
+
+// FetchMedia descarga un archivo del cliente (HU-60): GET /{media-id} da una URL temporal que se pide con el mismo
+// token. https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media
+func (c *Client) FetchMedia(ctx context.Context, _, ref string) (app.Media, error) {
+	var info struct {
+		URL      string `json:"url"`
+		MimeType string `json:"mime_type"`
+	}
+	if err := c.get(ctx, c.base+"/"+url.PathEscape(ref), 64<<10, func(raw []byte) error { return json.Unmarshal(raw, &info) }); err != nil {
+		return app.Media{}, err
+	}
+	if info.URL == "" {
+		return app.Media{}, app.ErrNoMedia
+	}
+	var data []byte
+	if err := c.get(ctx, info.URL, app.MaxMediaBytes+1, func(raw []byte) error { data = raw; return nil }); err != nil {
+		return app.Media{}, err
+	}
+	if len(data) > app.MaxMediaBytes {
+		return app.Media{}, app.ErrNoMedia
+	}
+	return app.Media{Data: data, Mime: info.MimeType}, nil
+}
+
+func (c *Client) get(ctx context.Context, u string, limit int64, read func([]byte) error) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	res, err := c.http.Do(req)
+	if err != nil {
+		return netError{err}
+	}
+	defer func() { _ = res.Body.Close() }()
+	raw, err := io.ReadAll(io.LimitReader(res.Body, limit))
+	if err != nil {
+		return netError{err}
+	}
+	if res.StatusCode >= 300 {
+		return &APIError{Status: res.StatusCode}
+	}
+	return read(raw)
 }

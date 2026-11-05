@@ -1,16 +1,19 @@
 package server
 
 import (
+	"context"
 	"log/slog"
 
 	"sweveh/internal/audit"
 	"sweveh/internal/catalog"
+	catalogphotos "sweveh/internal/catalog/adapters/out/photos"
 	catalogpg "sweveh/internal/catalog/adapters/out/postgres"
 	catalogapp "sweveh/internal/catalog/app"
 	"sweveh/internal/customers"
 	customerspg "sweveh/internal/customers/adapters/out/postgres"
 	customersapp "sweveh/internal/customers/app"
 	"sweveh/internal/inventory"
+	inventoryphotos "sweveh/internal/inventory/adapters/out/photos"
 	inventorypg "sweveh/internal/inventory/adapters/out/postgres"
 	inventoryapp "sweveh/internal/inventory/app"
 	"sweveh/internal/orders"
@@ -23,6 +26,7 @@ import (
 	"sweveh/internal/outbox"
 	"sweveh/internal/platform/clock"
 	"sweveh/internal/platform/db"
+	"sweveh/internal/platform/reqctx"
 	"sweveh/internal/platform/storage"
 	"sweveh/internal/quotes"
 	quotesdeps "sweveh/internal/quotes/adapters/out/deps"
@@ -37,11 +41,12 @@ import (
 
 // Modules son los servicios de negocio ya cableados. Los comparten el api y el worker.
 type Modules struct {
-	Tx     *db.TxManager
-	Audit  audit.Log
-	Events outbox.Publisher
-	Clock  clock.Clock
-	Log    *slog.Logger
+	Storage storage.Store // archivos (notas de voz que se escuchan en el panel, HU-60)
+	Tx      *db.TxManager
+	Audit   audit.Log
+	Events  outbox.Publisher
+	Clock   clock.Clock
+	Log     *slog.Logger
 
 	Workshops tenancy.Workshops
 	Admin     *tenancy.Admin
@@ -59,13 +64,17 @@ type Modules struct {
 	InvF      inventory.Inventory
 	Quotes    *quotesapp.Quotes
 	QuotesF   quotes.Quotes
+
+	// PlatformAdmin dice si quien llama es administrador del ERP (HU-74, ADR-0030). Lo pone New; nil = nadie lo es.
+	PlatformAdmin func(ctx context.Context, p reqctx.Principal) (bool, error)
 }
 
 // Build arma los módulos sobre una conexión (rol sweveh_api o sweveh_worker).
 func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger) *Modules {
-	m := &Modules{Tx: tx, Audit: audit.NewLog(), Events: outbox.NewPublisher(), Clock: clk, Log: log}
+	m := &Modules{Storage: st, Tx: tx, Audit: audit.NewLog(), Events: outbox.NewPublisher(), Clock: clk, Log: log}
 	m.Workshops = tenancy.NewWorkshops(tenancypg.NewRepository(), m.Audit)
 	m.Catalog = catalogapp.NewService(tx, catalogpg.Repository{}, m.Audit, clk)
+	m.Catalog.SetPriceList(catalogphotos.New(st), catalogpg.Proposals{}) // HU-93; el lector lo pone wire si hay IA
 	m.CatalogF = catalog.New(m.Catalog)
 	m.Admin = tenancy.NewAdmin(tx, m.CatalogF, m.Audit, clk)
 
@@ -74,6 +83,7 @@ func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger
 	m.CustDir = customers.NewDirectory(m.Customers)
 	m.Vehicles = vehiclesapp.NewService(tx, vehiclespg.NewRepository(), m.CustDir, m.Audit, m.Events, clk)
 	m.Vehicles.SetExtra(vehiclespg.Extra{})
+	m.Vehicles.SetCustomerRegistrar(m.CustDir) // importación de clientes y vehículos (HU-92)
 	m.VehDir = vehicles.NewDirectory(m.Vehicles)
 
 	vdir, cdir := directory.NewVehicles(m.VehDir), directory.NewCustomers(m.CustDir)
@@ -81,12 +91,15 @@ func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger
 	flowRepo := orderspg.Flow{}
 	m.Orders.SetExampleMarker(flowRepo.MarkExample)
 	m.Flow = ordersapp.NewFlow(tx, flowRepo, m.Orders, vdir, ordersstorage.New(st), m.Audit, m.Events, clk)
+	m.Flow.SetStats(orderspg.Stats{}) // cifras del tablero (HU-68 a HU-73) y de los avisos programados
 	m.OrdersF = orders.New(m.Flow)
 	m.Flow.SetSettings(orderssettings.Reader{A: m.Admin})
 	m.Findings = ordersapp.NewFindings(tx, flowRepo, orderspg.Findings{}, m.Audit, clk)
 
 	m.Inventory = inventoryapp.NewService(tx, inventorypg.Repository{}, m.Audit, m.Events, clk)
+	m.Inventory.SetPhotoStore(inventoryphotos.New(st))
 	m.InvF = inventory.New(m.Inventory)
+	m.Flow.SetPartsReturner(m.InvF) // HU-26: cancelar devuelve a bodega lo descontado
 	m.Quotes = quotesapp.NewService(tx, quotespg.Repository{}, quotesdeps.Orders{O: m.OrdersF}, quotesdeps.Catalog{C: m.CatalogF},
 		quotesdeps.Inventory{I: m.InvF}, m.Audit, m.Events, clk)
 	m.QuotesF = quotes.New(m.Quotes)

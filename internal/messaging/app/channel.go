@@ -54,3 +54,21 @@ func IsRetryable(err error) bool {
 	var r interface{ Retryable() bool }
 	return errors.As(err, &r) && r.Retryable()
 }
+
+// Media es un archivo que mandó el cliente (nota de voz, HU-60).
+type Media struct {
+	Data []byte
+	Mime string
+}
+
+// MaxMediaBytes es el tope de lo que se descarga: WhatsApp permite audios de hasta 16 MB.
+const MaxMediaBytes = 16 << 20
+
+// ErrNoMedia: el mensaje no trae archivo o el canal no sabe descargarlo (el simulador).
+var ErrNoMedia = errors.New("messaging: el mensaje no tiene un archivo que se pueda descargar")
+
+// MediaFetcher descarga el archivo de un mensaje entrante por su referencia (id de Meta o URL de WAHA). Es opcional:
+// los canales que no lo implementan responden ErrNoMedia.
+type MediaFetcher interface {
+	FetchMedia(ctx context.Context, phoneNumberID, ref string) (Media, error)
+}

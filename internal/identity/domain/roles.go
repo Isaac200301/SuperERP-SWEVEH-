@@ -39,7 +39,7 @@ var frontOffice = []string{
 // Solo el dueño (configuración, costos, KPIs, usuarios, bitácora).
 var ownerOnly = []string{
 	"order:override_approval", "service:manage", "part:manage", "part:cost", "workshop:manage", "user:manage",
-	"kpi:read", "audit:read", "automation:manage", "import:run", "data_request:manage",
+	"kpi:read", "audit:read", "automation:manage", "import:run", "data_request:manage", "customer:merge",
 }
 
 // rolePermissions: el mecánico NO ve costos, totales de dinero ni KPIs (RF-21, HU-13, HU-81).

@@ -2,6 +2,7 @@ package wire
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -14,7 +15,9 @@ import (
 	"sweveh/internal/audit"
 	automationsdomain "sweveh/internal/automations/domain"
 	"sweveh/internal/inventory"
+	"sweveh/internal/messaging/adapters/out/whatsapp/local"
 	"sweveh/internal/messaging/adapters/out/whatsapp/meta"
+	"sweveh/internal/messaging/adapters/out/whatsapp/waha"
 	messagingapp "sweveh/internal/messaging/app"
 	"sweveh/internal/platform/authn"
 	"sweveh/internal/platform/config"
@@ -47,8 +50,12 @@ func (h *handler) routes(r chi.Router) {
 	r.With(h.g.Require("conversation:read")).Get("/conversations/{id}", j(h.conversation))
 	r.With(h.g.Require("inbox:manage")).Post("/conversations/{id}/messages", j(h.reply))
 	r.With(h.g.Require("inbox:manage")).Patch("/conversations/{id}", j(h.mode))
+	r.With(h.g.Require("conversation:read")).Get("/conversations/{id}/messages/{mid}/audio", h.voiceNote) // HU-60
 	r.With(h.g.Require("order:read")).Get("/orders/{id}/messages", j(h.orderMessages))
 	r.With(h.g.Require("workshop:manage")).Get("/whatsapp/channel", j(h.channel))
+	r.With(h.g.Require("workshop:manage")).Put("/whatsapp/channel", j(h.setChannel))
+	r.With(h.g.Require("workshop:manage")).Get("/whatsapp/waha", j(h.wahaStatus))
+	r.With(h.g.Require("workshop:manage")).Post("/whatsapp/waha/start", j(h.wahaStart))
 	r.With(h.g.Require("workshop:manage")).Post("/simulator/inbound", j(h.simulate))
 	r.With(h.g.Require("order:read")).Get("/automations", j(h.cards))
 	r.With(h.g.Require("automation:manage")).Patch("/automations/{code}", j(h.setCard))
@@ -56,7 +63,12 @@ func (h *handler) routes(r chi.Router) {
 	r.With(h.g.Require("inbox:manage")).Get("/inbox", j(h.inbox))
 	r.With(h.g.Require("inbox:manage")).Post("/inbox/{id}", j(h.resolve))
 	r.With(h.g.Require("inbox:manage")).Get("/inbox/stats", j(h.inboxStats))
+	r.With(h.g.Require("inbox:manage")).Get("/assistant/settings", j(h.assistantSettings))
+	r.With(h.g.Require("automation:manage")).Put("/assistant/settings", j(h.setAssistantSettings))
 	r.With(h.g.Require("audit:read")).Get("/audit", j(h.audit))
+	r.With(h.g.Require("data_request:manage")).Get("/customers/{id}/export", j(h.exportCustomer))
+	r.Get("/platform/usage", j(h.usage))         // HU-74: lo decide PlatformAdmin, no un permiso de taller
+	r.Get("/platform/messages", j(h.messageLog)) // HU-100: registro técnico por número, solo PlatformAdmin
 }
 
 type msgDTO struct {
@@ -208,11 +220,95 @@ func (h *handler) channel(r *http.Request, p reqctx.Principal) (int, any, error)
 	return http.StatusOK, map[string]any{"canal": map[string]any{"proveedor": ch.Provider, "numero": ch.Visible}}, nil
 }
 
+var errNoWAHA = shared.NotFound("waha_no_configurado", "El WhatsApp de prueba (WAHA) no está configurado en este servidor.")
+
+// demoOnly: las rutas de demo (simulador y WAHA) no existen en producción.
+func (h *handler) demoOnly() error {
+	if h.cfg.Env == config.EnvProduction {
+		return shared.NotFound("ruta_no_encontrada", "Esa ruta no existe.")
+	}
+	return nil
+}
+
+// setChannel cambia el número del taller entre el simulador ("prueba_local") y el WhatsApp de prueba de WAHA
+// ("waha", ADR-0027), sin tocar nada más (HU-101). El número oficial de Meta se conecta aparte.
+func (h *handler) setChannel(r *http.Request, p reqctx.Principal) (int, any, error) {
+	if err := h.demoOnly(); err != nil {
+		return 0, nil, err
+	}
+	var q struct {
+		Proveedor string `json:"proveedor"`
+	}
+	if err := httpx.Decode(r, &q); err != nil {
+		return 0, nil, err
+	}
+	ch := messagingapp.ChannelInfo{TallerID: p.TallerID}
+	switch q.Proveedor {
+	case "prueba_local":
+		ch.Provider, ch.PhoneNumberID = "prueba_local", local.Prefix+p.TallerID.String()
+	case "waha":
+		if !h.cfg.WhatsApp.WAHA.Enabled() {
+			return 0, nil, errNoWAHA
+		}
+		ch.Provider, ch.PhoneNumberID = "waha", waha.Prefix+h.cfg.WhatsApp.WAHA.Session
+	default:
+		return 0, nil, shared.Validation("proveedor_invalido", "Elige prueba_local o waha.").WithField("proveedor")
+	}
+	if err := h.s.Messaging.SetChannel(r.Context(), ch); err != nil {
+		return 0, nil, err
+	}
+	return h.channel(r, p)
+}
+
+// wahaStatus dice si WAHA está configurado, el estado de la sesión y, si espera el escaneo, el QR como imagen
+// (data URL). La clave de WAHA nunca sale al navegador.
+func (h *handler) wahaStatus(r *http.Request, _ reqctx.Principal) (int, any, error) {
+	if err := h.demoOnly(); err != nil {
+		return 0, nil, err
+	}
+	w := h.cfg.WhatsApp.WAHA
+	if !w.Enabled() {
+		return http.StatusOK, map[string]any{"configurado": false}, nil
+	}
+	c := WAHAClient(w)
+	st, err := c.SessionStatus(r.Context(), w.Session)
+	if err != nil {
+		h.log.WarnContext(r.Context(), "WAHA no responde", "error", err)
+		return http.StatusOK, map[string]any{"configurado": true, "sesion": w.Session, "estado": "SIN_CONEXION"}, nil
+	}
+	out := map[string]any{"configurado": true, "sesion": w.Session, "estado": st.Status}
+	if st.Me != nil {
+		out["numero"] = st.Me.ID
+	}
+	if st.Status == "SCAN_QR_CODE" {
+		if png, err := c.QR(r.Context(), w.Session); err == nil {
+			out["qr"] = "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
+		}
+	}
+	return http.StatusOK, out, nil
+}
+
+// wahaStart crea o arranca la sesión de WAHA para poder escanear el QR.
+func (h *handler) wahaStart(r *http.Request, p reqctx.Principal) (int, any, error) {
+	if err := h.demoOnly(); err != nil {
+		return 0, nil, err
+	}
+	w := h.cfg.WhatsApp.WAHA
+	if !w.Enabled() {
+		return 0, nil, errNoWAHA
+	}
+	if err := WAHAClient(w).StartSession(r.Context(), w.Session); err != nil {
+		h.log.WarnContext(r.Context(), "no se pudo arrancar la sesión de WAHA", "error", err)
+		return 0, nil, shared.Rule("waha_sin_conexion", "No pudimos conectar con WAHA. Revisa que esté corriendo (make waha).")
+	}
+	return h.wahaStatus(r, p)
+}
+
 // simulate inyecta un mensaje de cliente por el canal de prueba local, con el mismo formato del webhook de Meta.
 // Solo existe para la demo sin cuenta de Meta (D-01 pendiente) y nunca en producción.
 func (h *handler) simulate(r *http.Request, p reqctx.Principal) (int, any, error) {
-	if h.cfg.Env == config.EnvProduction {
-		return 0, nil, shared.NotFound("ruta_no_encontrada", "Esa ruta no existe.")
+	if err := h.demoOnly(); err != nil {
+		return 0, nil, err
 	}
 	var q struct {
 		Celular string `json:"celular"`
@@ -231,6 +327,10 @@ func (h *handler) simulate(r *http.Request, p reqctx.Principal) (int, any, error
 	if err != nil {
 		return 0, nil, err
 	}
+	// Con un número real (WAHA o Meta) las respuestas saldrían a ese celular: el simulador no se mezcla.
+	if ch.Provider != "prueba_local" {
+		return 0, nil, shared.Rule("canal_real", "El taller está usando un WhatsApp real. Vuelve al simulador en Mi taller para usar esta pantalla.")
+	}
 	body, err := meta.SimulatedBody(ch.PhoneNumberID, phone, q.Nombre, q.Texto, q.Boton, h.s.M.Clock.Now())
 	if err != nil {
 		return 0, nil, err
@@ -247,7 +347,7 @@ func (h *handler) cards(r *http.Request, p reqctx.Principal) (int, any, error) {
 	for _, c := range cards {
 		out = append(out, map[string]any{"codigo": c.Code, "nombre": c.Name, "disparador": c.Trigger, "activa": c.Active,
 			"proximamente": c.ComingSoon, "enviaMensaje": c.SendsMessage, "editable": c.Editable, "texto": c.Text,
-			"datos": c.Placeholders, "ejecucionesSemana": c.WeekCount,
+			"datos": c.Placeholders, "ejecucionesSemana": c.WeekCount, "fueraDeVentana": c.OutsideWindow,
 			"costo": map[bool]string{true: "1 mensaje por envío", false: "No cuesta mensajes"}[c.SendsMessage]})
 	}
 	return http.StatusOK, map[string]any{"automatizaciones": out}, err
@@ -287,7 +387,8 @@ func (h *handler) runs(r *http.Request, p reqctx.Principal) (int, any, error) {
 func draftOut(d assistantapp.DraftRecord) map[string]any {
 	return map[string]any{"id": d.ID.String(), "conversacionId": d.ConversationID.String(), "celular": shared.NationalNumber(d.Phone),
 		"mensajeCliente": d.InboundText, "intencion": d.Intent, "propuesto": d.Proposed, "final": d.Final, "fuentes": d.Sources,
-		"accion": d.Action, "estado": d.State, "origen": d.Origin, "creadoEn": d.CreatedAt, "resueltoEn": d.ResolvedAt}
+		"accion": d.Action, "estado": d.State, "origen": d.Origin, "creadoEn": d.CreatedAt, "resueltoEn": d.ResolvedAt,
+		"mensajeId": d.InboundID.String(), "notaDeVoz": d.Voice}
 }
 
 func (h *handler) inbox(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -320,11 +421,39 @@ func (h *handler) resolve(r *http.Request, p reqctx.Principal) (int, any, error)
 
 func (h *handler) inboxStats(r *http.Request, p reqctx.Principal) (int, any, error) {
 	sent, edited, err := h.s.Assistant.Stats(r.Context(), p.TallerID)
+	if err != nil {
+		return 0, nil, err
+	}
 	pct := 0.0
 	if sent > 0 {
 		pct = float64(edited) * 100 / float64(sent)
 	}
-	return http.StatusOK, map[string]any{"enviados": sent, "editados": edited, "porcentajeEditados": pct}, err
+	// HU-66: el panel consulta las tarjetas pendientes para el contador y el sonido.
+	pending, err := h.s.Assistant.Drafts(r.Context(), p.TallerID, true)
+	return http.StatusOK, map[string]any{"enviados": sent, "editados": edited, "porcentajeEditados": pct, "pendientes": len(pending)}, err
+}
+
+// assistantSettings dice si el agente responde solo (ADR-0028).
+func (h *handler) assistantSettings(r *http.Request, p reqctx.Principal) (int, any, error) {
+	on, err := h.s.Assistant.AutoReply(r.Context(), p.TallerID)
+	return http.StatusOK, map[string]any{"autoEnvio": on}, err
+}
+
+// setAssistantSettings enciende o apaga el envío automático; solo el dueño (automation:manage).
+func (h *handler) setAssistantSettings(r *http.Request, p reqctx.Principal) (int, any, error) {
+	var q struct {
+		AutoEnvio *bool `json:"autoEnvio"`
+	}
+	if err := httpx.Decode(r, &q); err != nil {
+		return 0, nil, err
+	}
+	if q.AutoEnvio == nil {
+		return 0, nil, shared.Validation("auto_envio_requerido", "Indica si el asistente responde solo.").WithField("autoEnvio")
+	}
+	if err := h.s.Assistant.SetAutoReply(r.Context(), p.TallerID, p.Actor(), *q.AutoEnvio); err != nil {
+		return 0, nil, err
+	}
+	return http.StatusOK, map[string]any{"autoEnvio": *q.AutoEnvio}, nil
 }
 
 // audit lista la bitácora con filtros por entidad o por fecha (HU-88, criterio 2).
@@ -353,8 +482,13 @@ func (h *handler) audit(r *http.Request, p reqctx.Principal) (int, any, error) {
 // extra implementa analytics.Extra.
 type extra struct{ s *Services }
 
-func (e extra) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error) {
-	return e.s.Messaging.ResponseMinutes(ctx, tallerID, since)
+func (e extra) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]analytics.ResponseTime, error) {
+	rs, err := e.s.Messaging.ResponseMinutes(ctx, tallerID, since)
+	out := make([]analytics.ResponseTime, 0, len(rs))
+	for _, r := range rs {
+		out = append(out, analytics.ResponseTime{Minutes: r.Minutes, Auto: r.Auto})
+	}
+	return out, err
 }
 
 func (e extra) FailedNotices(ctx context.Context, tallerID shared.ID, since time.Time) ([]analytics.FailedNotice, error) {

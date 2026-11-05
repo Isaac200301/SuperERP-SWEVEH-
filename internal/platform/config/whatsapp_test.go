@@ -79,3 +79,41 @@ func TestAIProvider(t *testing.T) {
 		})
 	}
 }
+
+// WAHA (demo, ADR-0027): apagado si no hay WAHA_URL; con URL exige clave y firma, y nunca en producción.
+func TestWAHA(t *testing.T) {
+	full := map[string]string{"WAHA_URL": "http://localhost:3000", "WAHA_API_KEY": "k", "WAHA_WEBHOOK_SECRET": "s"}
+	cases := []struct {
+		name      string
+		env       Env
+		vars      map[string]string
+		errSubstr string
+	}{
+		{"apagado", EnvProduction, nil, ""},
+		{"local completo", EnvLocal, full, ""},
+		{"sin firma", EnvLocal, map[string]string{"WAHA_URL": "http://localhost:3000", "WAHA_API_KEY": "k"}, "WAHA_WEBHOOK_SECRET"},
+		{"producción", EnvProduction, full, "no se permite en producción"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, k := range []string{"WAHA_URL", "WAHA_API_KEY", "WAHA_WEBHOOK_SECRET", "WAHA_SESSION"} {
+				t.Setenv(k, tc.vars[k])
+			}
+			t.Setenv("WHATSAPP_PROVIDER", "meta")
+			t.Setenv("WHATSAPP_ACCESS_TOKEN", "t")
+			t.Setenv("WHATSAPP_APP_SECRET", "s")
+			var errs []error
+			wa, _ := engine(tc.env, &errs)
+			got := ""
+			for _, e := range errs {
+				got += e.Error()
+			}
+			if (tc.errSubstr == "") != (got == "") || !strings.Contains(got, tc.errSubstr) {
+				t.Fatalf("error %q, esperaba %q", got, tc.errSubstr)
+			}
+			if wa.WAHA.Enabled() != (tc.vars != nil) || (wa.WAHA.Enabled() && wa.WAHA.Session != "default") {
+				t.Fatalf("%+v", wa.WAHA)
+			}
+		})
+	}
+}

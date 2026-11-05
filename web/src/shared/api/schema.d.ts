@@ -158,6 +158,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/vehicles/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Importar clientes y vehículos desde CSV (HU-92). Sin confirmar=1 es solo la vista previa; con errores no se importa nada. Los clientes nuevos quedan con autorización pendiente. Permiso import:run */
+        post: operations["importVehicles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/vehicles/by-plate/{placa}": {
         parameters: {
             query?: never;
@@ -537,6 +554,74 @@ export interface paths {
         patch: operations["changeVehicleOwner"];
         trace?: never;
     };
+    "/customers/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Posibles clientes repetidos, agrupados por nombre (HU-15). Permiso customer:merge */
+        get: operations["listDuplicateCustomers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unir un cliente repetido al que se conserva (HU-15). Sus vehículos, órdenes y conversaciones pasan al que queda; queda en la bitácora. Permiso customer:merge */
+        post: operations["mergeCustomers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Copia de los datos del titular (HU-87) con autorizaciones, vehículos, órdenes y mensajes. Permiso data_request:manage */
+        get: operations["exportCustomerData"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/anonymize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Borrar los datos del titular (HU-87). Anonimiza nombre, celular, correo, placas, conversaciones y borradores; conserva órdenes y montos. No se puede deshacer. Permiso data_request:manage */
+        post: operations["anonymizeCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers/{id}/vehicles": {
         parameters: {
             query?: never;
@@ -600,6 +685,74 @@ export interface paths {
         put?: never;
         /** Crear un servicio (HU-07). Permiso service:manage */
         post: operations["createService"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pasar la lista de precios con una foto (HU-93, ADR-0032): la IA lee la foto y cada fila queda por revisar; nada se vuelve servicio sin aprobación. JPG, PNG o WebP hasta 8 MB. Sin IA responde 422 lista_sin_ia. Permiso service:manage */
+        post: operations["importPriceListPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Filas de la lista de precios por revisar (HU-93); ?todas=1 incluye las resueltas. Permiso service:manage */
+        get: operations["listPriceListProposals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/proposals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Aprobar (con las correcciones del dueño: crea el servicio) o descartar una fila (HU-93). Permiso service:manage */
+        post: operations["resolvePriceListProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/proposals/{id}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La foto de la lista de esa fila, para verla al lado (HU-93). Permiso service:manage */
+        get: operations["getPriceListProposalPhoto"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -674,6 +827,24 @@ export interface paths {
         head?: never;
         /** Editar o desactivar un repuesto (HU-32). Permiso part:manage */
         patch: operations["updatePart"];
+        trace?: never;
+    };
+    "/parts/{id}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La foto del repuesto. Permiso part:read */
+        get: operations["getPartPhoto"];
+        /** Foto del repuesto para la vitrina de WhatsApp (ADR-0029). JPG, PNG o WebP hasta 5 MB. Permiso part:manage */
+        put: operations["setPartPhoto"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/parts/{id}/entries": {
@@ -1025,9 +1196,27 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Qué tan seguido el dueño edita los borradores (HU-65). Permiso inbox:manage */
+        /** Qué tan seguido el dueño edita los borradores (HU-65) y cuántas tarjetas esperan (HU-66). Permiso inbox:manage */
         get: operations["getDraftStats"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assistant/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Si el agente responde solo (ADR-0028). Permiso inbox:manage */
+        get: operations["getAssistantSettings"];
+        /** Enciende o apaga el envío automático del agente (HU-67, ADR-0028). Permiso automation:manage */
+        put: operations["setAssistantSettings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1044,6 +1233,23 @@ export interface paths {
         };
         /** Conversaciones de WhatsApp del taller. Permiso conversation:read */
         get: operations["listConversations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{id}/messages/{mid}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nota de voz del cliente para escucharla en el panel (HU-60). Se descarga del canal la primera vez. Permiso conversation:read */
+        get: operations["getVoiceNote"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1113,8 +1319,43 @@ export interface paths {
         };
         /** Canal de WhatsApp del taller (número de prueba o real, HU-101). Permiso workshop:manage */
         get: operations["getWhatsAppChannel"];
+        /** Solo fuera de producción: cambia el número del taller entre el simulador (prueba_local) y el WhatsApp de prueba de WAHA (waha, ADR-0027). Permiso workshop:manage */
+        put: operations["setWhatsAppChannel"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp/waha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Solo fuera de producción: estado de la sesión de WAHA y, si espera el escaneo, el QR como data URL (ADR-0027). Permiso workshop:manage */
+        get: operations["getWahaSession"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp/waha/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Solo fuera de producción: crea o arranca la sesión de WAHA para escanear el QR (ADR-0027). Permiso workshop:manage */
+        post: operations["startWahaSession"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1132,6 +1373,40 @@ export interface paths {
         put?: never;
         /** Solo fuera de producción: simula un mensaje de cliente por el canal local, con el formato del webhook de Meta (D-01). Permiso workshop:manage */
         post: operations["simulateInbound"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Registro técnico de mensajes (HU-100): por celular, qué entró y salió en cada taller con su estado, error y hora, y los webhooks crudos de los últimos 7 días que lo mencionan. Sin el texto de los mensajes. Solo administradores del ERP (PLATFORM_ADMINS) */
+        get: operations["getPlatformMessageLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Medidor del administrador del ERP (HU-74, ADR-0030): mensajes enviados del mes contra los incluidos y costo de IA por taller, el que más cuesta primero. Solo administradores del ERP (PLATFORM_ADMINS); a un usuario de taller le responde 403 sin_permiso */
+        get: operations["getPlatformUsage"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1159,6 +1434,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AssistantSettings: {
+            /** @description true = el agente responde solo; false = todo pasa por Por revisar */
+            autoEnvio: boolean;
+        };
+        WahaSession: {
+            configurado: boolean;
+            sesion?: string;
+            /** @description STOPPED, STARTING, SCAN_QR_CODE, WORKING, FAILED, NOT_FOUND o SIN_CONEXION */
+            estado?: string;
+            /** @description chat del número vinculado, p. ej. 573009999999@c.us */
+            numero?: string;
+            /** @description data:image/png;base64,… mientras espera el escaneo */
+            qr?: string;
+        };
         ItemRecepcion: {
             /** @description Estable; vacía = se arma con el nombre */
             clave: string;
@@ -1210,6 +1499,8 @@ export interface components {
             detalle: string;
             /** @description Explicación en palabras del taller (HU-75) */
             queSignifica: string;
+            /** @description Calculado con los datos de ejemplo del registro (HU-71) */
+            ejemplo?: boolean;
         };
         Pendiente: {
             tipo: string;
@@ -1237,6 +1528,8 @@ export interface components {
             datos: string[] | null;
             ejecucionesSemana: number;
             costo: string;
+            /** @description Suele salir fuera de la ventana de 24 h: en producción cambiar el texto pide una plantilla nueva aprobada por Meta (HU-42, Q-17) */
+            fueraDeVentana?: boolean;
         };
         Borrador: {
             /** Format: uuid */
@@ -1244,7 +1537,14 @@ export interface components {
             /** Format: uuid */
             conversacionId: string;
             celular: string;
+            /** @description Lo que escribió el cliente; si mandó una nota de voz, su transcripción (HU-60) */
             mensajeCliente: string;
+            /**
+             * Format: uuid
+             * @description Mensaje del cliente: con notaDeVoz, el audio está en /conversations/{conversacionId}/messages/{mensajeId}/audio
+             */
+            mensajeId?: string;
+            notaDeVoz?: boolean;
             intencion: string;
             /** @description Texto que propone la IA o la plantilla; no sale sin aprobación (RF-18) */
             propuesto: string;
@@ -1295,6 +1595,8 @@ export interface components {
                 }[];
                 boton?: string;
                 nombre?: string;
+                /** @description Foto enviada: "repuesto:<id>" es la foto de la vitrina (ADR-0029); "evidencia:<orden>:<id>", una foto de la orden marcada para el cliente (HU-56) */
+                imagen?: string;
             } | null;
             estado: string;
             origen: string;
@@ -1429,6 +1731,25 @@ export interface components {
             ordenAbierta: string | null;
             estadoOrden: components["schemas"]["EstadoOrden"] | null;
         };
+        /** @description Una fila leída de la foto de la lista de precios (HU-93) */
+        PropuestaServicio: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Las filas de la misma foto comparten lote
+             */
+            loteId: string;
+            nombre: string;
+            /** Format: int64 */
+            precio: number | null;
+            /** @enum {string} */
+            tipoVehiculo: "carro" | "moto" | "ambos";
+            /** @enum {string} */
+            estado: "pendiente" | "aprobada" | "descartada";
+            /** Format: uuid */
+            servicioId: string | null;
+        };
         Servicio: {
             /** Format: uuid */
             id: string;
@@ -1472,6 +1793,9 @@ export interface components {
             ubicacion?: string;
             /** @description Referencia original o equivalente */
             referenciaOem?: string;
+            /** @description El asesor de WhatsApp lo ofrece (vitrina, ADR-0029) */
+            ofrecerWhatsapp?: boolean;
+            tieneFoto?: boolean;
         };
         Miembro: {
             /** Format: uuid */
@@ -1502,6 +1826,7 @@ export interface components {
             atiende: string;
             especialidades: string[];
             ciudad: string;
+            direccion: string;
             tamano: string;
             horario: components["schemas"]["Horario"];
             contratoVersion: string | null;
@@ -1536,6 +1861,8 @@ export interface components {
             /** @description Permisos recurso:acción del rol; la UI los usa solo para ocultar, el servidor siempre verifica (R-05) */
             permisos?: string[];
             cuentaNueva: boolean;
+            /** @description Es administrador del ERP: ve el medidor de todos los talleres (HU-74, ADR-0030) */
+            adminPlataforma?: boolean;
         };
         Cliente: {
             /** Format: uuid */
@@ -1689,6 +2016,8 @@ export interface components {
                     avisos: string[];
                     conError: number;
                     importadas: number;
+                    /** @description Solo en la importación de clientes y vehículos (HU-92) */
+                    clientesNuevos?: number;
                     filas: {
                         fila: number;
                         referencia: string;
@@ -2126,6 +2455,32 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    importVehicles: {
+        parameters: {
+            query?: {
+                confirmar?: "0" | "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description CSV con nombre, celular, placa y tipo de vehículo (carro o moto); marca, línea, modelo, kilometraje, cilindraje y turbo son opcionales
+                     */
+                    archivo: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Importacion"];
+            400: components["responses"]["Problem"];
+            422: components["responses"]["Importacion"];
         };
     };
     getVehicleByPlate: {
@@ -2887,6 +3242,138 @@ export interface operations {
             409: components["responses"]["Problem"];
         };
     };
+    listDuplicateCustomers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        grupos: {
+                            clientes: components["schemas"]["Cliente"][];
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    mergeCustomers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    conservar: string;
+                    /** Format: uuid */
+                    unir: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Unidos */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        cliente: components["schemas"]["Cliente"];
+                        /** @description vehiculos, ordenes y conversaciones que pasaron al cliente */
+                        movidos: {
+                            [key: string]: number;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    exportCustomerData: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        generadoEn: string;
+                        cliente: {
+                            [key: string]: unknown;
+                        };
+                        autorizaciones: {
+                            [key: string]: unknown;
+                        }[];
+                        vehiculos: {
+                            [key: string]: unknown;
+                        }[];
+                        ordenes: {
+                            [key: string]: unknown;
+                        }[];
+                        mensajes: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    anonymizeCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Anonimizado */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description vehiculos, ordenes, borradores y mensajes tocados */
+                        anonimizados: {
+                            [key: string]: number;
+                        };
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
     listCustomerVehicles: {
         parameters: {
             query?: never;
@@ -3028,6 +3515,121 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+        };
+    };
+    importPriceListPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    foto: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Filas leídas, por revisar */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        propuestas: components["schemas"]["PropuestaServicio"][];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listPriceListProposals: {
+        parameters: {
+            query?: {
+                todas?: "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        propuestas: components["schemas"]["PropuestaServicio"][];
+                    };
+                };
+            };
+        };
+    };
+    resolvePriceListProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "aprobar" | "descartar";
+                    nombre?: string;
+                    /** Format: int64 */
+                    precio?: number | null;
+                    /** @enum {string} */
+                    tipoVehiculo?: "carro" | "moto" | "ambos";
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropuestaServicio"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getPriceListProposalPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La imagen */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            404: components["responses"]["Problem"];
         };
     };
     deleteService: {
@@ -3186,6 +3788,8 @@ export interface operations {
                     categoria?: string;
                     ubicacion?: string;
                     referenciaOem?: string;
+                    /** @description Mostrarlo en la vitrina del asesor de WhatsApp (ADR-0029) */
+                    ofrecerWhatsapp?: boolean;
                 };
             };
         };
@@ -3202,6 +3806,60 @@ export interface operations {
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    getPartPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La imagen */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    setPartPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    foto: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Repuesto"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
         };
     };
     addPartEntry: {
@@ -3518,6 +4176,8 @@ export interface operations {
                     atiende: string;
                     especialidades?: string[];
                     ciudad: string;
+                    /** @description Opcional; sale en el recordatorio de la cita (HU-44) */
+                    direccion?: string;
                     tamano: string;
                     contratoAceptado: boolean;
                 };
@@ -3595,7 +4255,10 @@ export interface operations {
     };
     getDashboard: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Solo carros o solo motos (HU-68, HU-70); vacío = todos */
+                tipo?: "carro" | "moto";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3613,6 +4276,10 @@ export interface operations {
                         porEstado: {
                             [key: string]: number;
                         };
+                        /** @description El taller aún no tiene órdenes propias: las cifras salen de los datos de ejemplo (HU-71) */
+                        ejemplo: boolean;
+                        /** @description Filtro aplicado: carro, moto o vacío */
+                        tipo: string;
                     };
                 };
             };
@@ -3783,9 +4450,57 @@ export interface operations {
                         enviados: number;
                         editados: number;
                         porcentajeEditados: number;
+                        /** @description Tarjetas por revisar (hasta 100) */
+                        pendientes: number;
                     };
                 };
             };
+        };
+    };
+    getAssistantSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistantSettings"];
+                };
+            };
+        };
+    };
+    setAssistantSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistantSettings"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistantSettings"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
         };
     };
     listConversations: {
@@ -3808,6 +4523,30 @@ export interface operations {
                     };
                 };
             };
+        };
+    };
+    getVoiceNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                mid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El audio */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/ogg": string;
+                };
+            };
+            404: components["responses"]["Problem"];
         };
     };
     getConversation: {
@@ -3948,6 +4687,83 @@ export interface operations {
             };
         };
     };
+    setWhatsAppChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    proveedor: "prueba_local" | "waha";
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        canal: {
+                            proveedor?: string;
+                            numero?: string;
+                        } | null;
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getWahaSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WahaSession"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    startWahaSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WahaSession"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
     simulateInbound: {
         parameters: {
             query?: never;
@@ -3976,6 +4792,102 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    getPlatformMessageLog: {
+        parameters: {
+            query: {
+                celular: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        celular: string;
+                        diasWebhooks: number;
+                        mensajes: {
+                            taller: string;
+                            /** Format: date-time */
+                            fecha: string;
+                            /** @enum {string} */
+                            direccion: "entrante" | "saliente";
+                            tipo: string;
+                            /** @enum {string} */
+                            estado: "recibido" | "pendiente" | "enviado" | "entregado" | "leido" | "fallido";
+                            origen: string;
+                            error: string | null;
+                            /** Format: date-time */
+                            enviadoEn: string | null;
+                            wamid: string | null;
+                        }[];
+                        webhooks: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: date-time */
+                            recibido: string;
+                            /** Format: date-time */
+                            procesado: string | null;
+                            error: string | null;
+                        }[];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    getPlatformUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description AAAA-MM */
+                        mes: string;
+                        /** @description Mensajes incluidos por taller (provisional, D-04) */
+                        incluidos: number;
+                        /** @description Para pasar el costo de IA a pesos (provisional) */
+                        pesosPorDolar: number;
+                        talleres: {
+                            /** Format: uuid */
+                            id: string;
+                            nombre: string;
+                            mensajes: number;
+                            incluidos: number;
+                            /** @description "34 de 1.000" */
+                            mensajesTexto: string;
+                            /** Format: int64 */
+                            iaMicroUsd: number;
+                            /** Format: int64 */
+                            iaPesos: number;
+                            /** @description "IA $1.200" */
+                            iaTexto: string;
+                            /** @description Lleva más mensajes de los incluidos */
+                            sePasa: boolean;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
         };
     };
     listAudit: {

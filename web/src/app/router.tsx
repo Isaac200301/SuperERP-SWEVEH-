@@ -11,6 +11,7 @@ const RegisterPage = page(() => import('../features/auth/RegisterPage'), 'Regist
 const LoginPage = page(() => import('../features/auth/LoginPage'), 'LoginPage');
 const PolicyPage = page(() => import('../features/auth/PolicyPage'), 'PolicyPage');
 const OrdersPage = page(() => import('../features/orders/OrdersPage'), 'OrdersPage');
+const CustomersPage = page(() => import('../features/customers/CustomersPage'), 'CustomersPage');
 const NewOrderPage = page(() => import('../features/orders/NewOrderPage'), 'NewOrderPage');
 const OrderDetailPage = page(() => import('../features/orders/OrderDetailPage'), 'OrderDetailPage');
 const FloorPage = page(() => import('../features/orders/FloorPage'), 'FloorPage');
@@ -18,6 +19,7 @@ const InboxPage = page(() => import('../features/inbox/InboxPage'), 'InboxPage')
 const ConversationsPage = page(() => import('../features/messaging/ConversationsPage'), 'ConversationsPage');
 const ConversationPage = page(() => import('../features/messaging/ConversationsPage'), 'ConversationPage');
 const SimulatorPage = page(() => import('../features/messaging/SimulatorPage'), 'SimulatorPage');
+const PlatformPage = page(() => import('../features/platform/PlatformPage'), 'PlatformPage');
 const AutomationsPage = page(() => import('../features/automations/AutomationsPage'), 'AutomationsPage');
 const DashboardPage = page(() => import('../features/dashboard/DashboardPage'), 'DashboardPage');
 const ServicesPage = page(() => import('../features/catalog/ServicesPage'), 'ServicesPage');
@@ -54,6 +56,7 @@ export const router = createBrowserRouter([
       { path: 'ordenes/nueva', element: <Lazy Page={NewOrderPage} /> },
       { path: 'ordenes/:id', element: <Lazy Page={OrderDetailPage} /> },
       { path: 'piso', element: <Lazy Page={FloorPage} /> },
+      { path: 'clientes', element: <Lazy Page={CustomersPage} /> },
       { path: 'por-revisar', element: <Lazy Page={InboxPage} /> },
       { path: 'conversaciones', element: <Lazy Page={ConversationsPage} /> },
       { path: 'conversaciones/:id', element: <Lazy Page={ConversationPage} /> },
@@ -66,6 +69,7 @@ export const router = createBrowserRouter([
       { path: 'taller', element: <Lazy Page={WorkshopPage} /> },
       { path: 'whatsapp-prueba', element: <Lazy Page={SimulatorPage} /> },
       { path: 'arranque', element: <Lazy Page={OnboardingPage} /> },
+      { path: 'plataforma', element: <Lazy Page={PlatformPage} /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

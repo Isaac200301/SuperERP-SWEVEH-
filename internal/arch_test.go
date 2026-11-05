@@ -85,9 +85,9 @@ func TestDependencyRules(t *testing.T) {
 				if !isStdlib(imp) && imp != "github.com/google/uuid" {
 					t.Errorf("%s (shared) importa %s", p.ImportPath, imp)
 				}
-			// 2. domain: solo biblioteca estándar, shared y su propio domain.
+			// 2. domain: solo biblioteca estándar, shared (y sus subpaquetes, como csvx) y su propio domain.
 			case layer == "domain":
-				if !isStdlib(imp) && imp != mod+"internal/shared" && (im != m || ilayer != "domain") {
+				if !isStdlib(imp) && imp != mod+"internal/shared" && !strings.HasPrefix(imp, mod+"internal/shared/") && (im != m || ilayer != "domain") {
 					t.Errorf("%s (domain) importa %s", p.ImportPath, imp)
 				}
 			// 3. app y ports: nada de adaptadores, HTTP ni drivers de base de datos.
@@ -103,8 +103,9 @@ func TestDependencyRules(t *testing.T) {
 				}
 			}
 			// 5. Entre módulos, solo la fachada (raíz del módulo). El composition root (server y wire,
-			// que adapta los puertos de un módulo a los de otro) está exento.
-			if m != "" && m != "server" && m != "wire" && im != "" && im != m && (contains(businessModules, im) || contains(crossCutting, im)) {
+			// que adapta los puertos de un módulo a los de otro) está exento, y también demo: la carga del taller
+			// ficticio arma el sistema completo y crea el taller como el registro (HU-97, ADR-0031).
+			if m != "" && m != "server" && m != "wire" && m != "demo" && im != "" && im != m && (contains(businessModules, im) || contains(crossCutting, im)) {
 				if ilayer != "" {
 					t.Errorf("%s importa el interior de otro módulo: %s (solo se permite su fachada)", p.ImportPath, imp)
 				}
@@ -123,6 +124,23 @@ func TestAdaptersStayInTheirModule(t *testing.T) {
 		for _, imp := range p.Imports {
 			if im, ilayer := moduleOf(imp); im != m && ilayer == "adapters" {
 				t.Errorf("%s importa adaptadores de %s", p.ImportPath, im)
+			}
+		}
+	}
+}
+
+// HU-101 (RNF-07): pasar del número de prueba al del taller solo cambia la configuración del canal. Los proveedores
+// de WhatsApp (simulador, WAHA, Meta) solo los conocen el módulo messaging y la raíz de composición (wire); el resto
+// del sistema habla con el puerto de canal.
+func TestWhatsAppProviderBehindChannel(t *testing.T) {
+	const providers = mod + "internal/messaging/adapters/out/whatsapp"
+	for _, p := range listPackages(t) {
+		if strings.HasPrefix(p.ImportPath, mod+"internal/messaging/") || strings.HasPrefix(p.ImportPath, mod+"internal/wire") {
+			continue
+		}
+		for _, imp := range p.Imports {
+			if strings.HasPrefix(imp, providers) {
+				t.Errorf("%s conoce el proveedor de WhatsApp %s (debe usar el canal de messaging)", p.ImportPath, imp)
 			}
 		}
 	}

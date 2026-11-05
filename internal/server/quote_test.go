@@ -209,11 +209,77 @@ func TestQuote_BuildSendApproveDiscountAndReturn(t *testing.T) {
 		t.Fatalf("aviso sin existencia: %v", r.body)
 	}
 	c.must(http.StatusOK, c.do("POST", q+"/send", nil))
-	if o := c.must(http.StatusOK, c.do("GET", "/api/v1/orders/"+id, nil)); o.str("estado") != "en_reparacion" {
-		t.Fatalf("la adicional no cambia el estado: %v", o.body)
+	if o := c.must(http.StatusOK, c.do("GET", "/api/v1/orders/"+id, nil)); o.str("estado") != "esperando_aprobacion" {
+		t.Fatalf("el adicional vuelve a pedir aprobación: %v", o.body)
 	}
 	c.must(http.StatusOK, c.do("POST", q+"/response", map[string]any{"decision": "aprobar", "canal": "telefono"}))
 	if s := partStock(t, c, "PF-20"); s != 5 {
 		t.Fatalf("sin existencia suficiente no debía descontar: %v", s)
 	}
+	if o := c.must(http.StatusOK, c.do("GET", "/api/v1/orders/"+id, nil)); o.str("estado") != "en_reparacion" {
+		t.Fatalf("aprobado el adicional, vuelve a En reparación: %v", o.body)
+	}
+}
+
+// HU-06: el precio de un servicio que no tiene se pide al cotizarlo y, si cotiza quien administra los servicios (el
+// dueño), queda en la lista para no pedirlo otra vez. Si cotiza el mecánico, su valor solo vale para esa cotización.
+func TestQuote_PriceAskedWhenNeeded(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550195", "Mario Lenis")
+	owner.must(http.StatusCreated, owner.do("POST", "/api/v1/users", map[string]any{"celular": "3005550196", "nombre": "Pedro Mecánico", "rol": "mecanico"}))
+	mec := e.login("3005550196")
+	sid := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/services", map[string]any{"nombre": "Diagnóstico eléctrico", "tipoVehiculo": "carro"})).str("id")
+	price := func() any {
+		for _, s := range owner.must(http.StatusOK, owner.do("GET", "/api/v1/services", nil)).body["servicios"].([]any) {
+			if s.(map[string]any)["id"] == sid {
+				return s.(map[string]any)["precio"]
+			}
+		}
+		t.Fatal("servicio no encontrado")
+		return nil
+	}
+	quote := func(phone, plate string) string {
+		r := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"celular": phone, "nombre": "Ana Ríos"}))
+		owner.must(http.StatusCreated, owner.do("POST", "/api/v1/vehicles", map[string]any{"placa": plate, "clienteId": nested(r.body, "cliente", "id"),
+			"cilindraje": "1400", "turbo": false, "energia": "gasolina", "transmision": "manual"}))
+		id := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/orders", map[string]any{"placa": plate, "sintoma": "No prende", "estadoInicial": "recibido"})).str("id")
+		owner.must(http.StatusOK, owner.do("POST", "/api/v1/orders/"+id+"/transition", map[string]any{"estado": "en_diagnostico", "version": r2v(owner, id)}))
+		return "/api/v1/orders/" + id + "/quote/lines"
+	}
+
+	// El mecánico cotiza con su valor: la lista no cambia.
+	mec.must(http.StatusOK, mec.do("POST", quote("3005550197", "HSD123"), map[string]any{"tipo": "servicio", "refId": sid, "cantidad": 1, "precioUnitario": 40000}))
+	if p := price(); p != nil {
+		t.Fatalf("el mecánico cambió la lista: %v", p)
+	}
+	// El dueño escribe el precio al cotizar y queda en la lista.
+	lines := quote("3005550198", "HSD124")
+	if r := owner.do("POST", lines, map[string]any{"tipo": "servicio", "refId": sid, "cantidad": 1}); r.str("code") != "precio_requerido" {
+		t.Fatalf("sin precio: %d %v", r.status, r.body)
+	}
+	owner.must(http.StatusOK, owner.do("POST", lines, map[string]any{"tipo": "servicio", "refId": sid, "cantidad": 1, "precioUnitario": 55000}))
+	if p := price(); p != float64(55000) {
+		t.Fatalf("precio en la lista: %v", p)
+	}
+	// Ya no se pide: la siguiente cotización toma el precio de la lista, y otro valor escrito no la cambia.
+	next := quote("3005550199", "HSD125")
+	owner.must(http.StatusOK, owner.do("POST", next, map[string]any{"tipo": "servicio", "refId": sid, "cantidad": 1}))
+	owner.must(http.StatusOK, owner.do("POST", next, map[string]any{"tipo": "servicio", "refId": sid, "cantidad": 1, "precioUnitario": 1}))
+	if p := price(); p != float64(55000) {
+		t.Fatalf("un precio de lista no se cambia desde la cotización: %v", p)
+	}
+}
+
+// HU-06: el agente de WhatsApp (AU-04) no se enciende sin horario: el sistema lo pide en ese momento.
+func TestAutomations_AgentNeedsSchedule(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550194", "Rosa Pérez")
+	owner.must(http.StatusOK, owner.do("PATCH", "/api/v1/automations/AU-04", map[string]any{"activa": false}))
+	r := owner.do("PATCH", "/api/v1/automations/AU-04", map[string]any{"activa": true})
+	if r.status != http.StatusUnprocessableEntity || r.str("code") != "horario_requerido" || r.str("field") != "horario" {
+		t.Fatalf("encender sin horario: %d %v", r.status, r.body)
+	}
+	owner.must(http.StatusOK, owner.do("PUT", "/api/v1/workshop/schedule", map[string]any{"horario": map[string]any{
+		"lun": map[string]any{"abre": "08:00", "cierra": "17:00"}}}))
+	owner.must(http.StatusOK, owner.do("PATCH", "/api/v1/automations/AU-04", map[string]any{"activa": true}))
 }

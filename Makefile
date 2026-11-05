@@ -9,7 +9,7 @@ GITLEAKS_IMAGE  := zricethezav/gitleaks:v8.30.1
 -include .env
 export
 
-.PHONY: help up down dev dev-api dev-worker dev-web agent-eval migrate migrate-down gen gen-check lint test test-go test-web cover vuln secrets ci build image e2e seed-demo reset-demo
+.PHONY: help up down waha dev dev-api dev-worker dev-web agent-eval agent-eval-conv migrate migrate-down gen gen-check lint test test-go test-web cover vuln secrets ci build image e2e seed-demo reset-demo
 
 help: ## Lista los comandos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -18,7 +18,11 @@ up: ## Levanta Postgres local (docker compose)
 	docker compose up -d --wait postgres
 
 down: ## Apaga Postgres local (conserva los datos)
-	docker compose down
+	docker compose --profile waha down
+
+waha: ## Levanta WAHA (WhatsApp no oficial, solo demo, ADR-0027) en http://localhost:3000
+	@test -n "$(WAHA_API_KEY)" -a -n "$(WAHA_WEBHOOK_SECRET)" || { echo "Faltan WAHA_API_KEY y WAHA_WEBHOOK_SECRET en .env"; exit 1; }
+	docker compose --profile waha up -d waha
 
 migrate: up ## Aplica las migraciones a la base local con sweveh_migrator
 	go run ./cmd/migrate up
@@ -43,6 +47,9 @@ dev-web: ## Corre el frontend con Vite
 
 agent-eval: ## Mide el intérprete configurado (AI_PROVIDER) con los 30 mensajes de HU-102
 	go run ./cmd/agent-eval
+
+agent-eval-conv: ## Mide el asesor con tools (ADR-0029) con las 20 conversaciones; necesita AI_PROVIDER=openrouter
+	go run ./cmd/agent-eval -conversaciones
 
 gen: ## Regenera sqlc y los tipos TypeScript del contrato OpenAPI
 	docker run --rm -v "$(CURDIR):/src" -w /src $(SQLC_IMAGE) generate
@@ -86,8 +93,8 @@ image: ## Construye la imagen de contenedor
 e2e: migrate ## Playwright: la orden de punta a punta con el api sirviendo la SPA (scripts/e2e.sh)
 	sh scripts/e2e.sh
 
-seed-demo: ## Taller ficticio (pendiente: HU-97/HU-98)
-	@echo "make seed-demo todavía no existe: llega con HU-97 y HU-98 (T5)." >&2; exit 1
+seed-demo: ## Carga el taller ficticio Servitaller El Pistón (HU-97, HU-98; nunca en producción)
+	go run ./cmd/demo seed
 
-reset-demo: ## Reinicia el taller ficticio (pendiente: HU-97)
-	@echo "make reset-demo todavía no existe: llega con HU-97 (T5)." >&2; exit 1
+reset-demo: ## Archiva la demo anterior y carga el taller ficticio de nuevo, entre dos demos (HU-97)
+	go run ./cmd/demo reset

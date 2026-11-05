@@ -190,6 +190,23 @@ func TestAgent_StatusAndWhichVehicle(t *testing.T) {
 	if m := w.last(andres); m["automatizacion"] != "AU-05" || !strings.Contains(m["cuerpo"].(string), "KLM482") {
 		t.Fatalf("estado de la escogida: %v", m)
 	}
+
+	// HU-56, criterio 1: con una foto marcada para el cliente, el estado sale con la última foto (y no con una sin marcar).
+	base := "/api/v1/orders/" + first
+	owner.must(http.StatusCreated, owner.upload(base+"/evidence", map[string]string{"lado": "frente", "mostrarCliente": "true"}, jpg))
+	shown := owner.must(http.StatusOK, owner.do("GET", base+"/evidence", nil)).body["evidencias"].([]any)[0].(map[string]any)["id"].(string)
+	owner.must(http.StatusCreated, owner.upload(base+"/evidence", map[string]string{"lado": "trasera"}, jpg))
+	w.press(andres, "Andrés Ruiz", "estado:"+first, "KLM482")
+	var img map[string]any
+	for _, m := range w.sent(andres) {
+		if m["tipo"] == "imagen" {
+			img = m
+		}
+	}
+	if img == nil || img["payload"].(map[string]any)["imagen"] != "evidencia:"+first+":"+shown || img["estado"] != "enviado" ||
+		!strings.Contains(img["cuerpo"].(string), "KLM482") {
+		t.Fatalf("última foto para el cliente: %v", img)
+	}
 }
 
 // HU-59: "quiero hablar con alguien" → mensaje fijo, conversación para una persona, alerta en "Pendiente hoy" y
@@ -235,6 +252,125 @@ func TestAgent_HumanRequestAndHandBack(t *testing.T) {
 	w.write(laura, "Laura Gómez", "¿y la alineación cuánto?")
 	if len(w.drafts()) != n+1 {
 		t.Fatal("al volver al asistente no hubo borrador")
+	}
+}
+
+// ADR-0028 / HU-67: el agente responde solo desde que el taller existe. Se detiene si el cliente pide una persona,
+// y vuelve al devolverle la conversación. Las notas para el dueño ("Responde tú") nunca salen. Apagado, todo vuelve a
+// "Por revisar". Solo el dueño lo cambia.
+func TestAgent_AutoReply(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550535", "Rosa Pérez")
+	if s := owner.must(http.StatusOK, owner.do("GET", "/api/v1/assistant/settings", nil)).body; s["autoEnvio"] != true {
+		t.Fatalf("un taller nuevo arranca con el envío automático: %v", s)
+	}
+	w := e.whatsapp(t, owner, nil)
+	w.autoReply(true)
+	w.service("Cambio de aceite", "ambos", 45000)
+	const laura = "3001234535"
+	w.customer(laura, "Laura Gómez")
+
+	before := len(w.sent(laura))
+	w.write(laura, "Laura Gómez", "¿cuánto el cambio de aceite?")
+	if got := w.last(laura)["cuerpo"].(string); len(w.sent(laura)) != before+1 || !strings.Contains(got, "$45.000") {
+		t.Fatalf("respuesta automática: %q", got)
+	}
+	if len(w.drafts()) != 0 {
+		t.Fatalf("quedó algo por revisar: %v", w.drafts())
+	}
+	all := owner.must(http.StatusOK, owner.do("GET", "/api/v1/inbox?todos=1", nil)).body["borradores"].([]any)
+	if d := all[0].(map[string]any); d["estado"] != "auto_enviado" || d["final"] != w.last(laura)["cuerpo"] {
+		t.Fatalf("historial: %v", d)
+	}
+
+	// El cliente pide una persona: el agente se detiene hasta que se la devuelvan.
+	w.write(laura, "Laura Gómez", "quiero hablar con una persona")
+	conv, _ := w.conversation(laura)
+	n := len(w.sent(laura))
+	w.write(laura, "Laura Gómez", "¿y el cambio de aceite para moto?")
+	if len(w.sent(laura)) != n {
+		t.Fatalf("respondió con la conversación en manos de una persona: %v", w.last(laura))
+	}
+	owner.must(http.StatusNoContent, owner.do("PATCH", "/api/v1/conversations/"+conv["id"].(string), map[string]any{"modo": "agente"}))
+	w.write(laura, "Laura Gómez", "¿cuánto vale el cambio de aceite?")
+	if len(w.sent(laura)) != n+1 {
+		t.Fatal("al devolverla al asistente no respondió solo")
+	}
+
+	// Apagado por el dueño: el siguiente mensaje espera en "Por revisar".
+	w.autoReply(false)
+	n = len(w.sent(laura))
+	w.write(laura, "Laura Gómez", "¿y el cambio de aceite lo hacen hoy?")
+	if len(w.sent(laura)) != n || len(w.drafts()) != 1 {
+		t.Fatalf("apagado: enviados %d, por revisar %v", len(w.sent(laura))-n, w.drafts())
+	}
+
+	// Recepción ve el interruptor pero no lo cambia.
+	owner.must(http.StatusCreated, owner.do("POST", "/api/v1/users", map[string]any{"celular": "3005550535", "nombre": "Recepción", "rol": "recepcion"}))
+	rec := e.login("3005550535")
+	rec.must(http.StatusOK, rec.do("GET", "/api/v1/assistant/settings", nil))
+	if r := rec.do("PUT", "/api/v1/assistant/settings", map[string]any{"autoEnvio": true}); r.status != http.StatusForbidden {
+		t.Fatalf("recepción cambió el envío automático: %d", r.status)
+	}
+	if r := owner.do("PUT", "/api/v1/assistant/settings", map[string]any{}); r.status != http.StatusBadRequest {
+		t.Fatalf("sin autoEnvio: %d", r.status)
+	}
+}
+
+// HU-55 / HU-12: la placa nunca duplica la orden ni toca un vehículo ajeno. Con orden abierta, el agente cuenta cómo
+// va; si la placa es de otro cliente, no se crea nada, no se dice nada del vehículo y una persona revisa. "hola"
+// recibe el saludo con lo que hace el asistente, sin pedir la placa ni llamar "Cliente" a nadie.
+func TestAgent_PlateNeverDuplicates(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550537", "Rosa Pérez")
+	w := e.whatsapp(t, owner, nil)
+	w.autoReply(true)
+	const ana, beto = "3001234537", "3001234538"
+	anaID := w.customer(ana, "Ana Ruiz")
+	w.orderFor(anaID, "GNO667")
+	open := func() int {
+		return len(owner.must(http.StatusOK, owner.do("GET", "/api/v1/orders?abiertas=1", nil)).body["ordenes"].([]any))
+	}
+	n := open()
+
+	w.write(ana, "Ana Ruiz", "GNO667")
+	if open() != n || !strings.Contains(w.last(ana)["cuerpo"].(string), "GNO667") {
+		t.Fatalf("placa propia con orden: abiertas %d→%d, respuesta %q", n, open(), w.last(ana)["cuerpo"])
+	}
+
+	w.customer(beto, "Cliente de prueba")
+	w.write(beto, "Cliente de prueba", "hola")
+	if got := w.last(beto)["cuerpo"].(string); !strings.Contains(got, "¿En qué te ayudo?") || strings.Contains(got, "placa") ||
+		strings.Contains(got, "Cliente") {
+		t.Fatalf("saludo: %q", got)
+	}
+	w.write(beto, "Cliente de prueba", "no lo he llevado")
+	if got := w.last(beto)["cuerpo"].(string); strings.Contains(got, "placa") {
+		t.Fatalf("pidió la placa sin motivo: %q", got)
+	}
+	w.write(beto, "Cliente de prueba", "gno667")
+	got := w.last(beto)["cuerpo"].(string)
+	if open() != n || strings.Contains(got, "OS-") || strings.Contains(got, "Renault") || !strings.Contains(got, "Una persona del taller") {
+		t.Fatalf("placa ajena: abiertas %d→%d, respuesta %q", n, open(), got)
+	}
+	if conv, _ := w.conversation(beto); conv["modo"] != "humano" || conv["pideHumano"] != true {
+		t.Fatalf("la placa ajena no pasó a una persona: %v", conv)
+	}
+}
+
+// Con el envío automático encendido, si la IA falla la tarjeta "Responde tú" queda para el dueño y al cliente no le
+// sale nada (HU-54).
+func TestAgent_AutoReplyKeepsOwnerNotes(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550536", "Rosa Pérez")
+	w := e.whatsappWith(t, owner, nil, fakeAI{err: errors.New("openrouter: respuesta 502 (código 0)")})
+	w.autoReply(true)
+	const laura = "3001234536"
+	w.customer(laura, "Laura Gómez")
+	before := len(w.sent(laura))
+	w.write(laura, "Laura Gómez", "¿cuánto el cambio de aceite?")
+	if d := w.draftFor("cambio de aceite"); !strings.Contains(d["propuesto"].(string), "Responde tú") || len(w.sent(laura)) != before {
+		t.Fatalf("nota para el dueño: %v, enviados %d", d, len(w.sent(laura))-before)
 	}
 }
 
@@ -369,8 +505,8 @@ func TestAgent_OwnerDecisionsAndStatusOff(t *testing.T) {
 	}
 }
 
-// HU-61: fuera de horario el cliente recibe el aviso fijo con la próxima apertura y su pregunta igual queda como
-// borrador para el dueño.
+// HU-61: fuera de horario el cliente recibe el aviso fijo con la próxima apertura (una sola vez aunque escriba varias
+// veces en la noche) y cada pregunta igual queda como borrador para el dueño en la mañana.
 func TestAgent_OutOfHours(t *testing.T) {
 	e := newEnv(t)
 	owner := e.register("3105550580", "Rosa Pérez")
@@ -389,4 +525,18 @@ func TestAgent_OutOfHours(t *testing.T) {
 		t.Fatalf("aviso: %v", m)
 	}
 	w.draftFor("cambio de aceite")
+	// HU-66: el panel cuenta las tarjetas que esperan para el contador y el sonido.
+	pending := func() any {
+		return owner.must(http.StatusOK, owner.do("GET", "/api/v1/inbox/stats", nil)).body["pendientes"]
+	}
+	before := pending().(float64)
+
+	w.write(laura, "Laura Gómez", "¿y la alineación?")
+	if n := len(w.closedNotices(laura)); n != 1 {
+		t.Fatalf("avisos de fuera de horario: %d; quiero 1", n)
+	}
+	w.draftFor("alineación")
+	if n := pending(); n != before+1 {
+		t.Fatalf("tarjetas pendientes: %v; antes %v", n, before)
+	}
 }

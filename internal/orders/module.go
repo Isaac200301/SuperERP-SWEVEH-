@@ -137,7 +137,30 @@ func (o Orders) OpenByCustomer(ctx context.Context, tallerID, customerID shared.
 	return out, nil
 }
 
+// Filter acota las cifras del tablero por tipo de vehículo y datos de ejemplo (HU-68, HU-70, HU-71).
+type Filter = app.Filter
+
 // LastShownPhoto devuelve la última foto marcada "mostrar al cliente" (AU-05, HU-21).
 func (o Orders) LastShownPhoto(ctx context.Context, tallerID, orderID shared.ID) (*shared.ID, error) {
 	return o.flow.LastShownPhoto(ctx, tallerID, orderID)
+}
+
+// MoveCustomer pasa las órdenes de un cliente a otro al unir clientes repetidos (HU-15).
+func (o Orders) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	return o.flow.MoveCustomer(ctx, tallerID, from, to)
+}
+
+// AnonymizeCustomer quita de las órdenes la placa real y quién recogió (HU-87).
+func (o Orders) AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID, plates map[shared.ID]string) (int, error) {
+	return o.flow.AnonymizeCustomer(ctx, tallerID, customerID, plates)
+}
+
+// ByCustomer son las órdenes del cliente para la copia de sus datos (HU-87).
+func (o Orders) ByCustomer(ctx context.Context, tallerID, customerID shared.ID) ([]Summary, error) {
+	list, err := o.flow.ByCustomer(ctx, tallerID, customerID)
+	out := make([]Summary, 0, len(list))
+	for _, x := range list {
+		out = append(out, summary(x))
+	}
+	return out, err
 }

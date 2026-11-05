@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 	"sweveh/internal/platform/clock"
 	"sweveh/internal/platform/db"
 	"sweveh/internal/platform/httpx"
+	"sweveh/internal/platform/reqctx"
 	"sweveh/internal/platform/storage"
 	quoteshttp "sweveh/internal/quotes/adapters/in/http"
 	"sweveh/internal/search"
@@ -59,6 +61,8 @@ type Deps struct {
 	Extra func(m *Modules, g *authn.Guard) []func(chi.Router)
 	// Public monta rutas sin sesión de usuario (webhook de WhatsApp). Puede ser nil.
 	Public func(r chi.Router)
+	// PlatformAdmins son los celulares (E.164) de los administradores del ERP (HU-74, ADR-0030).
+	PlatformAdmins []string
 }
 
 // New devuelve el router HTTP completo.
@@ -74,7 +78,19 @@ func New(d Deps) *chi.Mux {
 	})
 	identitySvc.SetMembers(identitypg.Members{})
 
+	// Administrador del ERP (HU-74, ADR-0030): su celular está en PLATFORM_ADMINS. Es el único lugar donde se decide.
+	m.PlatformAdmin = func(ctx context.Context, p reqctx.Principal) (bool, error) {
+		if len(d.PlatformAdmins) == 0 {
+			return false, nil
+		}
+		u, _, err := identitySvc.Me(ctx, p.UserID, p.TallerID)
+		if err != nil {
+			return false, err
+		}
+		return slices.Contains(d.PlatformAdmins, u.Phone), nil
+	}
 	identityH := identityhttp.NewHandler(identitySvc, d.Log, httpx.NewRateLimiter(d.LoginPerMinute, 5), d.TrustProxy)
+	identityH.SetPlatformAdmins(d.PlatformAdmins)
 	customersH := customershttp.NewHandler(m.Customers, guard, d.Log)
 	vehiclesH := vehicleshttp.NewHandler(m.Vehicles, guard, d.Log)
 	ordersH := ordershttp.NewHandler(m.Orders, m.Flow, guard, d.Log)

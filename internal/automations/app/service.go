@@ -45,7 +45,8 @@ type OrderInfo struct {
 	Code        string
 	State       string
 	Plate       string
-	Vehicle     string
+	Vehicle     string // marca y línea ("Yamaha NMAX")
+	Kind        string // "carro" | "moto"
 	CustomerID  shared.ID
 	PromisedAt  *time.Time
 	Example     bool
@@ -72,6 +73,7 @@ type Customers interface {
 
 type Workshop struct {
 	Name     string
+	Address  string                // opcional (HU-44)
 	Schedule map[string]*[2]string // día → [abre, cierra]
 }
 
@@ -187,6 +189,15 @@ func (s *Service) Toggle(ctx context.Context, tallerID shared.ID, actor shared.A
 		return domain.ErrComingSoon
 	}
 	return s.uow.Do(ctx, func(ctx context.Context) error {
+		if code == "AU-04" && on { // HU-06: el horario se pide justo cuando hace falta, al encender el agente
+			w, err := s.workshops.Get(ctx, tallerID)
+			if err != nil {
+				return err
+			}
+			if len(w.Schedule) == 0 {
+				return domain.ErrScheduleNeeded
+			}
+		}
 		rules, err := s.repo.Rules(ctx, tallerID)
 		if err != nil {
 			return err

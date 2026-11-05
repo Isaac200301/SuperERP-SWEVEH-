@@ -47,7 +47,16 @@ func (e *env) whatsappWith(t *testing.T, owner *client, ch messagingapp.Channel,
 	s := wire.BuildWith(m, ch, it, config.AI{Provider: "reglas"})
 	d := outbox.NewDispatcher(e.db.Worker, e.clk, e.log, 100)
 	wire.Register(d, s)
-	return &wa{t: t, e: e, owner: owner, s: s, d: d}
+	w := &wa{t: t, e: e, owner: owner, s: s, d: d}
+	// Las pruebas miran el borrador en "Por revisar": apagan el envío automático (ADR-0028). TestAgent_AutoReply
+	// lo prueba encendido.
+	w.autoReply(false)
+	return w
+}
+
+func (w *wa) autoReply(on bool) {
+	w.t.Helper()
+	w.owner.must(http.StatusOK, w.owner.do("PUT", "/api/v1/assistant/settings", map[string]any{"autoEnvio": on}))
 }
 
 // pump procesa webhooks y eventos hasta que no quede nada pendiente (o falla si no se estabiliza).
@@ -111,6 +120,17 @@ func (w *wa) sent(phone string) []map[string]any {
 	var out []map[string]any
 	for _, m := range msgs {
 		if m["direccion"] == "saliente" {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// closedNotices son los avisos de fuera de horario que le mandamos (HU-61).
+func (w *wa) closedNotices(phone string) []map[string]any {
+	var out []map[string]any
+	for _, m := range w.sent(phone) {
+		if b, _ := m["cuerpo"].(string); strings.Contains(b, "fuera de horario") {
 			out = append(out, m)
 		}
 	}

@@ -4,11 +4,12 @@ import { registerWorkshop, shot } from './helpers';
 
 /**
  * WhatsApp con el canal de prueba (ADR-0025), con api y worker reales: un cliente nuevo escribe por el simulador,
- * recibe la autorización de datos (HU-85), acepta y su pregunta llega a "Por revisar" como borrador (HU-62).
+ * recibe la autorización de datos (HU-85), acepta y el asistente le responde solo (ADR-0028); el dueño ve la respuesta
+ * en "Por revisar" → "Últimas respuestas automáticas".
  */
 const uniq = Date.now().toString().slice(-6);
 
-test('cliente nuevo por WhatsApp: autorización y borrador para el dueño', async ({ page }) => {
+test('cliente nuevo por WhatsApp: autorización y respuesta automática', async ({ page }) => {
   await registerWorkshop(page, `311${uniq}2`);
 
   await page.goto('/panel/taller');
@@ -26,6 +27,8 @@ test('cliente nuevo por WhatsApp: autorización y borrador para el dueño', asyn
   await shot(page, 'w1-simulador');
 
   await page.goto('/panel/por-revisar');
-  await expect(page.getByText('Hola, ¿a cómo el cambio de aceite?')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('switch', { name: 'El asistente responde solo' })).toBeChecked();
+  await page.getByText('Últimas respuestas automáticas').click({ timeout: 15_000 });
+  await expect(page.getByText('Hola, ¿a cómo el cambio de aceite?')).toBeVisible();
   await shot(page, 'w2-por-revisar');
 });

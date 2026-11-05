@@ -138,7 +138,8 @@ func (h *Handler) add(r *http.Request, p reqctx.Principal) (int, any, error) {
 	if err := httpx.Decode(r, &q); err != nil {
 		return 0, nil, err
 	}
-	in := app.LineInput{Kind: q.Tipo, Description: q.Descripcion, Qty: q.Cantidad, UnitPrice: q.Precio, HoursCent: hoursCent(q.Horas)}
+	in := app.LineInput{Kind: q.Tipo, Description: q.Descripcion, Qty: q.Cantidad, UnitPrice: q.Precio, HoursCent: hoursCent(q.Horas),
+		SaveToList: h.guard.Can(p, "service:manage")}
 	if in.HoursCent != nil && in.Qty == 0 {
 		in.Qty = 1
 	}

@@ -15,6 +15,7 @@ var (
 	ErrAttends  = shared.Validation("atiende_requerido", "Elige qué vehículos atiendes: carros, motos o ambos.").WithField("atiende")
 	ErrSize     = shared.Validation("tamano_invalido", "Elige cuántos trabajan: solo yo, 2 a 5 o 6 o más.").WithField("tamano")
 	ErrCity     = shared.Validation("ciudad_invalida", "La ciudad puede tener hasta 80 letras.").WithField("ciudad")
+	ErrAddress  = shared.Validation("direccion_invalida", "La dirección puede tener hasta 160 caracteres.").WithField("direccion")
 	ErrContract = shared.Rule("contrato_requerido", "Para continuar acepta el contrato de transmisión de datos con SWEVEH.").WithField("contratoAceptado")
 	ErrSchedule = shared.Validation("horario_invalido", "Usa horas como 08:00 y la hora de cierre después de la de apertura.").WithField("horario")
 )
@@ -35,6 +36,7 @@ type Profile struct {
 	Specialties []string
 	City        string
 	Size        string
+	Address     string // opcional: sale en el recordatorio de la cita (HU-44)
 }
 
 func (p *Profile) Validate() error {
@@ -47,6 +49,10 @@ func (p *Profile) Validate() error {
 	p.City = normalizeCity(p.City)
 	if len([]rune(p.City)) > 80 {
 		return ErrCity
+	}
+	p.Address = strings.Join(strings.Fields(p.Address), " ")
+	if len([]rune(p.Address)) > 160 {
+		return ErrAddress
 	}
 	clean := []string{}
 	for _, s := range p.Specialties {

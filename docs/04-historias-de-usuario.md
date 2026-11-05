@@ -1068,12 +1068,12 @@ _Módulo del MVP: M6. La IA propone, el dueño decide, y todo queda medido._
 
 **Criterios de aceptación**
 
-- **Dado** el auto-envío, **cuando** es la primera vez que entro a la configuración, **entonces** está apagado y todo pasa por "Por revisar".
+- **Dado** el auto-envío, **cuando** es la primera vez que entro a la configuración, **entonces** está **encendido** (ADR-0028; antes decía apagado).
 - **Dado** el auto-envío encendido y un mensaje que pide solo el horario, **cuando** llega, **entonces** la respuesta sale sin tarjeta, con el horario cargado tal cual, y queda registrada como "automática".
-- **Dado** un mensaje que mezcla horario con un síntoma o un diagnóstico, **cuando** llega, **entonces** no sale solo: va a "Por revisar".
+- **Dado** un mensaje que mezcla horario con un síntoma o un diagnóstico, **cuando** llega, **entonces** sale la plantilla de diagnóstico (ADR-0028: Pablo eligió "solo siempre"). Solo esperan en "Por revisar" las notas para el dueño ("Responde tú", nota de voz).
 - **Dado** el dueño, **cuando** apaga el auto-envío, **entonces** desde ese momento todo vuelve a pasar por revisión.
 
-**Notas:** Estaba como Later; los criterios son nuevos. CHOQUE: contradice RF-18, CA-09 y D-07 ("nada redactado por la IA sale sin una aprobación registrada"). Solo es coherente si la respuesta automática no la redacta la IA sino que llena una plantilla con datos del taller, como AU-05. Q-27 pide decidirlo.
+**Notas:** Estaba como Later; los criterios son nuevos. CHOQUE con RF-18, CA-09 y D-07 resuelto por ADR-0028 (4-nov-2026): la IA solo interpreta y la respuesta es una plantilla con datos del taller, como AU-05, así que sale sola salvo que el cliente pida una persona, el taller tome la conversación o el dueño apague el interruptor.
 
 **Trazabilidad:** Depende de: HU-62, HU-65
 

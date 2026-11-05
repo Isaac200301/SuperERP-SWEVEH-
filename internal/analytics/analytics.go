@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -28,7 +29,7 @@ type UnitOfWork interface {
 
 // Extra son lecturas de módulos que no tienen fachada en este paquete (mensajería, agente, inventario).
 type Extra interface {
-	ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error)
+	ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]ResponseTime, error)
 	PendingDrafts(ctx context.Context, tallerID shared.ID) (int, error)
 	LowStock(ctx context.Context, tallerID shared.ID) ([]inventory.Part, error)
 	CustomerNames(ctx context.Context, tallerID shared.ID, ids []shared.ID) (map[shared.ID]string, error)
@@ -36,6 +37,12 @@ type Extra interface {
 	FailedNotices(ctx context.Context, tallerID shared.ID, since time.Time) ([]FailedNotice, error)
 	// HumanRequests son las conversaciones en las que el cliente pidió una persona y nadie la ha cerrado (HU-59).
 	HumanRequests(ctx context.Context, tallerID shared.ID) ([]HumanRequest, error)
+}
+
+// ResponseTime es cuánto tardó la primera respuesta a un mensaje del cliente; Auto = respuesta automática de AU-05.
+type ResponseTime struct {
+	Minutes float64
+	Auto    bool
 }
 
 // HumanRequest es una conversación esperando a una persona del taller.
@@ -79,6 +86,7 @@ type KPI struct {
 	Display string   `json:"texto"`
 	Detail  string   `json:"detalle"`
 	Meaning string   `json:"queSignifica"`
+	Example bool     `json:"ejemplo"` // calculado con los datos de ejemplo del registro (HU-71)
 }
 
 func f(v float64) *float64 { return &v }
@@ -108,14 +116,26 @@ func money(v int64) string {
 	return "$" + out
 }
 
+// dashboard son los 6 números del taller (HU-68 a HU-73). ?tipo=carro|moto los separa por tipo de vehículo (HU-68 y
+// HU-70, Should). Las órdenes de ejemplo (registro y taller ficticio) suman para que los números no salgan en cero, y
+// los números que salen de órdenes llevan la marca "ejemplo" mientras existan (HU-71, docs/03 "taller ficticio").
 func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, error) {
 	now := h.now()
+	kind := r.URL.Query().Get("tipo")
+	if kind != "carro" && kind != "moto" {
+		kind = ""
+	}
 	var kpis []KPI
 	var byState map[string]int
+	example := false
 	err := h.uow.Do(r.Context(), func(ctx context.Context) error {
-		st := h.orders.Stats()
 		var err error
-		if byState, err = st.StateCounts(ctx, p.TallerID); err != nil {
+		st := h.orders.Stats()
+		if example, err = st.HasExample(ctx, p.TallerID); err != nil {
+			return err
+		}
+		flt := orders.Filter{Kind: kind, Example: true}
+		if byState, err = st.StateCounts(ctx, p.TallerID, flt); err != nil {
 			return err
 		}
 		open := 0
@@ -130,25 +150,34 @@ func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, erro
 			return err
 		}
 		k := KPI{Code: "aprobaciones", Label: "Aprobaciones pendientes", Value: f(float64(len(pend))), Display: fmt.Sprintf("%d", len(pend)),
-			Meaning: "Cotizaciones que el cliente todavía no aprueba. Mientras esperan, el carro ocupa espacio y no se trabaja."}
-		if len(pend) > 0 {
-			k.Detail = fmt.Sprintf("la más antigua hace %d h", int(now.Sub(pend[0].SentAt).Hours()))
+			Meaning: "Cotizaciones que el cliente todavía no aprueba, y cuántas horas lleva esperando la más antigua. Mientras esperan, el vehículo ocupa espacio y no se trabaja."}
+		if len(pend) > 0 { // HU-69: "1 · 26 h"
+			hours := int(now.Sub(pend[0].SentAt).Hours())
+			k.Display, k.Detail = fmt.Sprintf("%d · %d h", len(pend), hours), fmt.Sprintf("la más antigua lleva %d h esperando", hours)
 		}
 		kpis = append(kpis, k)
 
-		days, n, err := st.AvgCycleDays(ctx, p.TallerID, now.AddDate(0, 0, -30))
+		cycles, err := st.Cycles(ctx, p.TallerID, now.AddDate(0, 0, -30), flt)
 		if err != nil {
 			return err
 		}
-		k = KPI{Code: "tiempo", Label: "Tiempo promedio por orden (30 días)", Value: days, Display: "sin datos",
-			Meaning: "Cuántos días pasan desde que se abre la orden hasta que se entrega el vehículo, en las entregas del último mes."}
-		if days != nil {
-			k.Display, k.Detail = fmt.Sprintf("%.1f días", *days), fmt.Sprintf("%d órdenes entregadas", n)
+		k = KPI{Code: "tiempo", Label: "Tiempo promedio por orden (30 días)", Display: "sin datos",
+			Meaning: "Cuánto pasa desde que se abre la orden hasta que se entrega el vehículo, en las entregas del último mes: en horas y en días hábiles (lunes a viernes)."}
+		if len(cycles) > 0 { // HU-70: horas y días hábiles
+			var hours, bdays float64
+			for _, c := range cycles {
+				hours += c.Closed.Sub(c.Opened).Hours()
+				bdays += BusinessDays(c.Opened, c.Closed)
+			}
+			n := float64(len(cycles))
+			k.Value = f(hours / n)
+			k.Display = fmt.Sprintf("%.0f h · %.1f días hábiles", hours/n, bdays/n)
+			k.Detail = fmt.Sprintf("%d órdenes entregadas", len(cycles))
 		}
 		kpis = append(kpis, k)
 
 		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-		ids, err := st.DeliveredSince(ctx, p.TallerID, monthStart)
+		ids, err := st.DeliveredSince(ctx, p.TallerID, monthStart, flt)
 		if err != nil {
 			return err
 		}
@@ -161,14 +190,45 @@ func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, erro
 			sum += t
 		}
 		k = KPI{Code: "ticket", Label: "Ticket promedio", Display: "sin datos",
-			Meaning: "Lo que paga en promedio cada cliente por orden entregada este mes (lo aprobado en la cotización)."}
+			Meaning: "Es lo que paga en promedio cada cliente por orden entregada este mes (lo aprobado en la cotización)."}
+		// HU-75: frente al mes pasado y qué órdenes lo mueven.
+		prevIDs, err := st.DeliveredSince(ctx, p.TallerID, monthStart.AddDate(0, -1, 0), flt)
+		if err != nil {
+			return err
+		}
+		cur := map[shared.ID]bool{}
+		for _, id := range ids {
+			cur[id] = true
+		}
+		var onlyPrev []shared.ID
+		for _, id := range prevIDs {
+			if !cur[id] {
+				onlyPrev = append(onlyPrev, id)
+			}
+		}
+		prev, err := h.quotes.ApprovedTotals(ctx, p.TallerID, onlyPrev)
+		if err != nil {
+			return err
+		}
 		if len(totals) > 0 {
 			avg := sum / int64(len(totals))
 			k.Value, k.Display, k.Detail = f(float64(avg)), money(avg), fmt.Sprintf("%d órdenes con cotización aprobada", len(totals))
+			movers, err := h.topOrders(ctx, p.TallerID, totals, 2)
+			if err != nil {
+				return err
+			}
+			k.Meaning += " " + compare(avg, average(prev), "el mes pasado") + " " + movers
+		} else if len(prev) > 0 { // al empezar el mes todavía no hay entregas: se cuenta cómo cerró el anterior
+			movers, err := h.topOrders(ctx, p.TallerID, prev, 2)
+			if err != nil {
+				return err
+			}
+			k.Meaning += fmt.Sprintf(" Todavía no hay entregas este mes; el mes pasado fue %s en %d órdenes. %s", money(average(prev)), len(prev),
+				strings.Replace(movers, "Lo mueven", "Lo movieron", 1))
 		}
 		kpis = append(kpis, k)
 
-		back, total, err := st.Returning(ctx, p.TallerID, now.AddDate(-1, 0, 0))
+		back, total, err := st.Returning(ctx, p.TallerID, now.AddDate(-1, 0, 0), flt)
 		if err != nil {
 			return err
 		}
@@ -180,22 +240,107 @@ func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, erro
 		}
 		kpis = append(kpis, k)
 
-		mins, err := h.extra.ResponseMinutes(ctx, p.TallerID, now.AddDate(0, 0, -7))
+		times, err := h.extra.ResponseMinutes(ctx, p.TallerID, monthStart)
 		if err != nil {
 			return err
 		}
 		k = KPI{Code: "respuesta", Label: "Minutos hasta responder un WhatsApp", Display: "sin datos",
-			Meaning: "La mediana de minutos entre que el cliente escribe y alguien del taller (o el agente) le contesta, esta semana."}
-		if m := median(mins); m != nil {
+			Meaning: "La mediana de minutos entre que el cliente escribe y alguien del taller (o el asesor) le contesta, este mes. Las respuestas automáticas del estado del vehículo (AU-05) salen al instante y se cuentan aparte para no maquillar el número."}
+		var people, auto []float64
+		for _, t := range times {
+			if t.Auto {
+				auto = append(auto, t.Minutes)
+			} else {
+				people = append(people, t.Minutes)
+			}
+		}
+		if m := median(people); m != nil {
 			k.Value, k.Display = m, fmt.Sprintf("%.0f min", *m)
+		}
+		if len(auto) > 0 {
+			k.Detail = fmt.Sprintf("aparte, %d respuestas automáticas del estado (AU-05)", len(auto))
 		}
 		kpis = append(kpis, k)
 		return nil
 	})
+	for i := range kpis {
+		kpis[i].Example = example && kpis[i].Code != "aprobaciones" && kpis[i].Code != "respuesta"
+	}
 	if byState == nil {
 		byState = map[string]int{}
 	}
-	return http.StatusOK, map[string]any{"kpis": kpis, "porEstado": byState}, err
+	return http.StatusOK, map[string]any{"kpis": kpis, "porEstado": byState, "ejemplo": example, "tipo": kind}, err
+}
+
+// average es el promedio de los totales (0 si no hay).
+func average(totals map[shared.ID]int64) int64 {
+	if len(totals) == 0 {
+		return 0
+	}
+	var sum int64
+	for _, t := range totals {
+		sum += t
+	}
+	return sum / int64(len(totals))
+}
+
+// compare dice en una frase cómo va el número frente a otro periodo (HU-75).
+func compare(now, before int64, period string) string {
+	if before == 0 {
+		return "No hay entregas de " + period + " para comparar."
+	}
+	pct := float64(now-before) * 100 / float64(before)
+	switch {
+	case pct >= 1:
+		return fmt.Sprintf("Va %.0f %% arriba de %s (%s).", pct, period, money(before))
+	case pct <= -1:
+		return fmt.Sprintf("Va %.0f %% abajo de %s (%s).", -pct, period, money(before))
+	}
+	return fmt.Sprintf("Va igual que %s (%s).", period, money(before))
+}
+
+// topOrders nombra las órdenes que más pesan en el ticket (HU-75): "Lo mueven sobre todo OS-0043 ($145.000) y …".
+func (h *Handler) topOrders(ctx context.Context, tallerID shared.ID, totals map[shared.ID]int64, n int) (string, error) {
+	type item struct {
+		id    shared.ID
+		total int64
+	}
+	var list []item
+	for id, t := range totals {
+		list = append(list, item{id, t})
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].total > list[j].total })
+	var parts []string
+	for i := 0; i < len(list) && i < n; i++ {
+		o, err := h.orders.Load(ctx, tallerID, list[i].id)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, fmt.Sprintf("%s (%s)", o.Code, money(list[i].total)))
+	}
+	if len(parts) == 0 {
+		return "", nil
+	}
+	return "Lo mueven sobre todo " + strings.Join(parts, " y ") + ".", nil
+}
+
+// BusinessDays son los días hábiles (lunes a viernes) entre a y b, con fracción: un fin de semana en medio no cuenta.
+func BusinessDays(a, b time.Time) float64 {
+	if !b.After(a) {
+		return 0
+	}
+	var total time.Duration
+	for t := a; t.Before(b); {
+		next := time.Date(t.Year(), t.Month(), t.Day()+1, 0, 0, 0, 0, t.Location())
+		if next.After(b) {
+			next = b
+		}
+		if wd := t.Weekday(); wd != time.Saturday && wd != time.Sunday {
+			total += next.Sub(t)
+		}
+		t = next
+	}
+	return total.Hours() / 24
 }
 
 // Pending es un pendiente del día (HU-76).
@@ -231,8 +376,8 @@ func (h *Handler) today(r *http.Request, p reqctx.Principal) (int, any, error) {
 				continue
 			}
 			id := o.ID.String()
-			out = append(out, Pending{Kind: "sin_recoger", Title: fmt.Sprintf("%s %s sin recoger", o.Vehicle, o.Plate),
-				Detail: fmt.Sprintf("Listo hace %d días · %s", d, names[o.CustomerID]), OrderID: &id, Tone: "err"})
+			out = append(out, Pending{Kind: "sin_recoger", Title: fmt.Sprintf("%s %s · %d días sin recoger", o.Vehicle, o.Plate, d),
+				Detail: fmt.Sprintf("%s · %s", o.Code, names[o.CustomerID]), OrderID: &id, Tone: "err"})
 		}
 		if money {
 			pend, err := h.quotes.Pending(ctx, p.TallerID)

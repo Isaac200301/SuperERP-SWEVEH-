@@ -4,6 +4,7 @@ package http
 import (
 	"log/slog"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -23,6 +24,7 @@ type Handler struct {
 	log        *slog.Logger
 	limiter    *httpx.RateLimiter
 	trustProxy bool
+	admins     []string // HU-74: celulares de los administradores del ERP
 }
 
 func NewHandler(svc *app.Service, log *slog.Logger, limiter *httpx.RateLimiter, trustProxy bool) *Handler {
@@ -89,7 +91,12 @@ type sessionResp struct {
 	Roles       []string    `json:"roles"`
 	CuentaNueva bool        `json:"cuentaNueva"`
 	Permisos    []string    `json:"permisos"`
+	// AdminPlataforma: es administrador del ERP y ve el medidor de todos los talleres (HU-74, ADR-0030).
+	AdminPlataforma bool `json:"adminPlataforma"`
 }
+
+// SetPlatformAdmins son los celulares (E.164) de los administradores del ERP, para /me (HU-74).
+func (h *Handler) SetPlatformAdmins(phones []string) { h.admins = phones }
 
 type userDTO struct {
 	ID      string `json:"id"`
@@ -157,7 +164,7 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, sessionResp{
 		Usuario: userDTO{ID: u.ID.String(), Nombre: u.Name, Celular: shared.NationalNumber(u.Phone)},
 		Taller:  workshopDTO{ID: ws.ID.String(), Nombre: ws.Name},
-		Roles:   p.Roles, Permisos: domain.Permissions(p.Roles),
+		Roles:   p.Roles, Permisos: domain.Permissions(p.Roles), AdminPlataforma: slices.Contains(h.admins, u.Phone),
 	})
 }
 

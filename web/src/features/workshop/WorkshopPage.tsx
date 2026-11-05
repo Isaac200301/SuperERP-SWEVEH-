@@ -5,21 +5,25 @@ import { Link } from 'react-router';
 import { api, unwrap } from '../../shared/api/client';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
+import { WahaCard } from '../messaging/WahaCard';
 import { card, ProfileForm, type Taller } from './ProfileForm';
 import { SettingsForm } from './SettingsForm';
 
 const select = 'min-h-[52px] rounded-btn border-[1.5px] border-line bg-white px-4 text-base';
 const dias = { lun: 'Lunes', mar: 'Martes', mie: 'Miércoles', jue: 'Jueves', vie: 'Viernes', sab: 'Sábado', dom: 'Domingo' } as const;
 
-/** HU-08: horario semanal; un día sin horas queda cerrado. */
-export function Schedule({ t }: { t: Taller }) {
+/** HU-08: horario semanal; un día sin horas queda cerrado. onSaved sirve para seguir con lo que pidió el horario (HU-06). */
+export function Schedule({ t, onSaved }: { t: Taller; onSaved?: () => void }) {
   const qc = useQueryClient();
   const [h, setH] = useState<Record<string, { abre: string; cierra: string } | null>>(() =>
     Object.fromEntries(Object.keys(dias).map((d) => [d, t.horario[d] ?? null])),
   );
   const guardar = useMutation({
     mutationFn: async () => unwrap(await api.PUT('/workshop/schedule', { body: { horario: h } })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['taller'] }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['taller'] });
+      onSaved?.();
+    },
   });
   return (
     <section className={card} aria-labelledby="horario">
@@ -69,6 +73,7 @@ export function WorkshopPage() {
       <ProfileForm t={q.data} />
       <Schedule t={q.data} />
       <SettingsForm />
+      <WahaCard />
     </>
   );
 }

@@ -39,3 +39,8 @@ func (i Inventory) Parts(ctx context.Context, tallerID shared.ID, ids []shared.I
 func (i Inventory) Discount(ctx context.Context, tallerID, orderID shared.ID, lines []Line, by shared.Actor) ([]shared.ID, error) {
 	return i.svc.Discount(ctx, tallerID, orderID, lines, by)
 }
+
+// ReturnAll devuelve a bodega lo que la orden descontó y no se ha devuelto (HU-26, al cancelar).
+func (i Inventory) ReturnAll(ctx context.Context, tallerID, orderID shared.ID, by shared.Actor) (int, error) {
+	return i.svc.ReturnAll(ctx, by, tallerID, orderID)
+}

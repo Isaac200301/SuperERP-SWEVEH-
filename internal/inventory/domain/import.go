@@ -1,16 +1,13 @@
 package domain
 
 import (
-	"bytes"
-	"encoding/csv"
 	"errors"
-	"io"
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"sweveh/internal/shared"
+	"sweveh/internal/shared/csvx"
 )
 
 // Límites de la importación (HU-37, Propuesta): suficientes para un taller pequeño y acotan el trabajo del servidor.
@@ -67,122 +64,29 @@ type ImportRow struct {
 }
 
 // ParseImport lee un CSV y valida cada fila con las reglas del repuesto (HU-37). No importa nada: el caso de uso
-// decide si confirma. Acepta "," o ";" (Excel en español usa ";"), BOM y archivos de Excel en Windows (no UTF-8).
+// decide si confirma. La lectura del archivo (separador, BOM, Excel en Windows) es de shared/csvx.
 func ParseImport(data []byte) (ImportFile, error) {
-	if len(data) > MaxImportBytes {
+	t, err := csvx.Read(data, MaxImportBytes, MaxImportRows)
+	switch {
+	case errors.Is(err, csvx.ErrTooLarge):
 		return ImportFile{}, ErrImportTooMany
-	}
-	data = toUTF8(bytes.TrimPrefix(data, []byte{0xEF, 0xBB, 0xBF}))
-	r := csv.NewReader(bytes.NewReader(data))
-	r.Comma = detectSeparator(data)
-	r.FieldsPerRecord = -1
-	r.TrimLeadingSpace = true
-	header, err := r.Read()
-	if errors.Is(err, io.EOF) {
+	case errors.Is(err, csvx.ErrEmpty):
 		return ImportFile{}, ErrImportEmpty
-	}
-	if err != nil {
+	case err != nil:
 		return ImportFile{}, ErrImportFormat
 	}
-	idx, warnings := mapHeader(header)
+	idx, warnings := csvx.Columns(t.Header, columnAliases)
 	for _, need := range []string{"referencia", "nombre", "precio"} {
 		if _, ok := idx[need]; !ok {
 			return ImportFile{}, ErrImportHeader
 		}
 	}
 	out := ImportFile{Warnings: warnings}
-	for line := 2; ; line++ {
-		rec, err := r.Read()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return ImportFile{}, ErrImportFormat
-		}
-		if blank(rec) {
-			continue
-		}
-		if len(out.Rows) == MaxImportRows {
-			return ImportFile{}, ErrImportTooMany
-		}
-		out.Rows = append(out.Rows, parseRow(line, rec, idx))
-	}
-	if len(out.Rows) == 0 {
-		return ImportFile{}, ErrImportEmpty
+	for _, r := range t.Rows {
+		out.Rows = append(out.Rows, parseRow(r.Line, r.Fields, idx))
 	}
 	markDuplicates(out.Rows)
 	return out, nil
-}
-
-// fold deja un texto comparable: minúsculas, sin tildes, sin lo que va entre paréntesis y con espacios simples.
-func fold(s string) string {
-	if i := strings.Index(s, "("); i >= 0 {
-		s = s[:i]
-	}
-	s = strings.NewReplacer("á", "a", "é", "e", "í", "i", "ó", "o", "ú", "u", "ü", "u", "ñ", "n",
-		"Á", "a", "É", "e", "Í", "i", "Ó", "o", "Ú", "u", "Ü", "u", "Ñ", "n").Replace(strings.ToLower(s))
-	return strings.Join(strings.Fields(s), " ")
-}
-
-func mapHeader(header []string) (map[string]int, []string) {
-	idx := map[string]int{}
-	var warnings []string
-	for i, h := range header {
-		col, ok := columnAliases[fold(h)]
-		switch {
-		case strings.TrimSpace(h) == "":
-			continue
-		case !ok:
-			warnings = append(warnings, "La columna \""+strings.TrimSpace(h)+"\" no la reconocemos y se ignora.")
-		case hasKey(idx, col):
-			warnings = append(warnings, "La columna \""+strings.TrimSpace(h)+"\" está repetida; se usa la primera.")
-		default:
-			idx[col] = i
-		}
-	}
-	return idx, warnings
-}
-
-func hasKey(m map[string]int, k string) bool { _, ok := m[k]; return ok }
-
-// toUTF8 convierte desde Windows-1252 (lo que guarda Excel en Windows como "CSV delimitado por comas") si el
-// archivo no es UTF-8 válido. Los bytes 0xA0-0xFF coinciden con Latin-1; 0x80-0x9F usan la tabla de Windows.
-func toUTF8(b []byte) []byte {
-	if utf8.Valid(b) {
-		return b
-	}
-	var out bytes.Buffer
-	for _, c := range b {
-		switch {
-		case c < 0x80:
-			out.WriteByte(c)
-		case c < 0xA0:
-			out.WriteRune(cp1252[c-0x80])
-		default:
-			out.WriteRune(rune(c))
-		}
-	}
-	return out.Bytes()
-}
-
-var cp1252 = [32]rune{'€', '�', '‚', 'ƒ', '„', '…', '†', '‡', 'ˆ', '‰', 'Š', '‹', 'Œ', '�', 'Ž', '�',
-	'�', '‘', '’', '“', '”', '•', '–', '—', '˜', '™', 'š', '›', 'œ', '�', 'ž', 'Ÿ'}
-
-func detectSeparator(data []byte) rune {
-	first, _, _ := bytes.Cut(data, []byte("\n"))
-	if bytes.Count(first, []byte(";")) > bytes.Count(first, []byte(",")) {
-		return ';'
-	}
-	return ','
-}
-
-func blank(rec []string) bool {
-	for _, v := range rec {
-		if strings.TrimSpace(v) != "" {
-			return false
-		}
-	}
-	return true
 }
 
 // reThousands: "65.000", "65,000" o "1.250.000" son pesos con separador de miles.
@@ -225,11 +129,11 @@ func parseRow(line int, rec []string, idx map[string]int) ImportRow {
 			row.Errors = append(row.Errors, "precio: es obligatorio")
 		}
 	}
-	kind, ok := kindAliases[fold(get("tipo"))]
+	kind, ok := kindAliases[csvx.Fold(get("tipo"))]
 	if !ok {
 		row.Errors = append(row.Errors, "para: escribe Carro, Moto o Carro y moto")
 	}
-	category := fold(get("categoria"))
+	category := csvx.Fold(get("categoria"))
 	if c, ok := categoryAliases[category]; ok {
 		category = c
 	}

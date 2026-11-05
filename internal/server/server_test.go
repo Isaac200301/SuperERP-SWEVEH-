@@ -49,6 +49,12 @@ type env struct {
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
+	return newEnvWith(t, config.API{Env: config.EnvLocal})
+}
+
+// newEnvWith es newEnv con la configuración del motor (WhatsApp, IA) y los webhooks públicos montados.
+func newEnvWith(t *testing.T, cfg config.API) *env {
+	t.Helper()
 	d := testdb.New(t)
 	key, err := authn.GenerateDevKey()
 	if err != nil {
@@ -70,7 +76,7 @@ func newEnv(t *testing.T) *env {
 		Verifier:  authn.NewVerifier(map[string]*ecdsa.PublicKey{"test-1": &key.PublicKey}, clk),
 		OTPSender: mem, OTPPepper: []byte("pepper-de-pruebas-de-32-caracteres!!"),
 		AllowedOrigins: []string{origin}, LoginPerMinute: 100000, Storage: st,
-		Extra: wire.Extra(config.API{Env: config.EnvLocal}),
+		Extra: wire.Extra(cfg), Public: wire.Public(d.API, cfg, log), PlatformAdmins: cfg.Platform.Admins,
 	})
 	srv.Config.Handler = mux
 	srv.StartTLS()

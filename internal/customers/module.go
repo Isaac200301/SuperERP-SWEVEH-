@@ -68,9 +68,21 @@ func (d Directory) Register(ctx context.Context, tallerID shared.ID, phone, name
 	return Summary{ID: c.ID, Name: c.Name, Phone: c.Phone, Consent: string(c.Consent)}, err
 }
 
+// FindOrCreate busca el cliente por celular o lo crea con la autorización pendiente (HU-92, HU-95). No cambia el
+// nombre de uno que ya existe.
+func (d Directory) FindOrCreate(ctx context.Context, tallerID shared.ID, phone, name string, actor shared.Actor) (shared.ID, bool, error) {
+	r, err := d.svc.Register(ctx, app.RegisterCustomer{TallerID: tallerID, Actor: actor, Phone: phone, Name: name})
+	return r.Customer.ID, !r.Existing, err
+}
+
 // SetConsent registra la autorización del cliente con su prueba (HU-85).
 func (d Directory) SetConsent(ctx context.Context, tallerID, id shared.ID, granted bool, rec app.ConsentRecord, actor shared.Actor) error {
 	return d.svc.SetConsent(ctx, tallerID, id, actor, granted, rec)
+}
+
+// FillName pone el nombre que dio el cliente si el que tiene es de relleno (ADR-0029).
+func (d Directory) FillName(ctx context.Context, tallerID, id shared.ID, name string, actor shared.Actor) (bool, error) {
+	return d.svc.FillName(ctx, tallerID, id, actor, name)
 }
 
 // ConsentRecord es la prueba de la autorización (re-exportado para otros módulos).

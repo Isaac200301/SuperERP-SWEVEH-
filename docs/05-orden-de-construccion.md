@@ -133,7 +133,7 @@ La cuenta de Meta y el número de prueba (plantillas propias y duración del tok
 
 > Los nombres de los comandos son una **Propuesta**; si el equipo prefiere otros, se cambian aquí y en `CLAUDE.md`.
 >
-> **Estado (2026-11-01):** existen `dev` (con `dev-api`, `dev-worker`, `dev-web`), `test`, `lint`, `gen`, `migrate`, `cover`, `ci`, `build` e `image`. `e2e`, `seed-demo` y `reset-demo` fallan a propósito con un mensaje hasta T5 (HU-97, HU-98). `make dev` levanta Postgres y migra, pero api, worker y web se corren en tres terminales.
+> **Estado (2026-11-01):** existen `dev` (con `dev-api`, `dev-worker`, `dev-web`), `test`, `lint`, `gen`, `migrate`, `cover`, `ci`, `build` e `image`. `e2e` corre el recorrido en navegador (desde 2026-11-03). `seed-demo` y `reset-demo` cargan y reinician el taller ficticio desde T5 (HU-97, HU-98, ADR-0031). `make dev` levanta Postgres y migra, pero api, worker y web se corren en tres terminales.
 
 ## 9. Plantilla de trabajo por HU (copiar en la descripción del PR)
 

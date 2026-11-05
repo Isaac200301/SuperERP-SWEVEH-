@@ -223,6 +223,26 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
 
+  /vehicles/import:
+    post:
+      operationId: importVehicles
+      summary: Importar clientes y vehículos desde CSV (HU-92). Sin confirmar=1 es solo la vista previa; con errores no se importa nada. Los clientes nuevos quedan con autorización pendiente. Permiso import:run
+      parameters:
+        - { name: confirmar, in: query, schema: { type: string, enum: ['0', '1'] } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [archivo]
+              properties:
+                archivo: { type: string, format: binary, description: 'CSV con nombre, celular, placa y tipo de vehículo (carro o moto); marca, línea, modelo, kilometraje, cilindraje y turbo son opcionales' }
+      responses:
+        '200': { $ref: '#/components/responses/Importacion' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Importacion' }
+
   /vehicles/by-plate/{placa}:
     get:
       operationId: getVehicleByPlate
@@ -747,6 +767,97 @@ paths:
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
 
+  /customers/duplicates:
+    get:
+      operationId: listDuplicateCustomers
+      summary: Posibles clientes repetidos, agrupados por nombre (HU-15). Permiso customer:merge
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [grupos]
+                properties:
+                  grupos:
+                    type: array
+                    items:
+                      type: object
+                      required: [clientes]
+                      properties:
+                        clientes: { type: array, items: { $ref: '#/components/schemas/Cliente' } }
+
+  /customers/merge:
+    post:
+      operationId: mergeCustomers
+      summary: Unir un cliente repetido al que se conserva (HU-15). Sus vehículos, órdenes y conversaciones pasan al que queda; queda en la bitácora. Permiso customer:merge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [conservar, unir]
+              properties:
+                conservar: { type: string, format: uuid }
+                unir: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Unidos
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cliente, movidos]
+                properties:
+                  cliente: { $ref: '#/components/schemas/Cliente' }
+                  movidos: { type: object, additionalProperties: { type: integer }, description: 'vehiculos, ordenes y conversaciones que pasaron al cliente' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /customers/{id}/export:
+    get:
+      operationId: exportCustomerData
+      summary: Copia de los datos del titular (HU-87) con autorizaciones, vehículos, órdenes y mensajes. Permiso data_request:manage
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [generadoEn, cliente, autorizaciones, vehiculos, ordenes, mensajes]
+                properties:
+                  generadoEn: { type: string, format: date-time }
+                  cliente: { type: object, additionalProperties: true }
+                  autorizaciones: { type: array, items: { type: object, additionalProperties: true } }
+                  vehiculos: { type: array, items: { type: object, additionalProperties: true } }
+                  ordenes: { type: array, items: { type: object, additionalProperties: true } }
+                  mensajes: { type: array, items: { type: object, additionalProperties: true } }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /customers/{id}/anonymize:
+    post:
+      operationId: anonymizeCustomer
+      summary: Borrar los datos del titular (HU-87). Anonimiza nombre, celular, correo, placas, conversaciones y borradores; conserva órdenes y montos. No se puede deshacer. Permiso data_request:manage
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: Anonimizado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [anonimizados]
+                properties:
+                  anonimizados: { type: object, additionalProperties: { type: integer }, description: 'vehiculos, ordenes, borradores y mensajes tocados' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
   /customers/{id}/vehicles:
     get:
       operationId: listCustomerVehicles
@@ -853,6 +964,89 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Servicio' }
         '400': { $ref: '#/components/responses/Problem' }
+
+  /services/photo:
+    post:
+      operationId: importPriceListPhoto
+      summary: 'Pasar la lista de precios con una foto (HU-93, ADR-0032): la IA lee la foto y cada fila queda por revisar; nada se vuelve servicio sin aprobación. JPG, PNG o WebP hasta 8 MB. Sin IA responde 422 lista_sin_ia. Permiso service:manage'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [foto]
+              properties:
+                foto: { type: string, format: binary }
+      responses:
+        '201':
+          description: Filas leídas, por revisar
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [propuestas]
+                properties:
+                  propuestas: { type: array, items: { $ref: '#/components/schemas/PropuestaServicio' } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /services/proposals:
+    get:
+      operationId: listPriceListProposals
+      summary: 'Filas de la lista de precios por revisar (HU-93); ?todas=1 incluye las resueltas. Permiso service:manage'
+      parameters:
+        - { name: todas, in: query, schema: { type: string, enum: ['1'] } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [propuestas]
+                properties:
+                  propuestas: { type: array, items: { $ref: '#/components/schemas/PropuestaServicio' } }
+
+  /services/proposals/{id}:
+    post:
+      operationId: resolvePriceListProposal
+      summary: 'Aprobar (con las correcciones del dueño: crea el servicio) o descartar una fila (HU-93). Permiso service:manage'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [aprobar, descartar] }
+                nombre: { type: string, maxLength: 120 }
+                precio: { type: integer, format: int64, nullable: true }
+                tipoVehiculo: { type: string, enum: [carro, moto, ambos] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PropuestaServicio' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /services/proposals/{id}/photo:
+    get:
+      operationId: getPriceListProposalPhoto
+      summary: La foto de la lista de esa fila, para verla al lado (HU-93). Permiso service:manage
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: La imagen
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/Problem' }
 
   /services/{id}:
     patch:
@@ -964,6 +1158,7 @@ paths:
                 categoria: { type: string, description: 'Una de Categoria o vacío' }
                 ubicacion: { type: string, maxLength: 40 }
                 referenciaOem: { type: string, maxLength: 40 }
+                ofrecerWhatsapp: { type: boolean, description: 'Mostrarlo en la vitrina del asesor de WhatsApp (ADR-0029)' }
       responses:
         '200':
           description: OK
@@ -973,6 +1168,40 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+
+  /parts/{id}/photo:
+    put:
+      operationId: setPartPhoto
+      summary: Foto del repuesto para la vitrina de WhatsApp (ADR-0029). JPG, PNG o WebP hasta 5 MB. Permiso part:manage
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [foto]
+              properties:
+                foto: { type: string, format: binary }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Repuesto' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    get:
+      operationId: getPartPhoto
+      summary: La foto del repuesto. Permiso part:read
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: La imagen
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/Problem' }
 
   /parts/{id}/entries:
     post:
@@ -1213,6 +1442,7 @@ paths:
                 atiende: { type: string }
                 especialidades: { type: array, items: { type: string } }
                 ciudad: { type: string }
+                direccion: { type: string, maxLength: 160, description: 'Opcional; sale en el recordatorio de la cita (HU-44)' }
                 tamano: { type: string }
                 contratoAceptado: { type: boolean }
       responses:
@@ -1267,6 +1497,8 @@ paths:
     get:
       operationId: getDashboard
       summary: Los 6 KPIs del taller y las órdenes abiertas por estado (HU-68…73). Permiso kpi:read
+      parameters:
+        - { name: tipo, in: query, description: 'Solo carros o solo motos (HU-68, HU-70); vacío = todos', schema: { type: string, enum: [carro, moto] } }
       responses:
         '200':
           description: OK
@@ -1274,10 +1506,12 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [kpis, porEstado]
+                required: [kpis, porEstado, ejemplo, tipo]
                 properties:
                   kpis: { type: array, items: { $ref: '#/components/schemas/Kpi' } }
                   porEstado: { type: object, additionalProperties: { type: integer } }
+                  ejemplo: { type: boolean, description: 'El taller aún no tiene órdenes propias: las cifras salen de los datos de ejemplo (HU-71)' }
+                  tipo: { type: string, description: 'Filtro aplicado: carro, moto o vacío' }
 
   /today:
     get:
@@ -1390,7 +1624,7 @@ paths:
   /inbox/stats:
     get:
       operationId: getDraftStats
-      summary: Qué tan seguido el dueño edita los borradores (HU-65). Permiso inbox:manage
+      summary: Qué tan seguido el dueño edita los borradores (HU-65) y cuántas tarjetas esperan (HU-66). Permiso inbox:manage
       responses:
         '200':
           description: OK
@@ -1398,11 +1632,39 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [enviados, editados, porcentajeEditados]
+                required: [enviados, editados, porcentajeEditados, pendientes]
                 properties:
                   enviados: { type: integer }
                   editados: { type: integer }
                   porcentajeEditados: { type: number }
+                  pendientes: { type: integer, description: 'Tarjetas por revisar (hasta 100)' }
+
+  /assistant/settings:
+    get:
+      operationId: getAssistantSettings
+      summary: Si el agente responde solo (ADR-0028). Permiso inbox:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantSettings' }
+    put:
+      operationId: setAssistantSettings
+      summary: Enciende o apaga el envío automático del agente (HU-67, ADR-0028). Permiso automation:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssistantSettings' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantSettings' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem' }
 
   /conversations:
     get:
@@ -1418,6 +1680,20 @@ paths:
                 required: [conversaciones]
                 properties:
                   conversaciones: { type: array, items: { $ref: '#/components/schemas/Conversacion' } }
+
+  /conversations/{id}/messages/{mid}/audio:
+    get:
+      operationId: getVoiceNote
+      summary: Nota de voz del cliente para escucharla en el panel (HU-60). Se descarga del canal la primera vez. Permiso conversation:read
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: mid, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: El audio
+          content:
+            audio/ogg: { schema: { type: string, format: binary } }
+        '404': { $ref: '#/components/responses/Problem' }
 
   /conversations/{id}:
     get:
@@ -1515,6 +1791,60 @@ paths:
                     properties:
                       proveedor: { type: string }
                       numero: { type: string }
+    put:
+      operationId: setWhatsAppChannel
+      summary: 'Solo fuera de producción: cambia el número del taller entre el simulador (prueba_local) y el WhatsApp de prueba de WAHA (waha, ADR-0027). Permiso workshop:manage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [proveedor]
+              properties:
+                proveedor: { type: string, enum: [prueba_local, waha] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [canal]
+                properties:
+                  canal:
+                    type: object
+                    nullable: true
+                    properties:
+                      proveedor: { type: string }
+                      numero: { type: string }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /whatsapp/waha:
+    get:
+      operationId: getWahaSession
+      summary: 'Solo fuera de producción: estado de la sesión de WAHA y, si espera el escaneo, el QR como data URL (ADR-0027). Permiso workshop:manage'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WahaSession' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /whatsapp/waha/start:
+    post:
+      operationId: startWahaSession
+      summary: 'Solo fuera de producción: crea o arranca la sesión de WAHA para escanear el QR (ADR-0027). Permiso workshop:manage'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WahaSession' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
 
   /simulator/inbound:
     post:
@@ -1536,6 +1866,84 @@ paths:
         '202': { description: Recibido }
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+
+  /platform/messages:
+    get:
+      operationId: getPlatformMessageLog
+      summary: 'Registro técnico de mensajes (HU-100): por celular, qué entró y salió en cada taller con su estado, error y hora, y los webhooks crudos de los últimos 7 días que lo mencionan. Sin el texto de los mensajes. Solo administradores del ERP (PLATFORM_ADMINS)'
+      parameters:
+        - { name: celular, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [celular, mensajes, webhooks, diasWebhooks]
+                properties:
+                  celular: { type: string }
+                  diasWebhooks: { type: integer }
+                  mensajes:
+                    type: array
+                    items:
+                      type: object
+                      required: [taller, fecha, direccion, tipo, estado, origen, error, enviadoEn, wamid]
+                      properties:
+                        taller: { type: string }
+                        fecha: { type: string, format: date-time }
+                        direccion: { type: string, enum: [entrante, saliente] }
+                        tipo: { type: string }
+                        estado: { type: string, enum: [recibido, pendiente, enviado, entregado, leido, fallido] }
+                        origen: { type: string }
+                        error: { type: string, nullable: true }
+                        enviadoEn: { type: string, format: date-time, nullable: true }
+                        wamid: { type: string, nullable: true }
+                  webhooks:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, recibido, procesado, error]
+                      properties:
+                        id: { type: string, format: uuid }
+                        recibido: { type: string, format: date-time }
+                        procesado: { type: string, format: date-time, nullable: true }
+                        error: { type: string, nullable: true }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  /platform/usage:
+    get:
+      operationId: getPlatformUsage
+      summary: 'Medidor del administrador del ERP (HU-74, ADR-0030): mensajes enviados del mes contra los incluidos y costo de IA por taller, el que más cuesta primero. Solo administradores del ERP (PLATFORM_ADMINS); a un usuario de taller le responde 403 sin_permiso'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [talleres, mes, incluidos, pesosPorDolar]
+                properties:
+                  mes: { type: string, description: 'AAAA-MM' }
+                  incluidos: { type: integer, description: 'Mensajes incluidos por taller (provisional, D-04)' }
+                  pesosPorDolar: { type: integer, description: 'Para pasar el costo de IA a pesos (provisional)' }
+                  talleres:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, nombre, mensajes, incluidos, mensajesTexto, iaMicroUsd, iaPesos, iaTexto, sePasa]
+                      properties:
+                        id: { type: string, format: uuid }
+                        nombre: { type: string }
+                        mensajes: { type: integer }
+                        incluidos: { type: integer }
+                        mensajesTexto: { type: string, description: '"34 de 1.000"' }
+                        iaMicroUsd: { type: integer, format: int64 }
+                        iaPesos: { type: integer, format: int64 }
+                        iaTexto: { type: string, description: '"IA $1.200"' }
+                        sePasa: { type: boolean, description: 'Lleva más mensajes de los incluidos' }
+        '403': { $ref: '#/components/responses/Problem' }
 
   /audit:
     get:
@@ -1602,6 +2010,7 @@ components:
               avisos: { type: array, items: { type: string }, description: 'Lo que no impide importar, p. ej. columnas que no se reconocen' }
               conError: { type: integer }
               importadas: { type: integer }
+              clientesNuevos: { type: integer, description: 'Solo en la importación de clientes y vehículos (HU-92)' }
               filas:
                 type: array
                 items:
@@ -1675,6 +2084,20 @@ components:
               ordenId: { type: string, format: uuid, description: 'Obligatorio en devoluciones' }
 
   schemas:
+    AssistantSettings:
+      type: object
+      required: [autoEnvio]
+      properties:
+        autoEnvio: { type: boolean, description: 'true = el agente responde solo; false = todo pasa por Por revisar' }
+    WahaSession:
+      type: object
+      required: [configurado]
+      properties:
+        configurado: { type: boolean }
+        sesion: { type: string }
+        estado: { type: string, description: 'STOPPED, STARTING, SCAN_QR_CODE, WORKING, FAILED, NOT_FOUND o SIN_CONEXION' }
+        numero: { type: string, description: 'chat del número vinculado, p. ej. 573009999999@c.us' }
+        qr: { type: string, description: 'data:image/png;base64,… mientras espera el escaneo' }
     ItemRecepcion:
       type: object
       required: [clave, nombre]
@@ -1727,6 +2150,7 @@ components:
         texto: { type: string, description: 'Valor ya formateado en español de Colombia' }
         detalle: { type: string }
         queSignifica: { type: string, description: 'Explicación en palabras del taller (HU-75)' }
+        ejemplo: { type: boolean, description: 'Calculado con los datos de ejemplo del registro (HU-71)' }
 
     Pendiente:
       type: object
@@ -1754,6 +2178,7 @@ components:
         datos: { type: array, items: { type: string }, nullable: true }
         ejecucionesSemana: { type: integer }
         costo: { type: string }
+        fueraDeVentana: { type: boolean, description: 'Suele salir fuera de la ventana de 24 h: en producción cambiar el texto pide una plantilla nueva aprobada por Meta (HU-42, Q-17)' }
 
     Borrador:
       type: object
@@ -1762,7 +2187,9 @@ components:
         id: { type: string, format: uuid }
         conversacionId: { type: string, format: uuid }
         celular: { type: string }
-        mensajeCliente: { type: string }
+        mensajeCliente: { type: string, description: 'Lo que escribió el cliente; si mandó una nota de voz, su transcripción (HU-60)' }
+        mensajeId: { type: string, format: uuid, description: 'Mensaje del cliente: con notaDeVoz, el audio está en /conversations/{conversacionId}/messages/{mensajeId}/audio' }
+        notaDeVoz: { type: boolean }
         intencion: { type: string }
         propuesto: { type: string, description: 'Texto que propone la IA o la plantilla; no sale sin aprobación (RF-18)' }
         final: { type: string, nullable: true }
@@ -1819,6 +2246,7 @@ components:
                   titulo: { type: string }
             boton: { type: string }
             nombre: { type: string }
+            imagen: { type: string, description: 'Foto enviada: "repuesto:<id>" es la foto de la vitrina (ADR-0029); "evidencia:<orden>:<id>", una foto de la orden marcada para el cliente (HU-56)' }
         estado: { type: string }
         origen: { type: string }
         ordenId: { type: string, format: uuid, nullable: true }
@@ -1925,6 +2353,19 @@ components:
         ordenAbierta: { type: string, nullable: true }
         estadoOrden: { allOf: [{ $ref: '#/components/schemas/EstadoOrden' }], nullable: true }
 
+    PropuestaServicio:
+      type: object
+      description: Una fila leída de la foto de la lista de precios (HU-93)
+      required: [id, loteId, nombre, precio, tipoVehiculo, estado, servicioId]
+      properties:
+        id: { type: string, format: uuid }
+        loteId: { type: string, format: uuid, description: 'Las filas de la misma foto comparten lote' }
+        nombre: { type: string }
+        precio: { type: integer, format: int64, nullable: true }
+        tipoVehiculo: { type: string, enum: [carro, moto, ambos] }
+        estado: { type: string, enum: [pendiente, aprobada, descartada] }
+        servicioId: { type: string, format: uuid, nullable: true }
+
     Servicio:
       type: object
       required: [id, nombre, tipoVehiculo, precio, duracionMin, activo, version]
@@ -1962,6 +2403,8 @@ components:
         categoria: { type: string, description: 'Una de Categoria o vacío' }
         ubicacion: { type: string }
         referenciaOem: { type: string, description: 'Referencia original o equivalente' }
+        ofrecerWhatsapp: { type: boolean, description: 'El asesor de WhatsApp lo ofrece (vitrina, ADR-0029)' }
+        tieneFoto: { type: boolean }
 
     Miembro:
       type: object
@@ -1990,13 +2433,14 @@ components:
 
     Taller:
       type: object
-      required: [id, nombre, atiende, especialidades, ciudad, tamano, horario, contratoVersion, contratoAceptadoEn, onboardingCompleto]
+      required: [id, nombre, atiende, especialidades, ciudad, direccion, tamano, horario, contratoVersion, contratoAceptadoEn, onboardingCompleto]
       properties:
         id: { type: string, format: uuid }
         nombre: { type: string }
         atiende: { type: string }
         especialidades: { type: array, items: { type: string } }
         ciudad: { type: string }
+        direccion: { type: string }
         tamano: { type: string }
         horario: { $ref: '#/components/schemas/Horario' }
         contratoVersion: { type: string, nullable: true }
@@ -2038,6 +2482,7 @@ components:
           items: { type: string }
           description: 'Permisos recurso:acción del rol; la UI los usa solo para ocultar, el servidor siempre verifica (R-05)'
         cuentaNueva: { type: boolean }
+        adminPlataforma: { type: boolean, description: 'Es administrador del ERP: ve el medidor de todos los talleres (HU-74, ADR-0030)' }
 
     Cliente:
       type: object

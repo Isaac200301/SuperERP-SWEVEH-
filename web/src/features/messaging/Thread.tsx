@@ -25,11 +25,22 @@ export function botones(m: Mensaje): Boton[] {
   return m.payload?.botones ?? [];
 }
 
+/** Foto enviada: "repuesto:<id>" es la foto de la vitrina (ADR-0029); "evidencia:<orden>:<id>", una foto de la orden (HU-56). */
+function foto(m: Mensaje): string | null {
+  const [tipo, a, b] = (m.payload?.imagen ?? '').split(':');
+  if (tipo === 'repuesto' && a) return `/api/v1/parts/${a}/photo`;
+  if (tipo === 'evidencia' && a && b) return `/api/v1/orders/${a}/evidence/${b}/file`;
+  return null;
+}
+
 /**
  * Hilo de WhatsApp como lo ve el cliente (docs/10 §4.5): lo suyo a la izquierda y lo del taller a la derecha, con
  * hora, quién lo envió y si no se entregó. Con onPress los botones se pueden pulsar (simulador).
  */
-export function Thread({ mensajes, onPress }: { mensajes: Mensaje[]; onPress?: (b: Boton) => void }) {
+/** Dirección del audio de una nota de voz (HU-60): el api la descarga del canal la primera vez. */
+export const audioURL = (conversacionId: string, mensajeId: string) => `/api/v1/conversations/${conversacionId}/messages/${mensajeId}/audio`;
+
+export function Thread({ mensajes, onPress, conversacionId }: { mensajes: Mensaje[]; onPress?: (b: Boton) => void; conversacionId?: string }) {
   if (mensajes.length === 0) return <p className="text-ink-2">Todavía no hay mensajes.</p>;
   return (
     <ol className="flex flex-col gap-2" aria-label="Mensajes de WhatsApp">
@@ -39,7 +50,14 @@ export function Thread({ mensajes, onPress }: { mensajes: Mensaje[]; onPress?: (
         return (
           <li key={m.id} className={`flex max-w-[85%] flex-col gap-1 ${mio ? 'self-end items-end' : 'self-start items-start'}`}>
             <div className={`rounded-2xl px-4 py-2 text-[15px] ${mio ? 'bg-[#DCF8C6]' : 'bg-white ring-1 ring-line'} ${m.estado === 'fallido' ? 'ring-2 ring-err' : ''}`}>
-              <p className="whitespace-pre-wrap">{m.cuerpo}</p>
+              {foto(m) ? <img src={foto(m) ?? ''} alt={m.cuerpo} className="mb-1 max-h-56 rounded-xl bg-white object-contain" /> : null}
+              {m.tipo === 'audio' ? (
+                <div className="mb-1 flex flex-col gap-1">
+                  <span className="text-xs font-bold text-ink-2">Nota de voz{m.cuerpo ? ' · transcripción' : ''}</span>
+                  {conversacionId ? <audio controls preload="none" src={audioURL(conversacionId, m.id)} aria-label="Escuchar la nota de voz" /> : null}
+                </div>
+              ) : null}
+              <p className="whitespace-pre-wrap">{m.tipo === 'audio' && !m.cuerpo ? 'Sin transcripción.' : m.cuerpo}</p>
               {bs.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {bs.map((b) =>

@@ -103,7 +103,7 @@ export function ConversationPage() {
       {c ? (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,560px)_minmax(0,320px)]">
           <section aria-label="Mensajes" className="flex flex-col gap-3 rounded-card bg-[#ECE5DD] p-4">
-            <Thread mensajes={conv.data?.mensajes ?? []} />
+            <Thread mensajes={conv.data?.mensajes ?? []} conversacionId={c.id} />
             {responder.isError ? <Alert>{responder.error.message}</Alert> : null}
             <form onSubmit={onSubmit} className="flex items-end gap-2">
               <div className="flex-1">

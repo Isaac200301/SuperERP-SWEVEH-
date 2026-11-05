@@ -220,18 +220,80 @@ func (Repository) Conversations(ctx context.Context, tallerID shared.ID, limit i
 }
 
 // ResponseMinutes: por cada mensaje del cliente, minutos hasta la siguiente respuesta del taller (HU-73).
-func (Repository) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error) {
+func (Repository) SentSince(ctx context.Context, tallerID shared.ID, since time.Time) (int, error) {
+	return db.Scalar[int](ctx, `SELECT count(*)::int FROM messaging.mensaje WHERE taller_id = $1 AND direccion = 'saliente'
+		AND estado IN ('enviado', 'entregado', 'leido') AND created_at >= $2`, tallerID, since)
+}
+
+// ResponseMinutes son los minutos entre cada mensaje del cliente y la primera respuesta (persona o agente). Auto marca
+// las respuestas automáticas (el estado de AU-05 y la autorización de datos), que el tablero cuenta aparte (HU-73).
+func (Repository) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]app.ResponseTime, error) {
 	type row struct {
-		Min float64 `db:"minutos"`
+		Min  float64 `db:"minutos"`
+		Auto bool    `db:"auto"`
 	}
-	rows, err := db.Many[row](ctx, `SELECT EXTRACT(EPOCH FROM (r.created_at - e.created_at)) / 60 AS minutos
+	rows, err := db.Many[row](ctx, `SELECT EXTRACT(EPOCH FROM (r.created_at - e.created_at)) / 60 AS minutos, r.auto
 		FROM messaging.mensaje e
-		JOIN LATERAL (SELECT created_at FROM messaging.mensaje s WHERE s.taller_id = e.taller_id AND s.conversacion_id = e.conversacion_id
+		JOIN LATERAL (SELECT created_at, COALESCE(automatizacion IN ('AU-05', 'consentimiento'), false) AS auto FROM messaging.mensaje s
+			WHERE s.taller_id = e.taller_id AND s.conversacion_id = e.conversacion_id
 			AND s.direccion = 'saliente' AND s.origen IN ('persona', 'agente') AND s.created_at > e.created_at ORDER BY s.created_at LIMIT 1) r ON true
 		WHERE e.taller_id = $1 AND e.direccion = 'entrante' AND e.created_at >= $2`, tallerID, since)
-	out := make([]float64, 0, len(rows))
+	out := make([]app.ResponseTime, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, r.Min)
+		out = append(out, app.ResponseTime{Minutes: r.Min, Auto: r.Auto})
 	}
 	return out, err
+}
+
+func (Repository) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	n, err := db.Exec(ctx, `UPDATE messaging.conversacion SET cliente_id = $3 WHERE taller_id = $1 AND cliente_id = $2`, tallerID, from, to)
+	return int(n), err
+}
+
+func (Repository) AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID) (int, error) {
+	n, err := db.Exec(ctx, `UPDATE messaging.mensaje SET cuerpo = NULL, payload = '{}'::jsonb, wamid = NULL,
+			estado = CASE WHEN estado = 'pendiente' THEN 'fallido' ELSE estado END,
+			error = CASE WHEN estado = 'pendiente' THEN 'cliente anonimizado' ELSE error END
+		WHERE taller_id = $1 AND conversacion_id IN (SELECT id FROM messaging.conversacion WHERE taller_id = $1 AND cliente_id = $2)`,
+		tallerID, customerID)
+	if err != nil {
+		return 0, err
+	}
+	_, err = db.Exec(ctx, `UPDATE messaging.conversacion SET celular = 'anonimo-' || id::text WHERE taller_id = $1 AND cliente_id = $2`,
+		tallerID, customerID)
+	return int(n), err
+}
+
+func (Repository) MessagesOf(ctx context.Context, tallerID, customerID shared.ID) ([]app.Message, error) {
+	return msgs(db.Many[msgRow](ctx, `SELECT `+msgCols+` FROM messaging.mensaje WHERE taller_id = $1
+		AND conversacion_id IN (SELECT id FROM messaging.conversacion WHERE taller_id = $1 AND cliente_id = $2) ORDER BY created_at, id`,
+		tallerID, customerID))
+}
+
+func (Repository) MessagesByPhone(ctx context.Context, tallerID shared.ID, phone string, limit int) ([]app.Message, error) {
+	return msgs(db.Many[msgRow](ctx, `SELECT `+msgCols+` FROM messaging.mensaje WHERE taller_id = $1
+		AND conversacion_id IN (SELECT id FROM messaging.conversacion WHERE taller_id = $1 AND celular = $2)
+		ORDER BY created_at DESC, id DESC LIMIT $3`, tallerID, phone, limit))
+}
+
+func (Repository) WebhooksMentioning(ctx context.Context, digits string, since time.Time, limit int) ([]app.WebhookTrace, error) {
+	type r struct {
+		ID          shared.ID  `db:"id"`
+		ReceivedAt  time.Time  `db:"recibido_en"`
+		ProcessedAt *time.Time `db:"procesado_en"`
+		Error       *string    `db:"error"`
+	}
+	rows, err := db.Many[r](ctx, `SELECT id, recibido_en, procesado_en, error FROM messaging.webhook_evento
+		WHERE recibido_en >= $2 AND strpos(cuerpo::text, $1) > 0 ORDER BY recibido_en DESC LIMIT $3`, digits, since, limit)
+	out := make([]app.WebhookTrace, 0, len(rows))
+	for _, x := range rows {
+		out = append(out, app.WebhookTrace{ID: x.ID, ReceivedAt: x.ReceivedAt, ProcessedAt: x.ProcessedAt, Error: x.Error})
+	}
+	return out, err
+}
+
+func (Repository) SetTranscript(ctx context.Context, tallerID, id shared.ID, text string) error {
+	_, err := db.Exec(ctx, `UPDATE messaging.mensaje SET cuerpo = $3, payload = payload || '{"transcripcion": true}'::jsonb
+		WHERE taller_id = $1 AND id = $2`, tallerID, id, text)
+	return err
 }

@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import { api, unwrap, type Schemas } from '../../shared/api/client';
+import { api, ApiError, unwrap, type Schemas } from '../../shared/api/client';
 import { formatoFechaHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { usePermission } from '../auth/api';
+import { Schedule } from '../workshop/WorkshopPage';
 
 type Automatizacion = Schemas['Automatizacion'];
 const key = ['automatizaciones'] as const;
@@ -51,6 +52,12 @@ function Card({ a, canManage }: { a: Automatizacion; canManage: boolean }) {
           </label>
           <textarea id={`t-${a.codigo}`} rows={2} className="rounded-btn border-[1.5px] border-line p-3" value={texto} onChange={(e) => setTexto(e.target.value)} />
           {a.datos && a.datos.length > 0 ? <p className="text-sm text-ink-2">Datos que se llenan solos: {a.datos.join(', ')}</p> : null}
+          {a.fueraDeVentana ? (
+            <p role="note" className="rounded-2xl bg-warn-tint p-3 text-sm text-warn-ink">
+              Este aviso suele salir cuando el cliente no ha escrito en 24 horas. En producción WhatsApp exige que el texto sea una plantilla
+              aprobada por Meta: si lo cambias, el texto nuevo necesita esa aprobación antes de usarse.
+            </p>
+          ) : null}
           <div>
             <Button variant="secondary" disabled={texto === a.texto} busy={guardar.isPending} onClick={() => guardar.mutate({ texto })}>
               Guardar texto
@@ -60,8 +67,23 @@ function Card({ a, canManage }: { a: Automatizacion; canManage: boolean }) {
       ) : a.enviaMensaje ? (
         <p className="rounded-2xl bg-surface p-3 text-sm">{a.texto}</p>
       ) : null}
-      {guardar.isError ? <Alert>{guardar.error.message}</Alert> : null}
+      {guardar.error instanceof ApiError && guardar.error.code === 'horario_requerido' ? (
+        <AskSchedule message={guardar.error.message} onSaved={() => guardar.mutate({ activa: true })} />
+      ) : guardar.isError ? (
+        <Alert>{guardar.error.message}</Alert>
+      ) : null}
     </li>
+  );
+}
+
+/** HU-06: el horario se pide justo al encender el agente; al guardarlo, el agente se enciende. */
+function AskSchedule({ message, onSaved }: { message: string; onSaved: () => void }) {
+  const t = useQuery({ queryKey: ['taller'], queryFn: async () => unwrap(await api.GET('/workshop')) });
+  return (
+    <div className="flex flex-col gap-3">
+      <p role="alert" className="rounded-2xl bg-warn-tint p-3 text-sm font-bold text-warn-ink">{message}</p>
+      {t.data ? <Schedule t={t.data} onSaved={onSaved} /> : null}
+    </div>
   );
 }
 

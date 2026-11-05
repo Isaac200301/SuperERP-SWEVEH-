@@ -18,6 +18,7 @@ import (
 	ordersdomain "sweveh/internal/orders/domain"
 	"sweveh/internal/shared"
 	vehiclesapp "sweveh/internal/vehicles/app"
+	vehiclesdomain "sweveh/internal/vehicles/domain"
 )
 
 // taller implementa assistantapp.Taller sobre las fachadas y servicios ya cableados.
@@ -146,7 +147,7 @@ func (t *taller) OpenOrders(ctx context.Context, tallerID, customerID shared.ID)
 		}
 		list, err := t.s.M.OrdersF.OpenByCustomer(ctx, tallerID, customerID, ids)
 		for _, i := range list {
-			out = append(out, assistantapp.Order{ID: i.ID, Code: i.Code, Plate: i.Plate, Vehicle: i.Vehicle, State: i.State, PromisedAt: i.PromisedAt})
+			out = append(out, assistantapp.Order{ID: i.ID, Code: i.Code, Plate: i.Plate, Vehicle: i.Vehicle, Kind: i.VehicleKind, State: i.State, PromisedAt: i.PromisedAt})
 		}
 		return err
 	})
@@ -157,7 +158,7 @@ func (t *taller) Order(ctx context.Context, tallerID, orderID shared.ID) (assist
 	var out assistantapp.Order
 	err := t.s.M.Tx.Do(ctx, func(ctx context.Context) error {
 		i, err := t.s.M.OrdersF.Info(ctx, tallerID, orderID)
-		out = assistantapp.Order{ID: i.ID, Code: i.Code, Plate: i.Plate, Vehicle: i.Vehicle, State: i.State, PromisedAt: i.PromisedAt}
+		out = assistantapp.Order{ID: i.ID, Code: i.Code, Plate: i.Plate, Vehicle: i.Vehicle, Kind: i.VehicleKind, State: i.State, PromisedAt: i.PromisedAt}
 		return err
 	})
 	return out, err
@@ -165,7 +166,7 @@ func (t *taller) Order(ctx context.Context, tallerID, orderID shared.ID) (assist
 
 func (t *taller) StatusReply(ctx context.Context, tallerID shared.ID, o assistantapp.Order, c assistantapp.Customer) (string, bool, error) {
 	return t.s.Automations.StatusReply(ctx, tallerID, automationsapp.OrderInfo{ID: o.ID, Code: o.Code, State: o.State, Plate: o.Plate,
-		Vehicle: o.Vehicle, PromisedAt: o.PromisedAt}, automationsapp.Customer{Name: c.Name, Phone: c.Phone, Consent: c.Consent})
+		Vehicle: o.Vehicle, Kind: o.Kind, PromisedAt: o.PromisedAt}, automationsapp.Customer{Name: c.Name, Phone: c.Phone, Consent: c.Consent})
 }
 
 func (t *taller) AgentOn(ctx context.Context, tallerID shared.ID) (bool, error) {
@@ -182,24 +183,130 @@ func (t *taller) RespondQuote(ctx context.Context, tallerID, orderID shared.ID, 
 	return t.s.M.QuotesF.Respond(ctx, tallerID, orderID, decision, "whatsapp", ref, agent)
 }
 
+// RespondQuoteItems aprueba los ítems con esos números, en el orden en que salieron en el mensaje (HU-30).
+func (t *taller) RespondQuoteItems(ctx context.Context, tallerID, orderID shared.ID, picks []int, ref string) (assistantapp.QuotePick, bool, error) {
+	var out assistantapp.QuotePick
+	q, err := t.s.M.QuotesF.ForOrder(ctx, tallerID, orderID)
+	if err != nil || q == nil {
+		return out, false, err
+	}
+	items := make(map[shared.ID]bool, len(q.Lines))
+	for _, l := range q.Lines {
+		items[l.ID] = false
+	}
+	for _, n := range picks {
+		if n > len(q.Lines) {
+			return out, false, nil
+		}
+		items[q.Lines[n-1].ID] = true
+	}
+	res, err := t.s.M.QuotesF.RespondItems(ctx, tallerID, orderID, items, "whatsapp", ref, agent)
+	if err != nil {
+		return out, false, err
+	}
+	return assistantapp.QuotePick{Approved: len(picks), Lines: len(q.Lines), Total: res.Total}, true, nil
+}
+
+// VoiceNote descarga la nota de voz por el canal del taller (HU-60).
+func (t *taller) VoiceNote(ctx context.Context, tallerID, msgID shared.ID) ([]byte, string, error) {
+	m, err := t.s.Messaging.VoiceNote(ctx, tallerID, msgID)
+	return m.Data, m.Mime, err
+}
+
+func (t *taller) SetTranscript(ctx context.Context, tallerID, msgID shared.ID, text string) error {
+	return t.s.Messaging.SetTranscript(ctx, tallerID, msgID, text)
+}
+
 func (t *taller) AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, ok bool, ref string) (bool, error) {
 	return t.s.M.OrdersF.AnswerReceipt(ctx, tallerID, orderID, agent, ok, ref)
 }
 
 // CreateOrderFromPlate crea vehículo (motor pendiente) y orden "Por recibir" (HU-55, HU-91).
-func (t *taller) CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string) (string, error) {
-	var code string
+func (t *taller) PlateOf(ctx context.Context, tallerID, customerID shared.ID, plate string) (assistantapp.PlateInfo, error) {
+	var out assistantapp.PlateInfo
 	err := t.s.M.Tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = t.plateOf(ctx, tallerID, customerID, plate)
+		return err
+	})
+	return out, err
+}
+
+// plateOf corre en la transacción del llamador.
+func (t *taller) plateOf(ctx context.Context, tallerID, customerID shared.ID, plate string) (assistantapp.PlateInfo, error) {
+	v, err := t.s.M.VehDir.ByPlate(ctx, tallerID, plate)
+	switch {
+	case errors.Is(err, vehiclesdomain.ErrVehicleNotFound):
+		return assistantapp.PlateInfo{Owner: "nueva"}, nil
+	case err != nil:
+		return assistantapp.PlateInfo{}, err
+	case v.CustomerID != customerID:
+		return assistantapp.PlateInfo{Owner: "ajena"}, nil
+	}
+	open, err := t.s.M.OrdersF.OpenByCustomer(ctx, tallerID, customerID, []shared.ID{v.ID})
+	if err != nil || len(open) == 0 {
+		return assistantapp.PlateInfo{Owner: "propia"}, err
+	}
+	i := open[0]
+	return assistantapp.PlateInfo{Owner: "propia", Code: i.Code, Open: &assistantapp.Order{ID: i.ID, Code: i.Code, Plate: i.Plate,
+		Vehicle: i.Vehicle, Kind: i.VehicleKind, State: i.State, PromisedAt: i.PromisedAt}}, nil
+}
+
+func (t *taller) CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string, when *time.Time) (assistantapp.PlateInfo, error) {
+	var out assistantapp.PlateInfo
+	err := t.s.M.Tx.Do(ctx, func(ctx context.Context) error {
+		p, err := t.plateOf(ctx, tallerID, customerID, plate)
+		if err != nil || p.Owner == "ajena" {
+			out = p
+			return err
+		}
+		if p.Open != nil { // con orden abierta: esa misma; si aún no llega el vehículo, se cambia la cita
+			out = p
+			if when == nil || p.Open.State != string(ordersdomain.StatePending) {
+				return nil
+			}
+			out.Rescheduled = true
+			_, err := t.s.M.Flow.SetPromise(ctx, tallerID, p.Open.ID, agent, when)
+			return err
+		}
 		v, err := t.s.M.Vehicles.Register(ctx, vehiclesapp.RegisterVehicle{TallerID: tallerID, Actor: agent, Plate: plate, CustomerID: customerID})
 		if err != nil {
 			return err
 		}
 		o, err := t.s.M.Orders.Open(ctx, ordersapp.OpenOrder{TallerID: tallerID, Actor: agent, VehicleID: v.Vehicle.ID, Symptom: symptom,
-			InitialState: ordersdomain.StatePending, ConfirmDuplicate: true})
-		code = o.Code()
+			InitialState: ordersdomain.StatePending})
+		if err != nil {
+			return err
+		}
+		out = assistantapp.PlateInfo{Owner: p.Owner, Code: o.Code()}
+		if when != nil { // la cita queda en la fecha prometida: AU-06 la recuerda ese día
+			_, err = t.s.M.Flow.SetPromise(ctx, tallerID, o.ID, agent, when)
+		}
 		return err
 	})
-	return code, err
+	return out, err
+}
+
+// OpenAt revisa la hora contra el horario del taller (HU-08). Sin horario registrado se acepta y el taller confirma.
+func (t *taller) OpenAt(ctx context.Context, tallerID shared.ID, at time.Time) (bool, string, error) {
+	st, err := t.s.M.Admin.Get(ctx, tallerID)
+	if err != nil {
+		return false, "", err
+	}
+	if len(st.Schedule) == 0 {
+		return true, "", nil
+	}
+	at = at.In(domain.Bogota)
+	sl := st.Schedule[dayKeys[at.Weekday()]]
+	if sl == nil {
+		return false, "", nil
+	}
+	hm := at.Format("15:04")
+	return hm >= sl.Opens && hm < sl.Closes, automationsHour(sl.Opens) + " a " + automationsHour(sl.Closes), nil
+}
+
+func (t *taller) SetCustomerName(ctx context.Context, tallerID, customerID shared.ID, name string) (bool, error) {
+	return t.s.M.CustDir.FillName(ctx, tallerID, customerID, name, agent)
 }
 
 func (t *taller) Catalog(ctx context.Context, tallerID shared.ID) ([]domain.Priced, []domain.Priced, error) {

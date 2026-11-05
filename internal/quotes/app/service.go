@@ -39,6 +39,8 @@ type Service struct {
 
 type Catalog interface {
 	Get(ctx context.Context, tallerID, id shared.ID) (Service, error)
+	// FillPrice guarda en la lista el precio de un servicio que no tenía (HU-06); no cambia uno que ya existe.
+	FillPrice(ctx context.Context, actor shared.Actor, tallerID, id shared.ID, price int64) error
 }
 
 type Part struct {
@@ -161,6 +163,9 @@ type LineInput struct {
 	Qty         int
 	UnitPrice   *int64 // obligatorio si el servicio no tiene precio o el ítem es libre
 	HoursCent   *int   // mano de obra por horas: el precio sale de la tarifa del taller
+	// SaveToList: si el servicio no tiene precio de lista, el que se escribe queda en la lista (HU-06). Solo para quien
+	// administra los servicios (service:manage): el mecánico cotiza con su valor sin cambiar la lista del dueño.
+	SaveToList bool
 }
 
 var ErrPriceNeeded = shared.Validation("precio_requerido", "Este servicio no tiene precio: escribe el valor para cotizarlo.").WithField("precioUnitario")
@@ -186,6 +191,11 @@ func (s *Quotes) AddLine(ctx context.Context, tallerID, orderID shared.ID, actor
 				l.UnitPrice = *sv.Price
 			} else if in.UnitPrice != nil {
 				l.UnitPrice, l.FreePrice = *in.UnitPrice, true
+				if in.SaveToList {
+					if err := s.catalog.FillPrice(ctx, actor, tallerID, *in.RefID, *in.UnitPrice); err != nil {
+						return err
+					}
+				}
 			} else {
 				return ErrPriceNeeded
 			}
@@ -334,8 +344,14 @@ func (s *Quotes) Send(ctx context.Context, tallerID, orderID shared.ID, actor sh
 		if err := s.repo.Save(ctx, q, pv); err != nil {
 			return err
 		}
-		if o.State == "en_diagnostico" {
+		switch {
+		case o.State == "en_diagnostico":
 			if err := s.orders.Move(ctx, tallerID, orderID, "esperando_aprobacion", actor, "cotización enviada"); err != nil {
+				return err
+			}
+		case o.State == "en_reparacion" && q.Number > 1:
+			// HU-31: el adicional vuelve a pedir aprobación; lo ya aprobado sigue en pie.
+			if err := s.orders.Move(ctx, tallerID, orderID, "esperando_aprobacion", actor, "cotización adicional enviada"); err != nil {
 				return err
 			}
 		}
@@ -385,6 +401,18 @@ func (s *Quotes) Respond(ctx context.Context, c RespondCmd) (domain.Quote, error
 		q.Version++
 		if err := s.repo.Save(ctx, q, pv); err != nil {
 			return err
+		}
+		if !approved && c.Response.Decision == "rechazar" && q.Number > 1 {
+			// HU-31: si el cliente no aprueba el adicional, se sigue con lo que ya había aprobado.
+			o, err := s.orders.Load(ctx, c.TallerID, c.OrderID)
+			if err != nil {
+				return err
+			}
+			if o.State == "esperando_aprobacion" {
+				if err := s.orders.Move(ctx, c.TallerID, c.OrderID, "en_reparacion", c.Actor, "cotización adicional no aprobada"); err != nil {
+					return err
+				}
+			}
 		}
 		if approved {
 			o, err := s.orders.Load(ctx, c.TallerID, c.OrderID)

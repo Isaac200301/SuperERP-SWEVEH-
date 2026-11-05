@@ -11,6 +11,12 @@ import (
 	"github.com/google/uuid"
 )
 
+type AssistantAjuste struct {
+	TallerID  uuid.UUID
+	AutoEnvio bool
+	UpdatedAt time.Time
+}
+
 type AssistantBorrador struct {
 	ID                uuid.UUID
 	TallerID          uuid.UUID
@@ -28,6 +34,7 @@ type AssistantBorrador struct {
 	CreatedAt         time.Time
 	ResueltoEn        *time.Time
 	ResueltoPor       *uuid.UUID
+	NotaDeVoz         bool
 }
 
 type AssistantLlamadaIum struct {
@@ -80,6 +87,22 @@ type AutomationRegla struct {
 	UpdatedAt time.Time
 }
 
+type CatalogPropuestum struct {
+	ID           uuid.UUID
+	TallerID     uuid.UUID
+	LoteID       uuid.UUID
+	FotoClave    string
+	FotoTipo     string
+	Nombre       string
+	Precio       *int64
+	TipoVehiculo string
+	Estado       string
+	ServicioID   *uuid.UUID
+	CreatedAt    time.Time
+	ResueltoEn   *time.Time
+	ResueltoPor  *uuid.UUID
+}
+
 type CatalogServicio struct {
 	ID           uuid.UUID
 	TallerID     uuid.UUID
@@ -119,6 +142,9 @@ type CustomersCliente struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	CreatedBy          *uuid.UUID
+	FusionadoCon       *uuid.UUID
+	FusionadoEn        *time.Time
+	AnonimizadoEn      *time.Time
 }
 
 type IdentityAutorizacionTitular struct {
@@ -182,23 +208,26 @@ type IdentityUsuario struct {
 }
 
 type InventoryArticulo struct {
-	ID            uuid.UUID
-	TallerID      uuid.UUID
-	Referencia    string
-	Nombre        string
-	TipoVehiculo  string
-	Costo         int64
-	PrecioVenta   int64
-	Existencia    int32
-	Minimo        int32
-	Activo        bool
-	Version       int32
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	Marca         *string
-	Categoria     *string
-	Ubicacion     *string
-	ReferenciaOem *string
+	ID              uuid.UUID
+	TallerID        uuid.UUID
+	Referencia      string
+	Nombre          string
+	TipoVehiculo    string
+	Costo           int64
+	PrecioVenta     int64
+	Existencia      int32
+	Minimo          int32
+	Activo          bool
+	Version         int32
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Marca           *string
+	Categoria       *string
+	Ubicacion       *string
+	ReferenciaOem   *string
+	OfrecerWhatsapp bool
+	FotoClave       *string
+	FotoTipo        *string
 }
 
 type InventoryMovimiento struct {
@@ -430,6 +459,7 @@ type TenancyTaller struct {
 	ContratoVersion    *string
 	ContratoAceptadoEn *time.Time
 	OnboardingCompleto bool
+	Direccion          *string
 }
 
 type VehiclesPropietarioHistorial struct {

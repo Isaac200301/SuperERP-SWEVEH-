@@ -20,6 +20,11 @@ type FlowRepository interface {
 	MarkExample(ctx context.Context, tallerID, id shared.ID) error
 	InsertHistory(ctx context.Context, tallerID, orderID shared.ID, from *domain.State, to domain.State, by *shared.ID, reason string, at time.Time) error
 	List(ctx context.Context, f ListFilter) ([]domain.Order, error)
+	// MoveCustomer pasa las órdenes de un cliente a otro (unir clientes repetidos, HU-15).
+	MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error)
+	// AnonymizeCustomer pone la placa nueva en las órdenes de cada vehículo y borra quién recogió en las del cliente.
+	AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID, plates map[shared.ID]string) (int, error)
+	ByCustomer(ctx context.Context, tallerID, customerID shared.ID) ([]domain.Order, error)
 
 	GetChecklist(ctx context.Context, tallerID, orderID shared.ID) (domain.Checklist, bool, error)
 	SaveChecklist(ctx context.Context, tallerID shared.ID, c domain.Checklist) error

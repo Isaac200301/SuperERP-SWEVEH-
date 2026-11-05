@@ -1,16 +1,24 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link } from 'react-router';
 
 import { api, unwrap, type EstadoOrden } from '../../shared/api/client';
 import { estados, flujoFor } from '../../shared/i18n/es-CO';
 import { useSettings } from '../workshop/SettingsForm';
 import { Alert } from '../../shared/ui/Alert';
+import { Segmented } from '../../shared/ui/Segmented';
 
 const tonos = { err: 'bg-err-tint text-err-ink', warn: 'bg-warn-tint text-warn-ink', info: 'bg-primary-tint' } as const;
 
 /** HU-68…73 y HU-76: los 6 números del taller, cada uno con "qué significa" (HU-75), y lo pendiente de hoy. */
 export function DashboardPage() {
-  const kpis = useQuery({ queryKey: ['tablero'], queryFn: async () => unwrap(await api.GET('/dashboard')), refetchInterval: 60_000 });
+  const [tipo, setTipo] = useState<'' | 'carro' | 'moto'>('');
+  const kpis = useQuery({
+    queryKey: ['tablero', tipo],
+    queryFn: async () => unwrap(await api.GET('/dashboard', { params: { query: tipo ? { tipo } : {} } })),
+    refetchInterval: 60_000,
+  });
+  const taller = useQuery({ queryKey: ['taller'], queryFn: async () => unwrap(await api.GET('/workshop')) });
   const settings = useSettings().data;
   const hoy = useQuery({ queryKey: ['hoy'], queryFn: async () => unwrap(await api.GET('/today')).pendientes, refetchInterval: 60_000 });
   return (
@@ -37,6 +45,11 @@ export function DashboardPage() {
                     Atender
                   </Link>
                 ) : null}
+                {p.tipo === 'borradores' ? (
+                  <Link className="font-bold underline" to="/panel/por-revisar">
+                    Revisar
+                  </Link>
+                ) : null}
                 {p.tipo === 'inventario' ? (
                   <Link className="font-bold underline" to="/panel/repuestos?bajo=1">
                     Ver repuestos
@@ -48,12 +61,32 @@ export function DashboardPage() {
         </section>
       ) : null}
       {kpis.isError ? <Alert>{kpis.error.message}</Alert> : null}
+      {taller.data?.atiende === 'ambos' ? ( // HU-68 y HU-70 (Should): mezclar carros y motos falsea los promedios
+        <Segmented
+          label="Ver"
+          value={tipo}
+          onChange={setTipo}
+          options={[
+            { value: '', label: 'Todo' },
+            { value: 'carro', label: 'Carros' },
+            { value: 'moto', label: 'Motos' },
+          ]}
+        />
+      ) : null}
+      {kpis.data?.ejemplo ? (
+        <p role="note" className="rounded-2xl bg-primary-tint p-3 text-sm">
+          Los números marcados <b>ejemplo</b> incluyen órdenes de ejemplo para que el tablero no salga vacío.
+        </p>
+      ) : null}
       {kpis.data ? (
         <>
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {kpis.data.kpis.map((k) => (
               <li key={k.codigo} className="flex flex-col gap-1 rounded-card bg-white p-5">
-                <span className="text-sm font-bold text-ink-2">{k.titulo}</span>
+                <span className="text-sm font-bold text-ink-2">
+                  {k.titulo}
+                  {k.ejemplo ? <span className="ml-2 rounded-full bg-warn-tint px-2 py-0.5 text-xs text-warn-ink">ejemplo</span> : null}
+                </span>
                 <span className="text-[28px] font-extrabold">{k.texto}</span>
                 <span className="text-sm">{k.detalle}</span>
                 <details className="text-sm text-ink-2">

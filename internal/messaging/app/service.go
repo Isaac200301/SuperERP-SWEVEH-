@@ -58,6 +58,18 @@ type Repository interface {
 	MarkWebhook(ctx context.Context, id shared.ID, errMsg *string) error
 	ChannelByNumber(ctx context.Context, phoneNumberID string) (ChannelInfo, bool, error)
 	ChannelOf(ctx context.Context, tallerID shared.ID) (ChannelInfo, bool, error)
+	// MoveCustomer pasa las conversaciones de un cliente a otro (unir clientes repetidos, HU-15).
+	MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error)
+	// AnonymizeCustomer borra el celular y el texto de las conversaciones del cliente (HU-87).
+	AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID) (int, error)
+	// MessagesOf son los mensajes de las conversaciones del cliente, en orden (copia de sus datos, HU-87).
+	MessagesOf(ctx context.Context, tallerID, customerID shared.ID) ([]Message, error)
+	// MessagesByPhone son los últimos mensajes de la conversación con ese celular (registro técnico, HU-100).
+	MessagesByPhone(ctx context.Context, tallerID shared.ID, phone string, limit int) ([]Message, error)
+	// SetTranscript guarda la transcripción de una nota de voz como texto del mensaje (HU-60).
+	SetTranscript(ctx context.Context, tallerID, id shared.ID, text string) error
+	// WebhooksMentioning son los webhooks crudos recibidos desde since que mencionan esos dígitos (HU-100).
+	WebhooksMentioning(ctx context.Context, digits string, since time.Time, limit int) ([]WebhookTrace, error)
 	UpsertChannel(ctx context.Context, c ChannelInfo) error
 	Conversation(ctx context.Context, tallerID shared.ID, phone string) (Conversation, error) // crea si no existe
 	ConversationByID(ctx context.Context, tallerID, id shared.ID) (Conversation, error)
@@ -70,7 +82,9 @@ type Repository interface {
 	Messages(ctx context.Context, tallerID, convID shared.ID, limit int) ([]Message, error)
 	MessagesByOrder(ctx context.Context, tallerID, orderID shared.ID) ([]Message, error)
 	Conversations(ctx context.Context, tallerID shared.ID, limit int) ([]ConversationSummary, error)
-	ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error)
+	ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]ResponseTime, error)
+	// SentSince cuenta los mensajes que salieron desde since (no cuenta los fallidos ni los pendientes). HU-74.
+	SentSince(ctx context.Context, tallerID shared.ID, since time.Time) (int, error)
 }
 
 // WebhookEvent es un cuerpo crudo recibido del proveedor de WhatsApp.
@@ -104,6 +118,7 @@ type Service struct {
 	parser  InboundParser
 	events  EventPublisher
 	clock   Clock
+	media   MediaSource
 }
 
 func NewService(tx TxRunner, r Repository, ch Channel, p InboundParser, e EventPublisher, c Clock) *Service {
@@ -125,6 +140,8 @@ type Inbound struct {
 	ButtonID      string
 	At            time.Time
 	Name          string
+	Media         string // referencia del archivo en el canal (id de Meta, URL de WAHA): notas de voz, HU-60
+	Mime          string
 }
 
 // ProcessWebhooks interpreta los cuerpos pendientes (los llama el worker).
@@ -196,7 +213,14 @@ func (s *Service) storeInbound(ctx context.Context, in Inbound) error {
 		if err != nil {
 			return err
 		}
-		payload, _ := json.Marshal(map[string]any{"boton": in.ButtonID, "nombre": in.Name})
+		if in, err = s.menuReply(ctx, tallerID, conv.ID, in); err != nil {
+			return err
+		}
+		p := map[string]any{"boton": in.ButtonID, "nombre": in.Name}
+		if in.Media != "" { // HU-60: el audio se descarga después (para transcribirlo y para escucharlo en el panel)
+			p["media"], p["mime"] = in.Media, in.Mime
+		}
+		payload, _ := json.Marshal(p)
 		wamid := in.WAMID
 		m := Message{ID: shared.NewID(), TallerID: tallerID, ConversationID: conv.ID, Direction: "entrante", WAMID: &wamid,
 			Kind: in.Kind, Body: in.Text, Payload: payload, State: "recibido", Origin: "cliente", CreatedAt: in.At}
@@ -213,6 +237,27 @@ func (s *Service) storeInbound(ctx context.Context, in Inbound) error {
 	})
 }
 
+// menuReply convierte un texto en la respuesta de un botón cuando el último mensaje de la conversación fue
+// nuestro con opciones y el cliente contesta con su número o su título ("1", "acepto"). Los canales sin botones
+// (WAHA, ADR-0027) las muestran como menú numerado; con botones reales, escribir la opción también vale.
+func (s *Service) menuReply(ctx context.Context, tallerID, convID shared.ID, in Inbound) (Inbound, error) {
+	if in.Kind != "texto" {
+		return in, nil
+	}
+	last, err := s.repo.Messages(ctx, tallerID, convID, 1)
+	if err != nil || len(last) == 0 || last[0].Direction != "saliente" || last[0].Kind != "botones" {
+		return in, err
+	}
+	var p struct {
+		Buttons []domain.Button `json:"botones"`
+	}
+	_ = json.Unmarshal(last[0].Payload, &p)
+	if id, ok := domain.MatchReply(in.Text, p.Buttons); ok {
+		in.Kind, in.ButtonID = "respuesta_boton", id
+	}
+	return in, nil
+}
+
 // Outgoing es un mensaje que se quiere enviar.
 type Outgoing struct {
 	TallerID   shared.ID
@@ -225,7 +270,18 @@ type Outgoing struct {
 	// Template indica que el texto está aprobado como plantilla de utilidad y puede salir fuera de la ventana.
 	// Hoy no hay plantillas aprobadas (Q-07/Q-17, Sin dato), así que fuera de la ventana no sale.
 	Template bool
+	// Media es una foto que va con el texto como pie (p. ej. "repuesto:<id>", vitrina ADR-0029). La resuelve
+	// MediaSource al enviar; el mensaje solo guarda la referencia.
+	Media string
 }
+
+// MediaSource trae la foto de una referencia de Outgoing.Media (la conecta el composition root).
+type MediaSource interface {
+	Media(ctx context.Context, tallerID shared.ID, ref string) (Image, error)
+}
+
+// SetMediaSource conecta de dónde salen las fotos que se envían.
+func (s *Service) SetMediaSource(m MediaSource) { s.media = m }
 
 var ErrOutsideWindow = shared.Rule("fuera_de_ventana", "El cliente no ha escrito en las últimas 24 horas; este aviso necesita una plantilla aprobada por Meta.")
 var ErrEmptyText = shared.Validation("mensaje_vacio", "Escribe el mensaje.")
@@ -248,11 +304,14 @@ func (s *Service) Enqueue(ctx context.Context, o Outgoing) (Message, error) {
 		if !domain.InWindow(conv.LastInbound, s.clock.Now()) && !o.Template {
 			return ErrOutsideWindow
 		}
-		kind := "texto"
-		if len(o.Buttons) > 0 {
+		kind, p := "texto", map[string]any{"botones": o.Buttons}
+		switch {
+		case o.Media != "":
+			kind, p = "imagen", map[string]any{"imagen": o.Media}
+		case len(o.Buttons) > 0:
 			kind = "botones"
 		}
-		payload, _ := json.Marshal(map[string]any{"botones": o.Buttons})
+		payload, _ := json.Marshal(p)
 		cat := "servicio"
 		m := Message{ID: shared.NewID(), TallerID: o.TallerID, ConversationID: conv.ID, Direction: "saliente", Kind: kind, Body: o.Text,
 			Payload: payload, State: "pendiente", Origin: o.Origin, Category: &cat, OrderID: o.OrderID, Automation: o.Automation, CreatedAt: s.clock.Now()}
@@ -302,13 +361,22 @@ func (s *Service) Deliver(ctx context.Context, tallerID, msgID shared.ID, attemp
 	}
 	var p struct {
 		Buttons []domain.Button `json:"botones"`
+		Image   string          `json:"imagen"`
 	}
 	_ = json.Unmarshal(m.Payload, &p)
 	var wamid string
 	var err error
-	if len(p.Buttons) > 0 {
+	switch {
+	case p.Image != "" && s.media != nil:
+		var img Image
+		if img, err = s.media.Media(ctx, tallerID, p.Image); err != nil {
+			return s.failed(ctx, m, errors.New("no se encontró la foto para enviar"))
+		}
+		img.Caption = m.Body
+		wamid, err = s.channel.SendImage(ctx, ch.PhoneNumberID, conv.Phone, img)
+	case len(p.Buttons) > 0:
 		wamid, err = s.channel.SendButtons(ctx, ch.PhoneNumberID, conv.Phone, m.Body, p.Buttons)
-	} else {
+	default:
 		wamid, err = s.channel.SendText(ctx, ch.PhoneNumberID, conv.Phone, m.Body)
 	}
 	if err != nil {
@@ -456,12 +524,137 @@ func (s *Service) LinkCustomer(ctx context.Context, tallerID, convID, customerID
 }
 
 // ResponseMinutes devuelve los minutos que tardó el taller en contestar cada mensaje (HU-73).
-func (s *Service) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]float64, error) {
-	var out []float64
+// SentSince cuenta los mensajes que salieron desde since, para el medidor del administrador (HU-74). Corre en la
+// transacción del llamador si la hay.
+func (s *Service) SentSince(ctx context.Context, tallerID shared.ID, since time.Time) (int, error) {
+	var n int
+	err := s.tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = s.repo.SentSince(ctx, tallerID, since)
+		return err
+	})
+	return n, err
+}
+
+// ResponseTime es cuánto tardó la primera respuesta a un mensaje del cliente; Auto = respuesta automática de AU-05.
+type ResponseTime struct {
+	Minutes float64
+	Auto    bool
+}
+
+func (s *Service) ResponseMinutes(ctx context.Context, tallerID shared.ID, since time.Time) ([]ResponseTime, error) {
+	var out []ResponseTime
 	err := s.tx.Do(ctx, func(ctx context.Context) error {
 		var err error
 		out, err = s.repo.ResponseMinutes(ctx, tallerID, since)
 		return err
 	})
 	return out, err
+}
+
+// MoveCustomer pasa las conversaciones del cliente repetido al que se conserva (HU-15). Cada conversación sigue con su
+// celular; solo cambia de quién es.
+func (s *Service) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	var n int
+	err := s.tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = s.repo.MoveCustomer(ctx, tallerID, from, to)
+		return err
+	})
+	return n, err
+}
+
+// AnonymizeCustomer borra lo que identifica al titular en sus conversaciones (HU-87): el celular queda como
+// "anonimo-<id>" y los mensajes sin texto. Lo que estaba por enviarse no sale.
+func (s *Service) AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID) (int, error) {
+	var n int
+	err := s.tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = s.repo.AnonymizeCustomer(ctx, tallerID, customerID)
+		return err
+	})
+	return n, err
+}
+
+// MessagesOf son los mensajes del cliente para la copia de sus datos (HU-87).
+func (s *Service) MessagesOf(ctx context.Context, tallerID, customerID shared.ID) ([]Message, error) {
+	var out []Message
+	err := s.tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.MessagesOf(ctx, tallerID, customerID)
+		return err
+	})
+	return out, err
+}
+
+// WebhookTrace es un webhook crudo en el registro técnico: cuándo llegó, si se procesó y el error (HU-100).
+type WebhookTrace struct {
+	ID          shared.ID
+	ReceivedAt  time.Time
+	ProcessedAt *time.Time
+	Error       *string
+}
+
+// MessagesByPhone son los últimos mensajes con ese celular en el taller, con su estado y error (HU-100).
+func (s *Service) MessagesByPhone(ctx context.Context, tallerID shared.ID, phone string) ([]Message, error) {
+	var out []Message
+	err := s.tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.MessagesByPhone(ctx, tallerID, phone, 50)
+		return err
+	})
+	return out, err
+}
+
+// WebhooksMentioning busca en los webhooks crudos de los últimos días los que mencionan el celular (HU-100). No
+// tienen taller: solo lo usa el registro técnico de plataforma.
+func (s *Service) WebhooksMentioning(ctx context.Context, digits string, since time.Time) ([]WebhookTrace, error) {
+	var out []WebhookTrace
+	err := s.tx.DoWithSettings(ctx, map[string]string{"app.admin_plataforma": "on"}, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.WebhooksMentioning(ctx, digits, since, 50)
+		return err
+	})
+	return out, err
+}
+
+// VoiceNote descarga del canal el audio de una nota de voz (HU-60). La descarga va fuera de la transacción.
+func (s *Service) VoiceNote(ctx context.Context, tallerID, msgID shared.ID) (Media, error) {
+	var (
+		m   Message
+		ch  ChannelInfo
+		ok  bool
+		err error
+	)
+	if err = s.tx.Do(ctx, func(ctx context.Context) error {
+		if m, err = s.repo.GetMessage(ctx, tallerID, msgID); err != nil {
+			return err
+		}
+		ch, ok, err = s.repo.ChannelOf(ctx, tallerID)
+		return err
+	}); err != nil {
+		return Media{}, err
+	}
+	var p struct {
+		Media string `json:"media"`
+		Mime  string `json:"mime"`
+	}
+	_ = json.Unmarshal(m.Payload, &p)
+	f, can := s.channel.(MediaFetcher)
+	if !ok || p.Media == "" || m.Kind != "audio" || !can {
+		return Media{}, ErrNoMedia
+	}
+	media, err := f.FetchMedia(ctx, ch.PhoneNumberID, p.Media)
+	if err != nil {
+		return Media{}, err
+	}
+	if media.Mime == "" {
+		media.Mime = p.Mime
+	}
+	return media, nil
+}
+
+// SetTranscript guarda la transcripción de la nota de voz en el mensaje: la conversación la muestra junto al audio.
+func (s *Service) SetTranscript(ctx context.Context, tallerID, msgID shared.ID, text string) error {
+	return s.tx.Do(ctx, func(ctx context.Context) error { return s.repo.SetTranscript(ctx, tallerID, msgID, text) })
 }

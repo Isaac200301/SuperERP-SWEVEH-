@@ -31,13 +31,39 @@ type Taller interface {
 	StatusReply(ctx context.Context, tallerID shared.ID, o Order, c Customer) (string, bool, error) // texto, AU-05 encendida
 	AgentOn(ctx context.Context, tallerID shared.ID) (bool, error)
 	RespondQuote(ctx context.Context, tallerID, orderID shared.ID, decision, ref string) error
+	// VoiceNote descarga del canal el audio de una nota de voz (HU-60).
+	VoiceNote(ctx context.Context, tallerID, msgID shared.ID) (audio []byte, mime string, err error)
+	// SetTranscript guarda la transcripción como texto del mensaje: la conversación la muestra junto al audio (HU-60).
+	SetTranscript(ctx context.Context, tallerID, msgID shared.ID, text string) error
+	// RespondQuoteItems aprueba solo los ítems con esos números (1 = el primero del mensaje, HU-30). ok=false si algún
+	// número no está en la cotización; entonces no registra nada.
+	RespondQuoteItems(ctx context.Context, tallerID, orderID shared.ID, picks []int, ref string) (res QuotePick, ok bool, err error)
 	// AnswerReceipt guarda "Está bien" (ok) o "Algo no cuadra" de la constancia; false si ya había respuesta.
 	AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, ok bool, ref string) (bool, error)
-	CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string) (string, error)
+	// PlateOf dice de quién es la placa en el taller: "nueva", "propia" (con su orden abierta, si tiene) o "ajena".
+	PlateOf(ctx context.Context, tallerID, customerID shared.ID, plate string) (PlateInfo, error)
+	// CreateOrderFromPlate abre la orden "Por recibir" (HU-55) con la cita en la fecha prometida si viene when (AU-06
+	// la recuerda ese día). Nunca duplica ni toca un vehículo ajeno: si la placa ya tiene orden abierta devuelve esa
+	// (y si está "Por recibir" y viene when, la reagenda); si es de otro cliente no crea nada (Owner "ajena").
+	CreateOrderFromPlate(ctx context.Context, tallerID, customerID shared.ID, plate, symptom string, when *time.Time) (PlateInfo, error)
+	// OpenAt dice si el taller atiende a esa hora y cuál es su horario ese día ("" = no abre ese día).
+	OpenAt(ctx context.Context, tallerID shared.ID, at time.Time) (bool, string, error)
+	// SetCustomerName pone el nombre que dio el cliente si el que tiene es de relleno; false = no cambió.
+	SetCustomerName(ctx context.Context, tallerID, customerID shared.ID, name string) (bool, error)
 
 	Catalog(ctx context.Context, tallerID shared.ID) ([]domain.Priced, []domain.Priced, error) // servicios, repuestos
 	Workshop(ctx context.Context, tallerID shared.ID) (name string, open bool, nextOpening string, err error)
 	Attends(ctx context.Context, tallerID shared.ID) (string, error) // carro | moto | ambos
+
+	// Para el asesor (ADR-0029).
+	Profile(ctx context.Context, tallerID shared.ID) (WorkshopProfile, error)
+	Vehicles(ctx context.Context, tallerID, customerID shared.ID) ([]Vehicle, error)
+	History(ctx context.Context, tallerID, convID shared.ID, before time.Time, limit int) ([]Turn, error)
+	Showcase(ctx context.Context, tallerID shared.ID, q string) ([]Product, error)
+	// LastClientPhoto es la referencia de la última foto de la orden marcada para el cliente ("" = no hay). HU-56.
+	LastClientPhoto(ctx context.Context, tallerID, orderID shared.ID) (string, error)
+	// SendMedia envía una foto (ref "repuesto:<id>" o "evidencia:<orden>:<id>") con un pie; false = ventana cerrada.
+	SendMedia(ctx context.Context, tallerID shared.ID, phone, caption, ref string) (bool, error)
 }
 
 type Inbound struct {
@@ -50,6 +76,7 @@ type Inbound struct {
 	ProfileName    string
 	Mode           string
 	At             time.Time
+	Voice          bool // era una nota de voz: Text es su transcripción (HU-60)
 }
 
 type Customer struct {
@@ -64,11 +91,21 @@ type Order struct {
 	Code       string
 	Plate      string
 	Vehicle    string
+	Kind       string // carro | moto
 	State      string
 	PromisedAt *time.Time
 }
 
 type Button struct{ ID, Title string }
+
+// PlateInfo es lo que se sabe de una placa para este cliente. Owner: nueva | propia | ajena. Open es la orden abierta
+// del cliente con esa placa; Code, el número de la orden creada o encontrada.
+type PlateInfo struct {
+	Owner       string
+	Open        *Order
+	Code        string
+	Rescheduled bool // la orden "Por recibir" quedó con la nueva fecha
+}
 
 // DraftRecord es un borrador guardado.
 type DraftRecord struct {
@@ -87,6 +124,7 @@ type DraftRecord struct {
 	ResolvedAt     *time.Time
 	InboundText    string
 	Phone          string
+	Voice          bool // el cliente mandó una nota de voz (HU-60)
 }
 
 // Action es lo que se ejecuta si el dueño envía el borrador (HU-55: crear la orden con la placa).
@@ -130,7 +168,11 @@ type InterpretResult struct {
 const AITimeout = 30 * time.Second
 
 type Repository interface {
-	InsertDraft(ctx context.Context, d DraftRecord) error
+	InsertDraft(ctx context.Context, d DraftRecord) (bool, error) // false si el mensaje ya tenía borrador
+	// AnonymizePhone borra el celular y los textos de los borradores de ese celular (HU-87).
+	AnonymizePhone(ctx context.Context, tallerID shared.ID, phone string) (int, error)
+	AutoReply(ctx context.Context, tallerID shared.ID) (bool, error)
+	SetAutoReply(ctx context.Context, tallerID shared.ID, on bool, at time.Time) error
 	Draft(ctx context.Context, tallerID, id shared.ID) (DraftRecord, error)
 	Drafts(ctx context.Context, tallerID shared.ID, onlyPending bool, limit int) ([]DraftRecord, error)
 	Resolve(ctx context.Context, tallerID, id shared.ID, state string, final *string, by shared.ID, at time.Time) (bool, error)
@@ -148,14 +190,16 @@ type AuditLog interface {
 type Clock interface{ Now() time.Time }
 
 type Service struct {
-	uow    UnitOfWork
-	repo   Repository
-	taller Taller
-	audit  AuditLog
-	clock  Clock
-	ai     Interpreter
-	free   Interpreter // reglas: respaldo sin costo cuando se agota el tope mensual
-	capUSD int64
+	uow     UnitOfWork
+	repo    Repository
+	stt     Transcriber // notas de voz (HU-60); nil = sin transcripción
+	taller  Taller
+	audit   AuditLog
+	clock   Clock
+	ai      Interpreter
+	free    Interpreter // reglas: respaldo sin costo cuando se agota el tope mensual
+	capUSD  int64
+	advisor Advisor // asesor con tools (ADR-0029); nil = solo el flujo de reglas
 }
 
 func NewService(u UnitOfWork, r Repository, t Taller, a AuditLog, c Clock, ai, free Interpreter, monthlyCapMicroUSD int64) *Service {
@@ -176,6 +220,7 @@ const (
 	receiptOK   = "¡Gracias! Quedó registrado que el recibo está bien. Te avisamos cada avance."
 	receiptAsk  = "Gracias por avisarnos. Una persona del taller te escribe para revisarlo contigo."
 	cantAnswer  = "No pudimos armar una respuesta segura. Responde tú."
+	plateAsk    = "¡Gracias! Una persona del taller revisa esa placa y te escribe en un momento."
 )
 
 // HandleInbound procesa un mensaje entrante (lo llama el worker al recibir "messaging.mensaje_recibido").
@@ -207,6 +252,9 @@ func (s *Service) HandleInbound(ctx context.Context, tallerID, msgID shared.ID) 
 	}
 	if c.Consent == "rechazada" || in.Mode == "humano" {
 		return nil // lo atiende una persona desde la conversación
+	}
+	if done, err := s.quotePick(ctx, tallerID, in, *c); done || err != nil {
+		return err
 	}
 	return s.process(ctx, tallerID, in, *c)
 }
@@ -269,6 +317,13 @@ func (s *Service) button(ctx context.Context, tallerID shared.ID, in Inbound, c 
 		}
 		_, err = s.taller.Send(ctx, tallerID, in.Phone, reply, nil, "AU-02", &oid)
 		return err
+	case strings.HasPrefix(in.ButtonID, "quote:elegir:"): // HU-30: el cliente escribe los números de lo que aprueba
+		oid, err := shared.ParseID(strings.TrimPrefix(in.ButtonID, "quote:elegir:"))
+		if err != nil || c == nil {
+			return nil
+		}
+		_, err = s.taller.Send(ctx, tallerID, in.Phone, quotePickAsk, nil, "AU-02", &oid)
+		return err
 	case strings.HasPrefix(in.ButtonID, "recibo:ok:") || strings.HasPrefix(in.ButtonID, "recibo:revisar:"):
 		return s.receipt(ctx, tallerID, in, c)
 	case strings.HasPrefix(in.ButtonID, "estado:"):
@@ -327,11 +382,49 @@ func (s *Service) status(ctx context.Context, tallerID shared.ID, in Inbound, c 
 		return s.saveDraft(ctx, tallerID, in, "estado", text, nil, nil, "plantilla")
 	}
 	oid := o.ID
-	_, err = s.taller.Send(ctx, tallerID, in.Phone, text, nil, "AU-05", &oid)
+	if _, err = s.taller.Send(ctx, tallerID, in.Phone, text, nil, "AU-05", &oid); err != nil {
+		return err
+	}
+	return s.sendLastPhoto(ctx, tallerID, in.Phone, o)
+}
+
+// sendLastPhoto manda, después del estado, la última foto de la orden marcada para el cliente (HU-56, criterio 1).
+func (s *Service) sendLastPhoto(ctx context.Context, tallerID shared.ID, phone string, o Order) error {
+	ref, err := s.taller.LastClientPhoto(ctx, tallerID, o.ID)
+	if err != nil || ref == "" {
+		return err
+	}
+	_, err = s.taller.SendMedia(ctx, tallerID, phone, photoCaption(o), ref)
 	return err
 }
 
-// process clasifica y responde: plantillas exactas salen solas; todo lo demás queda como borrador.
+func photoCaption(o Order) string {
+	return strings.TrimSpace("Así va tu " + o.Vehicle + " " + o.Plate)
+}
+
+// closedWindow es cuánto dura un aviso de fuera de horario: si ya se le dijo al cliente en ese lapso, no se repite
+// aunque escriba varias veces en la noche (HU-61).
+const closedWindow = 12 * time.Hour
+
+// closedNotice manda el aviso de fuera de horario con la próxima apertura, salvo que ya haya salido en esta
+// conversación en las últimas 12 horas.
+func (s *Service) closedNotice(ctx context.Context, tallerID shared.ID, in Inbound, nextOpening string) error {
+	history, err := s.taller.History(ctx, tallerID, in.ConversationID, in.At, historyTurns)
+	if err != nil {
+		return err
+	}
+	prefix := strings.SplitN(closedTxt, "%", 2)[0]
+	for _, h := range history {
+		if !h.FromCustomer && strings.HasPrefix(h.Text, prefix) && in.At.Sub(h.At) < closedWindow {
+			return nil
+		}
+	}
+	_, err = s.taller.Send(ctx, tallerID, in.Phone, sprintf(closedTxt, nextOpening), nil, "AU-04", nil)
+	return err
+}
+
+// process clasifica y responde: plantillas exactas salen solas; las respuestas armadas con datos del taller salen
+// solas con el envío automático (ADR-0028) o quedan como borrador. Las notas para el dueño siempre esperan.
 func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c Customer) error {
 	on, err := s.taller.AgentOn(ctx, tallerID)
 	if err != nil || !on {
@@ -341,11 +434,22 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 	if err != nil {
 		return err
 	}
-	if in.Kind == "audio" { // HU-60: sin transcripción todavía (proveedor Sin dato)
-		return s.saveDraft(ctx, tallerID, in, "nota_de_voz", "Recibimos una nota de voz. Escúchala en la conversación y responde tú.", nil, nil, "plantilla")
+	if in.Kind == "audio" { // HU-60: se transcribe y sigue el mismo flujo del texto
+		text, err := s.transcribe(ctx, tallerID, in)
+		if err != nil {
+			return err
+		}
+		if text == "" {
+			return s.saveDraft(ctx, tallerID, in, "nota_de_voz", voiceNoteCard, nil, nil, "plantilla")
+		}
+		in.Kind, in.Text, in.Voice = "texto", text, true
 	}
 	if in.Kind != "texto" {
 		return nil
+	}
+	handled, tried, err := s.advise(ctx, tallerID, in, c)
+	if err != nil || handled {
+		return err
 	}
 	services, parts, err := s.taller.Catalog(ctx, tallerID)
 	if err != nil {
@@ -356,7 +460,7 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 		return err
 	}
 	u, ok, err := s.interpret(ctx, tallerID, in, InterpretRequest{Text: in.Text, Workshop: name, Attends: attends,
-		Catalog: domain.Items(services, parts)})
+		Catalog: domain.Items(services, parts)}, tried)
 	if err != nil {
 		return err
 	}
@@ -364,8 +468,8 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 		return s.saveDraft(ctx, tallerID, in, "otro", cantAnswer, nil, nil, "plantilla")
 	}
 	intent := u.ToIntent(in.Text)
-	if !open { // HU-61: aviso de fuera de horario (una vez por mensaje) y se sigue con el borrador
-		if _, err := s.taller.Send(ctx, tallerID, in.Phone, sprintf(closedTxt, nextOpening), nil, "AU-04", nil); err != nil {
+	if !open { // HU-61: aviso fijo de fuera de horario (sin IA), una vez por noche; el borrador queda para la mañana
+		if err := s.closedNotice(ctx, tallerID, in, nextOpening); err != nil {
 			return err
 		}
 	}
@@ -373,7 +477,7 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 	case "humano":
 		return s.human(ctx, tallerID, in)
 	case "fuera_tema": // HU-58: borrador de plantilla; el dueño decide si lo envía
-		return s.saveDraft(ctx, tallerID, in, "fuera_tema", sprintf(offTopicTxt, name), nil, nil, "plantilla")
+		return s.answer(ctx, tallerID, in, "fuera_tema", sprintf(offTopicTxt, name), nil, nil, "plantilla")
 	case "estado":
 		orders, err := s.taller.OpenOrders(ctx, tallerID, c.ID)
 		if err != nil {
@@ -402,16 +506,17 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 		}
 	}
 	var action *Action
-	if intent.Plate != "" { // HU-55: la placa crea la orden "Por recibir" cuando el dueño envía
-		orders, err := s.taller.OpenOrders(ctx, tallerID, c.ID)
+	if intent.Plate != "" { // HU-55: la placa crea la orden "Por recibir" al enviar la respuesta
+		p, err := s.taller.PlateOf(ctx, tallerID, c.ID, intent.Plate)
 		if err != nil {
 			return err
 		}
-		exists := false
-		for _, o := range orders {
-			exists = exists || o.Plate == intent.Plate
-		}
-		if !exists {
+		switch {
+		case p.Owner == "ajena": // de otro cliente: no se crea nada ni se dice nada del vehículo (HU-12)
+			return s.plateReview(ctx, tallerID, in)
+		case p.Open != nil && len(intent.Services)+len(intent.Others) == 0: // ya tiene orden: se cuenta cómo va
+			return s.status(ctx, tallerID, in, c, *p.Open)
+		case p.Open == nil:
 			prev, _ := s.taller.PreviousText(ctx, tallerID, in.ConversationID, in.At)
 			sym := in.Text
 			if prev != nil {
@@ -423,9 +528,9 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 			}{Plate: intent.Plate, Symptom: sym}}
 			// La placa sola no repite la cotización: se confirma la recepción.
 			if len(intent.Services)+len(intent.Others) == 0 {
-				d := domain.Draft{Text: "¡Gracias " + firstName(c.Name) + "! Te dejamos registrada la placa " + intent.Plate + ". Te esperamos " +
+				d := domain.Draft{Text: domain.Greet("¡Gracias", c.Name) + " Te dejamos registrada la placa " + intent.Plate + ". Te esperamos " +
 					strings.TrimSuffix(nextOpening, ".") + "."}
-				return s.saveDraft(ctx, tallerID, in, "placa", d.Text, d.Sources, action, "ia")
+				return s.answer(ctx, tallerID, in, "placa", d.Text, d.Sources, action, "ia")
 			}
 		}
 	}
@@ -435,20 +540,23 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 		// Lo que no valida no sale: pasa a "Lo contesto yo" (RF-17).
 		return s.saveDraft(ctx, tallerID, in, intent.Kind, cantAnswer, nil, nil, "plantilla")
 	}
-	return s.saveDraft(ctx, tallerID, in, intent.Kind, d.Text, d.Sources, action, "ia")
+	return s.answer(ctx, tallerID, in, intent.Kind, d.Text, d.Sources, action, "ia")
 }
 
-func firstName(n string) string {
-	if f := strings.Fields(n); len(f) > 0 {
-		return f[0]
+// plateReview: la placa es de otro cliente. No se crea nada ni se dice nada del vehículo; una persona del taller
+// revisa (la conversación pasa a modo humano con alerta, HU-59).
+func (s *Service) plateReview(ctx context.Context, tallerID shared.ID, in Inbound) error {
+	if err := s.taller.SetMode(ctx, tallerID, in.ConversationID, "humano", true); err != nil {
+		return err
 	}
-	return n
+	_, err := s.taller.Send(ctx, tallerID, in.Phone, plateAsk, nil, "AU-04", nil)
+	return err
 }
 
 // interpret hace la única llamada al intérprete (RNF-05) fuera de la transacción, con límite de 30 s, y la
 // registra (HU-99). Con el tope mensual del taller agotado usa las reglas (sin costo). ok=false si la salida no
 // cumple el esquema o la IA falló: el llamador deja la tarjeta para el dueño (HU-54).
-func (s *Service) interpret(ctx context.Context, tallerID shared.ID, in Inbound, req InterpretRequest) (domain.Understanding, bool, error) {
+func (s *Service) interpret(ctx context.Context, tallerID shared.ID, in Inbound, req InterpretRequest, rulesOnly bool) (domain.Understanding, bool, error) {
 	var spent int64
 	if err := s.uow.Do(ctx, func(ctx context.Context) error {
 		var err error
@@ -458,8 +566,11 @@ func (s *Service) interpret(ctx context.Context, tallerID shared.ID, in Inbound,
 		return domain.Understanding{}, false, err
 	}
 	ai, result := s.ai, "ok"
-	if spent >= s.capUSD {
+	switch {
+	case spent >= s.capUSD:
 		ai, result = s.free, "tope"
+	case rulesOnly: // el asesor ya llamó a la IA y falló: el respaldo es sin costo
+		ai = s.free
 	}
 	start := time.Now()
 	cctx, cancel := context.WithTimeout(ctx, AITimeout)
@@ -499,14 +610,105 @@ func monthStart(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
 }
 
+// saveDraft deja una tarjeta para el dueño en "Por revisar". La usan las notas que no van al cliente
+// ("Responde tú", nota de voz) y AU-05 apagada.
 func (s *Service) saveDraft(ctx context.Context, tallerID shared.ID, in Inbound, intent, text string, src []domain.Source, a *Action, origin string) error {
+	return s.uow.Do(ctx, func(ctx context.Context) error {
+		_, err := s.repo.InsertDraft(ctx, s.draft(tallerID, in, intent, text, src, a, origin))
+		return err
+	})
+}
+
+// answer guarda la respuesta al cliente y, con el envío automático encendido (ADR-0028), la envía de una vez: queda
+// "auto_enviado". La IA no redacta: el texto sale de plantillas con datos del taller y se valida antes de salir. Si no
+// valida o la ventana de 24 h está cerrada, se queda pendiente para el dueño.
+func (s *Service) answer(ctx context.Context, tallerID shared.ID, in Inbound, intent, text string, src []domain.Source, a *Action, origin string) error {
+	d := s.draft(tallerID, in, intent, text, src, a, origin)
+	return s.uow.Do(ctx, func(ctx context.Context) error {
+		inserted, err := s.repo.InsertDraft(ctx, d)
+		if err != nil || !inserted { // si el evento llegó otra vez, no se envía de nuevo
+			return err
+		}
+		on, err := s.repo.AutoReply(ctx, tallerID)
+		if err != nil || !on {
+			return err
+		}
+		final, sent, err := s.deliver(ctx, tallerID, d, d.Proposed, true)
+		if errors.Is(err, errInvalidDraft) || (err == nil && !sent) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		now := s.clock.Now()
+		if _, err := s.repo.Resolve(ctx, tallerID, d.ID, "auto_enviado", &final, shared.ID{}, now); err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: shared.Actor{Type: shared.ActorAgent}, Action: "borrador.auto_enviado",
+			Entity: "borrador", EntityID: d.ID, After: map[string]any{"final": final}, OccurredAt: now})
+	})
+}
+
+func (s *Service) draft(tallerID shared.ID, in Inbound, intent, text string, src []domain.Source, a *Action, origin string) DraftRecord {
 	if src == nil {
 		src = []domain.Source{}
 	}
+	return DraftRecord{ID: shared.NewID(), TallerID: tallerID, ConversationID: in.ConversationID, InboundID: in.ID,
+		Intent: intent, Proposed: text, Sources: src, Action: a, State: "pendiente", Origin: origin, CreatedAt: s.clock.Now(),
+		Phone: in.Phone, InboundText: in.Text, Voice: in.Voice || in.Kind == "audio"}
+}
+
+var errInvalidDraft = shared.Rule("borrador_invalido", "El borrador no pasó la validación de precios. Edítalo antes de enviar.")
+
+// deliver envía un borrador: revalida el texto del agente (check), crea la orden de la placa (HU-55) y lo manda.
+// sent=false si la ventana de 24 h está cerrada.
+func (s *Service) deliver(ctx context.Context, tallerID shared.ID, d DraftRecord, text string, check bool) (string, bool, error) {
+	if check {
+		services, parts, err := s.taller.Catalog(ctx, tallerID)
+		if err != nil {
+			return "", false, err
+		}
+		if err := domain.Validate(text, append(services, parts...)); err != nil {
+			return "", false, errInvalidDraft
+		}
+	}
+	if d.Action != nil && d.Action.CreateOrder != nil {
+		p, err := s.createOrder(ctx, tallerID, d)
+		if err != nil {
+			return "", false, err
+		}
+		if p.Code != "" {
+			text += " Tu orden es la " + p.Code + "."
+		}
+	}
+	ok, err := s.taller.Send(ctx, tallerID, d.Phone, text, nil, "AU-04", nil)
+	return text, ok, err
+}
+
+// AutoReply dice si el agente responde solo en este taller (ADR-0028).
+func (s *Service) AutoReply(ctx context.Context, tallerID shared.ID) (bool, error) {
+	var on bool
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		on, err = s.repo.AutoReply(ctx, tallerID)
+		return err
+	})
+	return on, err
+}
+
+// SetAutoReply enciende o apaga el envío automático. Apagado, todo vuelve a "Por revisar" (HU-67).
+func (s *Service) SetAutoReply(ctx context.Context, tallerID shared.ID, actor shared.Actor, on bool) error {
 	return s.uow.Do(ctx, func(ctx context.Context) error {
-		return s.repo.InsertDraft(ctx, DraftRecord{ID: shared.NewID(), TallerID: tallerID, ConversationID: in.ConversationID, InboundID: in.ID,
-			Intent: intent, Proposed: text, Sources: src, Action: a, State: "pendiente", Origin: origin, CreatedAt: s.clock.Now(),
-			Phone: in.Phone, InboundText: in.Text})
+		before, err := s.repo.AutoReply(ctx, tallerID)
+		if err != nil {
+			return err
+		}
+		now := s.clock.Now()
+		if err := s.repo.SetAutoReply(ctx, tallerID, on, now); err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "asistente.auto_envio", Entity: "taller",
+			EntityID: tallerID, Before: map[string]any{"autoEnvio": before}, After: map[string]any{"autoEnvio": on}, OccurredAt: now})
 	})
 }
 
@@ -549,26 +751,8 @@ func (s *Service) Resolve(ctx context.Context, tallerID, draftID shared.ID, acto
 				t := strings.TrimSpace(*edited)
 				text, state = t, "editado_enviado"
 			}
-			services, parts, err := s.taller.Catalog(ctx, tallerID)
-			if err != nil {
-				return err
-			}
-			if state == "enviado" { // el texto del agente se vuelve a validar; el editado es del dueño
-				if err := domain.Validate(text, append(services, parts...)); err != nil {
-					return shared.Rule("borrador_invalido", "El borrador no pasó la validación de precios. Edítalo antes de enviar.")
-				}
-			}
-			var orderID *shared.ID
-			if d.Action != nil && d.Action.CreateOrder != nil {
-				code, err := s.createOrder(ctx, tallerID, d)
-				if err != nil {
-					return err
-				}
-				if code != "" {
-					text += " Tu orden es la " + code + "."
-				}
-			}
-			ok, err := s.taller.Send(ctx, tallerID, d.Phone, text, nil, "AU-04", orderID)
+			// El texto del agente se vuelve a validar; el editado es del dueño.
+			text, ok, err := s.deliver(ctx, tallerID, d, text, state == "enviado")
 			if err != nil {
 				return err
 			}
@@ -604,16 +788,27 @@ func (s *Service) Resolve(ctx context.Context, tallerID, draftID shared.ID, acto
 	return out, err
 }
 
-func (s *Service) createOrder(ctx context.Context, tallerID shared.ID, d DraftRecord) (string, error) {
+func (s *Service) createOrder(ctx context.Context, tallerID shared.ID, d DraftRecord) (PlateInfo, error) {
 	in, err := s.taller.Message(ctx, tallerID, d.InboundID)
 	if err != nil {
-		return "", err
+		return PlateInfo{}, err
 	}
 	c, err := s.taller.CustomerByPhone(ctx, tallerID, in.Phone)
 	if err != nil || c == nil {
-		return "", err
+		return PlateInfo{}, err
 	}
-	return s.taller.CreateOrderFromPlate(ctx, tallerID, c.ID, d.Action.CreateOrder.Plate, d.Action.CreateOrder.Symptom)
+	return s.taller.CreateOrderFromPlate(ctx, tallerID, c.ID, d.Action.CreateOrder.Plate, d.Action.CreateOrder.Symptom, nil)
+}
+
+// MonthCost es el costo de IA del mes en micro USD (HU-99), para el medidor del administrador (HU-74).
+func (s *Service) MonthCost(ctx context.Context, tallerID shared.ID) (int64, error) {
+	var c int64
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		c, err = s.repo.MonthCost(ctx, tallerID, monthStart(s.clock.Now()))
+		return err
+	})
+	return c, err
 }
 
 // Stats es qué tan seguido el dueño edita los borradores (HU-65).
@@ -627,3 +822,122 @@ func (s *Service) Stats(ctx context.Context, tallerID shared.ID) (sent, edited i
 }
 
 var sprintf = fmt.Sprintf
+
+// AnonymizePhone borra el celular y los textos de los borradores del titular (HU-87). La intención y el estado se
+// conservan para las estadísticas de la bandeja.
+func (s *Service) AnonymizePhone(ctx context.Context, tallerID shared.ID, phone string) (int, error) {
+	var n int
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = s.repo.AnonymizePhone(ctx, tallerID, phone)
+		return err
+	})
+	return n, err
+}
+
+// QuotePick es el resultado de aprobar solo algunos ítems (HU-30).
+type QuotePick struct {
+	Approved, Lines int
+	Total           int64 // lo aprobado, con descuentos e IVA
+}
+
+// Textos de la aprobación por ítems (HU-30). Son plantillas, no IA.
+const (
+	quotePickAsk   = "Escribe los números de los ítems que apruebas, por ejemplo: 1 y 3."
+	quotePickAgain = "No encontré esos números en la cotización. Escribe los de los ítems que apruebas, por ejemplo: 1 y 3."
+	quotePickOK    = "Listo, aprobaste %d de %d ítems. El total queda en %s. Seguimos con lo que aprobaste."
+)
+
+// quotePick atiende la respuesta a "Elegir ítems" (HU-30): si lo último que le dijimos fue que escribiera los números
+// y el texto son números, aprueba esos ítems de la cotización que espera respuesta y confirma el total. done=false si
+// el mensaje no es eso y debe seguir el flujo normal.
+func (s *Service) quotePick(ctx context.Context, tallerID shared.ID, in Inbound, c Customer) (bool, error) {
+	if in.Kind != "texto" {
+		return false, nil
+	}
+	picks, ok := domain.ParsePicks(in.Text)
+	if !ok {
+		return false, nil
+	}
+	history, err := s.taller.History(ctx, tallerID, in.ConversationID, in.At, 4)
+	if err != nil {
+		return false, err
+	}
+	var last *Turn
+	for i := len(history) - 1; i >= 0; i-- {
+		if !history[i].FromCustomer {
+			last = &history[i]
+			break
+		}
+	}
+	if last == nil || (last.Text != quotePickAsk && last.Text != quotePickAgain) {
+		return false, nil
+	}
+	orders, err := s.taller.OpenOrders(ctx, tallerID, c.ID)
+	if err != nil {
+		return false, err
+	}
+	var oid *shared.ID
+	for _, o := range orders {
+		if o.State == "esperando_aprobacion" {
+			id := o.ID
+			oid = &id
+		}
+	}
+	if oid == nil {
+		return false, nil
+	}
+	res, ok, err := s.taller.RespondQuoteItems(ctx, tallerID, *oid, picks, in.ID.String())
+	if err != nil {
+		return true, err
+	}
+	reply := quotePickAgain
+	if ok {
+		reply = sprintf(quotePickOK, res.Approved, res.Lines, domain.Money(res.Total))
+	}
+	_, err = s.taller.Send(ctx, tallerID, in.Phone, reply, nil, "AU-02", oid)
+	return true, err
+}
+
+// Transcriber pasa una nota de voz a texto en español (HU-60, ADR-0033).
+type Transcriber interface {
+	Transcribe(ctx context.Context, audio []byte, mime string) (string, error)
+}
+
+// SetTranscriber conecta la transcripción de notas de voz (composition root). Sin ella, la nota de voz queda como
+// tarjeta para que el dueño la escuche.
+func (s *Service) SetTranscriber(t Transcriber) { s.stt = t }
+
+const (
+	// voiceNoteCard es la tarjeta cuando no hay transcripción (sin proveedor o si falló).
+	voiceNoteCard = "Recibimos una nota de voz y no la pudimos transcribir. Escúchala en la conversación y responde tú."
+	// transcribeTimeout acota la descarga y la transcripción, fuera de la transacción.
+	transcribeTimeout = 60 * time.Second
+	// maxTranscript: una nota de voz larga se recorta para la IA (el texto completo queda en la conversación).
+	maxTranscript = 2000
+)
+
+// transcribe descarga la nota de voz y la transcribe (HU-60). Devuelve "" si no hay transcriptor, si el canal no
+// tiene el audio o si la transcripción falla: entonces queda la tarjeta para el dueño. Solo un error de la base corta.
+func (s *Service) transcribe(ctx context.Context, tallerID shared.ID, in Inbound) (string, error) {
+	if s.stt == nil {
+		return "", nil
+	}
+	tctx, cancel := context.WithTimeout(ctx, transcribeTimeout)
+	defer cancel()
+	audio, mime, err := s.taller.VoiceNote(tctx, tallerID, in.ID)
+	if err != nil || len(audio) == 0 {
+		return "", nil
+	}
+	text, err := s.stt.Transcribe(tctx, audio, mime)
+	if text = strings.TrimSpace(text); err != nil || text == "" {
+		return "", nil
+	}
+	if err := s.taller.SetTranscript(ctx, tallerID, in.ID, text); err != nil {
+		return "", err
+	}
+	if r := []rune(text); len(r) > maxTranscript {
+		text = string(r[:maxTranscript])
+	}
+	return text, nil
+}

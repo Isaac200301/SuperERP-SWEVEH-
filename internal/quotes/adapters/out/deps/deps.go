@@ -40,6 +40,10 @@ func (a Catalog) Get(ctx context.Context, tallerID, id shared.ID) (app.Service, 
 	return app.Service{Name: s.Name, Price: s.Price}, err
 }
 
+func (a Catalog) FillPrice(ctx context.Context, actor shared.Actor, tallerID, id shared.ID, price int64) error {
+	return a.C.FillPrice(ctx, actor, tallerID, id, price)
+}
+
 type Inventory struct{ I inventory.Inventory }
 
 func (a Inventory) Parts(ctx context.Context, tallerID shared.ID, ids []shared.ID) (map[shared.ID]app.Part, error) {

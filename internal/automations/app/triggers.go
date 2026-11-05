@@ -63,8 +63,15 @@ func (s *Service) fire(ctx context.Context, tallerID shared.ID, code, key string
 	})
 }
 
+// base son los datos comunes de los avisos. {vehiculo} es el tipo, para que diga "tu moto" o "tu carro" (HU-42);
+// {modelo}, la marca y línea.
 func (s *Service) base(w Workshop, c Customer, o OrderInfo) map[string]string {
-	return map[string]string{"cliente": firstName(c.Name), "taller": w.Name, "vehiculo": o.Vehicle, "placa": o.Plate, "orden": o.Code}
+	kind := o.Kind
+	if kind == "" {
+		kind = o.Vehicle
+	}
+	return map[string]string{"cliente": firstName(c.Name), "taller": w.Name, "vehiculo": kind, "modelo": o.Vehicle, "placa": o.Plate,
+		"orden": o.Code}
 }
 
 func firstName(n string) string {
@@ -139,12 +146,22 @@ func (s *Service) OnQuoteSent(ctx context.Context, tallerID, orderID shared.ID, 
 			return "", nil, err
 		}
 		d := s.base(w, c, o)
-		if q != nil {
-			d["items"] = "• " + strings.Join(q.Lines, "\n• ")
-			d["total"] = Money(q.Total)
-		}
 		id := orderID.String()
-		return domain.Render(t, d), []Button{{ID: "quote:aprobar:" + id, Title: "Aprobar"}, {ID: "quote:dudas:" + id, Title: "Tengo dudas"}}, nil
+		btns := []Button{{ID: "quote:aprobar:" + id, Title: "Aprobar"}}
+		if q != nil {
+			// Numerados: con 2 o más ítems el cliente puede aprobar solo algunos escribiendo sus números (HU-30).
+			items := make([]string, len(q.Lines))
+			for i, l := range q.Lines {
+				items[i] = itoa(i+1) + ". " + l
+			}
+			d["items"] = strings.Join(items, "\n")
+			d["total"] = Money(q.Total)
+			if len(q.Lines) > 1 {
+				btns = append(btns, Button{ID: "quote:elegir:" + id, Title: "Elegir ítems"})
+			}
+		}
+		btns = append(btns, Button{ID: "quote:dudas:" + id, Title: "Tengo dudas"})
+		return domain.Render(t, d), btns, nil
 	})
 }
 
@@ -169,6 +186,8 @@ func (s *Service) StatusReply(ctx context.Context, tallerID shared.ID, o OrderIn
 			data["prometida"] = "Te lo tenemos prometido para " + s.FormatDate(*o.PromisedAt, s.clock.Now()) + "."
 		} else if o.State == "listo" {
 			data["prometida"] = "Puedes recogerlo " + s.ScheduleText(w, s.clock.Now()) + "."
+		} else { // HU-22, criterio 2: sin fecha prometida no se inventa una
+			data["prometida"] = "Te avisamos apenas esté listo."
 		}
 		text = strings.TrimSpace(domain.Render(s.text(rules, d), data))
 		return nil
@@ -192,10 +211,15 @@ func (s *Service) LowStock(ctx context.Context, tallerID, partID shared.ID, ref 
 	})
 }
 
-// Daily corre AU-06 (cita de hoy) y AU-07 (listo hace 3 días) en todos los talleres. El worker la llama
-// con un candado consultivo para que corra en una sola instancia (R-07).
+// Daily corre AU-06 (cita de hoy) y AU-07 (listo hace 3 días) en todos los talleres. El worker la llama cada hora
+// con un candado consultivo para que corra en una sola instancia (R-07). Antes de las 7:00 a. m. (hora de Colombia) no
+// hace nada: el recordatorio sale en la mañana (HU-44) y nadie recibe avisos de madrugada. La clave por día evita
+// repetirlo en las corridas siguientes.
 func (s *Service) Daily(ctx context.Context, ids []shared.ID, withTenant func(context.Context, shared.ID) context.Context) error {
 	now := s.clock.Now()
+	if now.In(s.loc).Hour() < domain.DailyHour {
+		return nil
+	}
 	today := now.In(s.loc).Format("2006-01-02")
 	for _, tid := range ids {
 		tctx := withTenant(ctx, tid)
@@ -218,7 +242,11 @@ func (s *Service) Daily(ctx context.Context, ids []shared.ID, withTenant func(co
 			if err := s.fire(tctx, tid, "AU-06", "cita:"+o.ID.String()+":"+today, o, func(w Workshop, c Customer, t string) (string, []Button, error) {
 				d := s.base(w, c, o)
 				d["horario"] = s.ScheduleText(w, now)
-				return domain.Render(t, d), nil, nil
+				d["hora"] = hour(o.PromisedAt.In(s.loc).Format("15:04"))
+				if w.Address != "" {
+					d["direccion"] = "Estamos en " + w.Address + "."
+				}
+				return strings.TrimSpace(domain.Render(t, d)), nil, nil
 			}); err != nil {
 				return err
 			}

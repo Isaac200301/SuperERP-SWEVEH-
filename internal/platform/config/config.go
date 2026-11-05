@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"sweveh/internal/shared"
 )
 
 type Env string
@@ -39,6 +41,15 @@ type API struct {
 	StorageDir       string
 	WhatsApp         WhatsApp
 	AI               AI
+	Platform         Platform
+}
+
+// Platform es lo del administrador del ERP (HU-74, ADR-0030): quiénes son y con qué números se compara el consumo.
+// IncludedMessages y COPPerUSD son provisionales hasta decidir el plan (D-04, Q-24).
+type Platform struct {
+	Admins           []string // celulares en E.164 (+57…) de los administradores del ERP; vacío = nadie
+	IncludedMessages int      // mensajes incluidos por taller al mes ("34 de 1.000")
+	COPPerUSD        int      // pesos por dólar para mostrar el costo de IA en pesos
 }
 
 // WhatsApp configura el canal (HU-101). Provider elige el adaptador: "meta" (Cloud API, oficial) o "local"
@@ -50,7 +61,20 @@ type WhatsApp struct {
 	PhoneNumberID string
 	VerifyToken   string
 	APIBase       string
+	WAHA          WAHA
 }
+
+// WAHA es el WhatsApp no oficial para la demo (ADR-0027): un número de prueba vinculado con QR. Se activa con
+// WAHA_URL y convive con el proveedor del taller (el número "waha:<sesión>" va a WAHA). Prohibido en producción.
+type WAHA struct {
+	URL           string
+	APIKey        string
+	WebhookSecret string // la misma clave de WHATSAPP_HOOK_HMAC_KEY en WAHA
+	Session       string
+}
+
+// Enabled dice si WAHA está configurado.
+func (w WAHA) Enabled() bool { return w.URL != "" }
 
 // AI configura el intérprete del agente (D-08 abierta, ADR-0026). "reglas" = local sin costo; "openrouter" =
 // modelo de lenguaje por la API compatible con OpenAI, solo fuera de producción hasta cerrar AQ-09.
@@ -60,6 +84,10 @@ type AI struct {
 	Model              string
 	APIBase            string
 	MonthlyCapMicroUSD int64
+	// VisionModel lee la foto de la lista de precios (HU-93, ADR-0032): uno o varios modelos con imagen, por coma.
+	VisionModel string
+	// Transcripción de notas de voz (HU-60, ADR-0033): STT_PROVIDER vacío = sin transcripción; groq = Whisper en Groq.
+	STTProvider, STTAPIKey, STTModel, STTAPIBase string
 }
 
 // Worker es la configuración del proceso worker.
@@ -78,6 +106,8 @@ func engine(env Env, errs *[]error) (WhatsApp, AI) {
 		AppSecret: os.Getenv("WHATSAPP_APP_SECRET"), AccessToken: os.Getenv("WHATSAPP_ACCESS_TOKEN"),
 		PhoneNumberID: os.Getenv("WHATSAPP_PHONE_NUMBER_ID"), VerifyToken: os.Getenv("WHATSAPP_VERIFY_TOKEN"),
 		APIBase: get("WHATSAPP_API_BASE", "https://graph.facebook.com/v21.0"),
+		WAHA: WAHA{URL: os.Getenv("WAHA_URL"), APIKey: os.Getenv("WAHA_API_KEY"), WebhookSecret: os.Getenv("WAHA_WEBHOOK_SECRET"),
+			Session: get("WAHA_SESSION", "default")},
 	}
 	wa.Provider = get("WHATSAPP_PROVIDER", map[bool]string{true: "meta", false: "local"}[wa.AccessToken != ""])
 	switch {
@@ -88,12 +118,30 @@ func engine(env Env, errs *[]error) (WhatsApp, AI) {
 	case wa.Provider == "local" && env == EnvProduction:
 		*errs = append(*errs, errors.New("WHATSAPP_PROVIDER=local (simulador) no se permite en producción"))
 	}
+	switch w := wa.WAHA; {
+	case !w.Enabled():
+	case env == EnvProduction:
+		*errs = append(*errs, errors.New("WAHA_URL es solo para la demo (WhatsApp no oficial): no se permite en producción"))
+	case w.APIKey == "" || w.WebhookSecret == "":
+		*errs = append(*errs, errors.New("WAHA_URL necesita WAHA_API_KEY y WAHA_WEBHOOK_SECRET (firma de los webhooks)"))
+	}
 	return wa, aiConfig(env, errs)
 }
 
 func aiConfig(env Env, errs *[]error) AI {
 	ai := AI{Provider: get("AI_PROVIDER", "reglas"), APIKey: os.Getenv("AI_API_KEY"), Model: os.Getenv("AI_MODEL"),
-		APIBase: get("AI_API_BASE", "https://openrouter.ai/api/v1"), MonthlyCapMicroUSD: int64(getInt("AI_MONTHLY_CAP_MICRO_USD", 5_000_000, errs))}
+		APIBase: get("AI_API_BASE", "https://openrouter.ai/api/v1"), MonthlyCapMicroUSD: int64(getInt("AI_MONTHLY_CAP_MICRO_USD", 5_000_000, errs)),
+		VisionModel: get("AI_VISION_MODEL", "google/gemma-4-31b-it:free,nvidia/nemotron-3.5-super-vl:free"),
+		STTProvider: os.Getenv("STT_PROVIDER"), STTAPIKey: os.Getenv("STT_API_KEY"), STTModel: get("STT_MODEL", "whisper-large-v3-turbo"),
+		STTAPIBase: get("STT_API_BASE", "https://api.groq.com/openai/v1")}
+	switch {
+	case ai.STTProvider != "" && ai.STTProvider != "groq":
+		*errs = append(*errs, fmt.Errorf("STT_PROVIDER=%q no es un proveedor conocido (groq)", ai.STTProvider))
+	case ai.STTProvider == "groq" && ai.STTAPIKey == "":
+		*errs = append(*errs, errors.New("STT_PROVIDER=groq necesita STT_API_KEY"))
+	case ai.STTProvider == "groq" && env == EnvProduction:
+		*errs = append(*errs, errors.New("STT_PROVIDER=groq es solo para la demo: falta cerrar AQ-09 (voz de clientes a un tercero) antes de producción"))
+	}
 	switch {
 	case ai.Provider != "reglas" && ai.Provider != "openrouter":
 		*errs = append(*errs, fmt.Errorf("AI_PROVIDER=%q no es un proveedor conocido (reglas, openrouter)", ai.Provider))
@@ -134,6 +182,18 @@ func LoadAPI() (API, error) {
 		StorageDir:       get("STORAGE_DIR", ".data/fotos"),
 	}
 	c.WhatsApp, c.AI = engine(c.Env, &errs)
+	c.Platform = Platform{IncludedMessages: getInt("PLAN_MENSAJES_INCLUIDOS", 1000, &errs), COPPerUSD: getInt("TRM_COP_POR_USD", 4000, &errs)}
+	for _, raw := range splitList(os.Getenv("PLATFORM_ADMINS")) {
+		phone, err := shared.ParseColombianMobile(raw)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("PLATFORM_ADMINS: %q no es un celular colombiano", raw))
+			continue
+		}
+		c.Platform.Admins = append(c.Platform.Admins, phone)
+	}
+	if c.Platform.IncludedMessages <= 0 || c.Platform.COPPerUSD <= 0 {
+		errs = append(errs, errors.New("PLAN_MENSAJES_INCLUIDOS y TRM_COP_POR_USD deben ser mayores que cero"))
+	}
 	if err := c.Env.validate(); err != nil {
 		errs = append(errs, err)
 	}

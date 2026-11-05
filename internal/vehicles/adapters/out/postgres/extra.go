@@ -86,3 +86,23 @@ func (Extra) ChangeOwner(ctx context.Context, v domain.Vehicle, prev, next share
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`, shared.NewID(), v.TallerID, v.ID, prev, next, at, by)
 	return err
 }
+
+func (Extra) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	n, err := db.Exec(ctx, `UPDATE vehicles.vehiculo SET cliente_id = $3, version = version + 1, updated_at = now()
+		WHERE taller_id = $1 AND cliente_id = $2`, tallerID, from, to)
+	return int(n), err
+}
+
+func (Extra) AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID) (map[shared.ID]string, error) {
+	type r struct {
+		ID    shared.ID `db:"id"`
+		Placa string    `db:"placa"`
+	}
+	rows, err := db.Many[r](ctx, `UPDATE vehicles.vehiculo SET placa = 'ZZ' || upper(substr(md5(id::text), 1, 5)), formato_placa = 'especial',
+		version = version + 1, updated_at = now() WHERE taller_id = $1 AND cliente_id = $2 RETURNING id, placa`, tallerID, customerID)
+	out := make(map[shared.ID]string, len(rows))
+	for _, x := range rows {
+		out[x.ID] = x.Placa
+	}
+	return out, err
+}

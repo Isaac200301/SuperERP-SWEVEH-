@@ -15,6 +15,13 @@ type Extra interface {
 	Search(ctx context.Context, tallerID shared.ID, digits, text string, limit int) ([]domain.Customer, error)
 	List(ctx context.Context, tallerID shared.ID, limit int) ([]domain.Customer, error)
 	SetConsent(ctx context.Context, tallerID, id shared.ID, st domain.ConsentStatus, rec ConsentRecord) error
+	SetName(ctx context.Context, tallerID, id shared.ID, name string) error
+	Duplicates(ctx context.Context, tallerID shared.ID, limit int) ([]domain.Customer, error)
+	MarkMerged(ctx context.Context, tallerID, dropID, keepID shared.ID, at time.Time) error
+	Merged(ctx context.Context, tallerID, id shared.ID) (bool, error)
+	Anonymize(ctx context.Context, tallerID, id shared.ID, at time.Time) error
+	Anonymized(ctx context.Context, tallerID, id shared.ID) (bool, error)
+	Consents(ctx context.Context, tallerID, id shared.ID) ([]ConsentEntry, error)
 }
 
 // ConsentRecord es la prueba de la autorización del cliente (Ley 1581, Decreto 1377 art. 8).
@@ -87,4 +94,27 @@ func (s *Service) SetConsent(ctx context.Context, tallerID, customerID shared.ID
 		return s.events.Publish(ctx, tallerID, shared.Event{Type: "customers.autorizacion", AggregateID: customerID, OccurredAt: rec.At,
 			Payload: map[string]any{"estado": string(st), "canal": rec.Channel}})
 	})
+}
+
+// FillName pone el nombre que el cliente le dio al asesor (ADR-0029), solo si el que tiene es de relleno. false = no
+// cambió nada (ya tenía un nombre real).
+func (s *Service) FillName(ctx context.Context, tallerID, customerID shared.ID, actor shared.Actor, raw string) (bool, error) {
+	name, err := domain.CleanName(raw)
+	if err != nil {
+		return false, err
+	}
+	changed := false
+	err = s.uow.Do(ctx, func(ctx context.Context) error {
+		c, err := s.repo.ByID(ctx, tallerID, customerID)
+		if err != nil || !domain.IsPlaceholderName(c.Name) || c.Name == name {
+			return err
+		}
+		if err := s.extra.SetName(ctx, tallerID, customerID, name); err != nil {
+			return err
+		}
+		changed = true
+		return s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "cliente.nombre", Entity: "cliente",
+			EntityID: customerID, Before: map[string]any{"nombre": c.Name}, After: map[string]any{"nombre": name}, OccurredAt: s.clock.Now()})
+	})
+	return changed, err
 }

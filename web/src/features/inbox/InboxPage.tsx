@@ -3,6 +3,9 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 
 import { api, unwrap, type Schemas } from '../../shared/api/client';
+import { usePermission } from '../auth/api';
+import { PriceListReview } from '../catalog/PriceList';
+import { audioURL } from '../messaging/Thread';
 import { formatoCelular, formatoFechaHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
@@ -10,11 +13,16 @@ import { Button } from '../../shared/ui/Button';
 type Borrador = Schemas['Borrador'];
 const card = 'flex flex-col gap-3 rounded-card bg-white p-5';
 const key = ['bandeja'] as const;
-const campos: Record<string, string> = { precio: 'Precio', horario: 'Horario', otro: 'Pidió algo que no está en tu lista', atiende: 'Atiendes' };
+const campos: Record<string, string> = {
+  precio: 'Precio',
+  horario: 'Horario',
+  otro: 'Pidió algo que no está en tu lista',
+  atiende: 'Atiendes',
+};
 
 /**
- * HU-62, HU-63 y HU-64: la IA propone, el dueño decide. Nada sale al cliente sin pulsar Enviar (RF-18);
- * si edita, sale su texto. "Lo contesto yo" pasa la conversación a una persona (HU-59).
+ * HU-62, HU-63 y HU-64: lo que queda aquí sale solo cuando el dueño pulsa Enviar; si edita, sale su texto.
+ * "Lo contesto yo" pasa la conversación a una persona (HU-59).
  */
 function DraftCard({ d }: { d: Borrador }) {
   const qc = useQueryClient();
@@ -37,9 +45,19 @@ function DraftCard({ d }: { d: Borrador }) {
           {d.intencion} · {formatoFechaHora(d.creadoEn)}
         </span>
       </div>
-      <p className="rounded-2xl bg-surface p-3">
-        <b>El cliente escribió:</b> {d.mensajeCliente}
-      </p>
+      <div className="flex flex-col gap-2 rounded-2xl bg-surface p-3">
+        {d.notaDeVoz && d.mensajeId ? (
+          <>
+            <b>El cliente mandó una nota de voz{d.mensajeCliente ? '. Dice:' : '.'}</b>
+            <audio controls preload="none" src={audioURL(d.conversacionId, d.mensajeId)} aria-label="Escuchar la nota de voz" />
+            {d.mensajeCliente ? <p>{d.mensajeCliente}</p> : null}
+          </>
+        ) : (
+          <p>
+            <b>El cliente escribió:</b> {d.mensajeCliente}
+          </p>
+        )}
+      </div>
       <label htmlFor={`b-${d.id}`} className="text-[15px] font-extrabold">
         Respuesta propuesta (puedes editarla)
       </label>
@@ -48,11 +66,11 @@ function DraftCard({ d }: { d: Borrador }) {
         rows={3}
         className="rounded-btn border-[1.5px] border-line p-3 text-base"
         value={texto}
-        onChange={(e) => setTexto(e.target.value)}
+        onChange={e => setTexto(e.target.value)}
       />
       {d.fuentes && d.fuentes.length > 0 ? (
         <ul className="text-sm text-ink-2" aria-label="De dónde salió cada dato">
-          {d.fuentes.map((f) => (
+          {d.fuentes.map(f => (
             <li key={`${f.campo}-${f.origen}`}>
               {campos[f.campo] ?? f.campo}: {f.valor} · {f.origen}
             </li>
@@ -61,7 +79,11 @@ function DraftCard({ d }: { d: Borrador }) {
       ) : null}
       {resolver.isError ? <Alert>{resolver.error.message}</Alert> : null}
       <div className="flex flex-wrap gap-3">
-        <Button busy={resolver.isPending} missing={texto.trim() ? undefined : 'Escribe la respuesta.'} onClick={() => resolver.mutate('enviar')}>
+        <Button
+          busy={resolver.isPending}
+          missing={texto.trim() ? undefined : 'Escribe la respuesta.'}
+          onClick={() => resolver.mutate('enviar')}
+        >
           Enviar
         </Button>
         <Button variant="secondary" disabled={resolver.isPending} onClick={() => resolver.mutate('lo_contesto_yo')}>
@@ -75,6 +97,69 @@ function DraftCard({ d }: { d: Borrador }) {
   );
 }
 
+/**
+ * ADR-0028 / HU-67: el asistente responde solo (encendido de fábrica). Se detiene si el cliente pide una persona o
+ * el taller toma la conversación. Solo el dueño lo apaga; el resto lo ve.
+ */
+function AutoReply() {
+  const qc = useQueryClient();
+  const puede = usePermission('automation:manage');
+  const s = useQuery({ queryKey: [...key, 'auto'], queryFn: async () => unwrap(await api.GET('/assistant/settings')) });
+  const recientes = useQuery({
+    queryKey: [...key, 'todos'],
+    enabled: s.data?.autoEnvio === true,
+    refetchInterval: 10_000,
+    queryFn: async () =>
+      unwrap(await api.GET('/inbox', { params: { query: { todos: '1' } } }))
+        .borradores.filter(d => d.estado === 'auto_enviado')
+        .slice(0, 5),
+  });
+  const guardar = useMutation({
+    mutationFn: async (autoEnvio: boolean) => unwrap(await api.PUT('/assistant/settings', { body: { autoEnvio } })),
+    onSuccess: d => qc.setQueryData([...key, 'auto'], d),
+  });
+  if (!s.data) return null;
+  const on = s.data.autoEnvio;
+  return (
+    <section className={card} aria-labelledby="auto">
+      <label className="flex min-h-[44px] items-center gap-2 font-bold">
+        <input
+          type="checkbox"
+          role="switch"
+          aria-checked={on}
+          checked={on}
+          disabled={!puede || guardar.isPending}
+          onChange={e => guardar.mutate(e.target.checked)}
+        />
+        <span id="auto">El asistente responde solo</span>
+      </label>
+      <p className="text-ink-2">
+        {on
+          ? 'Las respuestas salen sin tu revisión, con los precios y horarios de tu lista. Si un cliente pide una persona o tomas la conversación, el asistente se detiene.'
+          : 'Apagado: cada respuesta espera aquí hasta que la envíes.'}
+        {puede ? '' : ' Solo el dueño lo cambia.'}
+      </p>
+      {guardar.isError ? <Alert>{guardar.error.message}</Alert> : null}
+      {on && recientes.data && recientes.data.length > 0 ? (
+        <details>
+          <summary className="cursor-pointer font-bold text-primary">Últimas respuestas automáticas</summary>
+          <ul className="mt-2 flex flex-col gap-2">
+            {recientes.data.map(d => (
+              <li key={d.id} className="rounded-2xl bg-surface p-3 text-sm">
+                <span className="font-mono">{formatoCelular(d.celular)}</span> · {formatoFechaHora(d.creadoEn)}
+                <br />
+                <b>Escribió:</b> {d.mensajeCliente}
+                <br />
+                <b>Automática:</b> {d.final ?? d.propuesto}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </section>
+  );
+}
+
 export function InboxPage() {
   const q = useQuery({ queryKey: key, queryFn: async () => unwrap(await api.GET('/inbox')).borradores, refetchInterval: 10_000 });
   const stats = useQuery({ queryKey: [...key, 'stats'], queryFn: async () => unwrap(await api.GET('/inbox/stats')) });
@@ -83,15 +168,19 @@ export function InboxPage() {
       <header>
         <h1 className="text-[28px] font-extrabold">Por revisar</h1>
         <p className="text-ink-2">
-          El agente prepara la respuesta; tú decides si sale.
-          {stats.data && stats.data.enviados > 0 ? ` Editaste ${Math.round(stats.data.porcentajeEditados)} % de los ${stats.data.enviados} enviados.` : ''}
+          Lo que el asistente no puede responder solo espera aquí.
+          {stats.data && stats.data.enviados > 0
+            ? ` Editaste ${Math.round(stats.data.porcentajeEditados)} % de los ${stats.data.enviados} enviados.`
+            : ''}
         </p>
       </header>
+      <AutoReply />
+      <PriceListReview />
       {q.isPending ? <p role="status">Cargando…</p> : null}
       {q.isError ? <Alert>{q.error.message}</Alert> : null}
       {q.data?.length === 0 ? <p className="rounded-card bg-white p-5 text-ink-2">No hay nada por revisar.</p> : null}
       <ul className="flex flex-col gap-3">
-        {(q.data ?? []).map((d) => (
+        {(q.data ?? []).map(d => (
           <DraftCard key={d.id} d={d} />
         ))}
       </ul>

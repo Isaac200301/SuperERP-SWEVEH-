@@ -29,5 +29,12 @@ Los **ADR-01 a ADR-21** nacen en `docs/06-arquitectura.md`, sección 14.1 (1-nov
 | [ADR-0023](0023-herramientas-del-sprint-0.md) | Herramientas concretas del Sprint 0 (goose, sqlc por Docker, chi, prueba de contrato, TS 5.9) | Propuesta | Propuesto |
 | [ADR-0025](0025-canal-whatsapp-por-proveedor.md) | Canal de WhatsApp por proveedor: Meta oficial, simulador local, WAHA solo para la demo | Pablo / Propuesta | Propuesto |
 | [ADR-0026](0026-interprete-de-ia-por-proveedor.md) | Intérprete de IA por proveedor: la IA interpreta y el código redacta; reglas por defecto, OpenRouter para la demo | Pablo / Propuesta | Propuesto |
+| [ADR-0027](0027-waha-canal-de-demo.md) | WAHA como WhatsApp de prueba para la demo (no oficial): menú con números en vez de botones, motor GOWS, prohibido en producción | Pablo / Propuesta | Propuesto |
+| [ADR-0028](0028-agente-responde-solo.md) | El agente responde solo, encendido por defecto; se detiene si el cliente pide una persona o el taller toma la conversación; las notas para el dueño esperan en Por revisar | Pablo / Propuesta | Propuesto |
+| [ADR-0029](0029-asesor-whatsapp-con-tools.md) | El agente es un asesor del taller: prompt de asesor, historial, tools con reglas en código (sin duplicar órdenes ni placas ajenas), guardias de precio y vitrina de productos con foto; 20/20 conversaciones con Nemotron | Pablo / Propuesta | Propuesto |
+| [ADR-0030](0030-administrador-del-erp.md) | Administrador del ERP por `PLATFORM_ADMINS`, medidor de mensajes y costo de IA por taller (HU-74) con una excepción de RLS que solo lista talleres | Equipo / Propuesta | Propuesto |
+| [ADR-0031](0031-taller-ficticio-de-la-demo.md) | Taller ficticio de la demo: carga por la API real con reloj controlado; reiniciar archiva (la bitácora es inmutable) y vuelve a cargar; `make seed-demo` / `make reset-demo` | Equipo / Propuesta | Propuesto |
+| [ADR-0032](0032-lista-de-precios-por-foto.md) | Lista de precios por foto (HU-93): la IA de visión lee la foto, cada fila es una propuesta que el dueño corrige y aprueba; solo entonces es servicio | Equipo / Propuesta | Propuesto |
+| [ADR-0033](0033-notas-de-voz-con-groq.md) | Notas de voz (HU-60): se descargan del canal, se transcriben con Groq (Whisper, solo demo) y siguen el flujo del texto; el audio se escucha en el panel | Pablo / Propuesta | Propuesto |
 
 Cuando una propuesta se acepta o se cambia: actualizar la columna Estado, crear el ADR en este directorio si el cambio es nuevo y reflejarlo en `docs/06-arquitectura.md`.

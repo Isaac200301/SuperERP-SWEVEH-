@@ -29,6 +29,11 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(h.guard.Require("service:manage")).Post("/services", httpx.JSON(h.log, h.create))
 	r.With(h.guard.Require("service:manage")).Patch("/services/{id}", httpx.JSON(h.log, h.update))
 	r.With(h.guard.Require("service:manage")).Delete("/services/{id}", httpx.JSON(h.log, h.remove))
+	// HU-93: lista de precios por foto (ADR-0032).
+	r.With(h.guard.Require("service:manage")).Post("/services/photo", httpx.JSON(h.log, h.importPhoto))
+	r.With(h.guard.Require("service:manage")).Get("/services/proposals", httpx.JSON(h.log, h.proposals))
+	r.With(h.guard.Require("service:manage")).Post("/services/proposals/{id}", httpx.JSON(h.log, h.resolveProposal))
+	r.With(h.guard.Require("service:manage")).Get("/services/proposals/{id}/photo", h.proposalPhoto)
 }
 
 type dto struct {
