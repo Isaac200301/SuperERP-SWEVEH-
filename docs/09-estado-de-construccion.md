@@ -25,7 +25,7 @@
 
    **Ojo:** AU-06 y AU-07 solo salen con la ventana de 24 h abierta hasta tener plantillas aprobadas (Q-07).
 4. **Supabase staging:** borrar "weveh" y crear `sweveh-staging` en `sa-east-1`. Está bloqueado: el conector de Supabase solo ve "Isaac200301's Org" y hay que reconectarlo con la cuenta de weveh.
-5. **Resto de T6 (no demo):** HU-06, HU-15, HU-30, HU-44, HU-60, HU-61, HU-66, HU-72, HU-82, HU-87, HU-92, HU-100 y HU-101 siguen pendientes. Además, HU-26, HU-31, HU-35 a HU-38, HU-83 y HU-84 están "En curso" con código y falta revisarlas criterio por criterio.
+5. **Resto de T6 (no demo), 2026-11-04:** en código y con pruebas HU-06, HU-15, HU-30, HU-44, HU-61, HU-66, HU-72, HU-82, HU-87, HU-92, HU-100 y HU-101; revisadas criterio por criterio HU-13, HU-26, HU-31, HU-35 a HU-38, HU-83 y HU-84 (con dos correcciones: cancelar devuelve repuestos y el adicional pide aprobación). **Queda HU-60 (notas de voz):** hoy el audio no se guarda; falta descargarlo del canal, guardarlo para escucharlo en la tarjeta y transcribirlo, y elegir el proveedor de transcripción (Sin dato, Q-12; la voz de clientes a un tercero toca AQ-09 y AQ-10). Por confirmar con Isaac: HU-15 agrupa repetidos por nombre (el criterio dice "mismo celular", que no puede pasar).
 6. **Medir con datos reales:**
    - asesor: `make agent-eval-conv`, una vez por día, por el límite del plan gratuito;
    - lista de precios por foto (HU-93) con fotos reales;

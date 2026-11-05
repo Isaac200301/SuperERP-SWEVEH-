@@ -176,6 +176,7 @@ function Duplicates() {
       </div>
       {q.data.map((g, i) => {
         const [a, b] = g.clientes;
+        if (!a || !b) return null;
         const conservar = keep[i] ?? a.id;
         const otro = g.clientes.find((c) => c.id !== conservar) ?? b;
         const queda = g.clientes.find((c) => c.id === conservar) ?? a;
