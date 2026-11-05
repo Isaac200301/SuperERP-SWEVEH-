@@ -116,6 +116,35 @@ func TestDashboard_ApprovalsCycleAndTicket(t *testing.T) {
 
 // HU-73: la mediana del mes cuenta lo que tarda el taller en contestar; las respuestas automáticas (estado AU-05 y
 // autorización de datos) salen al instante y se cuentan aparte para no maquillar el número.
+// HU-72: un vehículo con dos visitas en 12 meses cuenta como vehículo que volvió; las órdenes canceladas no cuentan.
+func TestDashboard_ReturningVehicles(t *testing.T) {
+	e := newEnv(t)
+	c := e.register("3105550620", "Rosa Pérez")
+	deliver := func(id string) {
+		base := "/api/v1/orders/" + id
+		c.must(http.StatusOK, c.do("POST", base+"/quote/lines", map[string]any{"tipo": "servicio", "descripcion": "Revisión", "cantidad": 1,
+			"precioUnitario": 50000}))
+		c.must(http.StatusOK, c.do("POST", base+"/quote/send", nil))
+		c.must(http.StatusOK, c.do("POST", base+"/quote/response", map[string]any{"decision": "aprobar", "canal": "mostrador"}))
+		c.must(http.StatusOK, c.do("POST", base+"/transition", map[string]any{"estado": "listo", "version": r2v(c, id)}))
+		c.must(http.StatusOK, c.do("POST", base+"/transition", map[string]any{"estado": "entregado", "recogidoPor": "Carlos",
+			"accesoriosConfirmados": true, "version": r2v(c, id)}))
+	}
+	// Carlos: dos visitas. Laura: una visita y otra orden cancelada.
+	first, _ := orderInDiagnosis(t, c, "CAR621", 1)
+	deliver(first)
+	c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": "CAR621", "sintoma": "Cambio de aceite", "estadoInicial": "recibido"}))
+	once, _ := orderInDiagnosis(t, c, "LAU622", 1)
+	deliver(once)
+	cancelled := c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": "LAU622", "sintoma": "Ruido"})).str("id")
+	c.must(http.StatusOK, c.do("POST", "/api/v1/orders/"+cancelled+"/cancel", map[string]any{"motivo": "No vino", "version": r2v(c, cancelled)}))
+
+	k := kpi(t, c.must(http.StatusOK, c.do("GET", "/api/v1/dashboard", nil)).body, "vuelven")
+	if k["texto"] != "50 %" || k["detalle"] != "1 de 2 vehículos" {
+		t.Fatalf("clientes que vuelven: %v", k)
+	}
+}
+
 func TestDashboard_ResponseMedianSeparatesAutomatic(t *testing.T) {
 	e := newEnv(t)
 	owner := e.register("3105550620", "Rosa Pérez")

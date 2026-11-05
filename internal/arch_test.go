@@ -128,3 +128,20 @@ func TestAdaptersStayInTheirModule(t *testing.T) {
 		}
 	}
 }
+
+// HU-101 (RNF-07): pasar del número de prueba al del taller solo cambia la configuración del canal. Los proveedores
+// de WhatsApp (simulador, WAHA, Meta) solo los conocen el módulo messaging y la raíz de composición (wire); el resto
+// del sistema habla con el puerto de canal.
+func TestWhatsAppProviderBehindChannel(t *testing.T) {
+	const providers = mod + "internal/messaging/adapters/out/whatsapp"
+	for _, p := range listPackages(t) {
+		if strings.HasPrefix(p.ImportPath, mod+"internal/messaging/") || strings.HasPrefix(p.ImportPath, mod+"internal/wire") {
+			continue
+		}
+		for _, imp := range p.Imports {
+			if strings.HasPrefix(imp, providers) {
+				t.Errorf("%s conoce el proveedor de WhatsApp %s (debe usar el canal de messaging)", p.ImportPath, imp)
+			}
+		}
+	}
+}
