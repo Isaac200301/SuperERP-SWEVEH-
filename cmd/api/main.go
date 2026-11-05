@@ -63,6 +63,8 @@ func run() error {
 		sender = otp.NewConsole(os.Stderr)
 	case "memoria":
 		sender = otp.NewMemory()
+	case "waha": // código por el WhatsApp de prueba (ADR-0034, solo demo)
+		sender = wire.NewWAHAOTP(cfg.WhatsApp.WAHA)
 	}
 
 	store, err := storage.NewLocal(cfg.StorageDir)
