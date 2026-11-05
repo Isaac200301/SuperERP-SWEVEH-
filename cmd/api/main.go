@@ -71,6 +71,13 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("almacenamiento de fotos: %w", err)
 	}
+	if cfg.RunWorker { // ADR-0036: el worker en el mismo proceso, para la demo en un solo servicio
+		stopWorker, err := startWorker(ctx, cfg, store, clk, log)
+		if err != nil {
+			return err
+		}
+		defer stopWorker()
+	}
 	handler := server.New(server.Deps{
 		Storage: store, Extra: wire.Extra(cfg), Public: wire.Public(pool, cfg, log),
 		Pool: pool, Log: log, Clock: clk, Signer: signer, Verifier: verifier, OTPSender: sender,
@@ -103,6 +110,29 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// startWorker abre el pool del rol sweveh_worker (pocas conexiones, para no pasarse del pooler) y corre el worker en
+// segundo plano con el mismo almacenamiento del api. La función que devuelve lo detiene y espera a que termine antes de
+// cerrar su pool.
+func startWorker(ctx context.Context, cfg config.API, store storage.Store, clk clock.Clock, log *slog.Logger) (func(), error) {
+	pool, err := db.NewPool(ctx, db.PoolConfig{URL: cfg.WorkerDatabaseURL, MaxConns: 4, MaxConnLifetime: cfg.DBMaxLifetime,
+		SimpleProtocol: cfg.DBSimpleProtocol})
+	if err != nil {
+		return nil, fmt.Errorf("base del worker: %w", err)
+	}
+	wctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		wire.StartWorker(wctx, pool, store, clk, log.With("proceso", "worker"),
+			wire.WorkerConfig{WhatsApp: cfg.WhatsApp, AI: cfg.AI, Poll: cfg.PollInterval, Batch: cfg.BatchSize})
+	}()
+	return func() {
+		cancel()
+		<-done
+		pool.Close()
+	}, nil
 }
 
 func signingKey(cfg config.API, log *slog.Logger) (*ecdsa.PrivateKey, error) {

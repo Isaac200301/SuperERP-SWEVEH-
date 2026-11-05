@@ -56,3 +56,32 @@ func merge(a, b map[string]string) map[string]string {
 	}
 	return out
 }
+
+// ADR-0036: con RUN_WORKER=true el api corre también el worker y necesita el rol del worker; sin la variable, nada
+// cambia.
+func TestRunWorkerNeedsWorkerDatabase(t *testing.T) {
+	for _, tc := range []struct {
+		name, run, url, errSub string
+		want                   bool
+	}{
+		{"sin RUN_WORKER", "", "", "", false},
+		{"con RUN_WORKER y su base", "true", "postgres://worker", "", true},
+		{"RUN_WORKER sin base del worker", "true", "", "RUN_WORKER=true necesita WORKER_DATABASE_URL", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("APP_ENV", "local")
+			t.Setenv("DATABASE_URL", "postgres://api")
+			t.Setenv("OTP_SENDER", "consola")
+			t.Setenv("RUN_WORKER", tc.run)
+			t.Setenv("WORKER_DATABASE_URL", tc.url)
+			c, err := LoadAPI()
+			got := ""
+			if err != nil {
+				got = err.Error()
+			}
+			if c.RunWorker != tc.want || (tc.errSub == "") != !strings.Contains(got, "RUN_WORKER") || !strings.Contains(got, tc.errSub) {
+				t.Fatalf("RunWorker=%v error %q", c.RunWorker, got)
+			}
+		})
+	}
+}
