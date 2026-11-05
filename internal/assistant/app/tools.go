@@ -42,7 +42,7 @@ var AdvisorTools = []ToolSpec{
 		Params: obj(`"producto":{"type":"string","description":"la referencia del producto que devolvió productos"}`, "producto")},
 	{Name: "horario", Description: "Horario del taller y si está abierto ahora.", Params: obj(``)},
 	{Name: "mis_ordenes", Description: "Órdenes abiertas del cliente que escribe, con su estado. Solo las suyas.", Params: obj(``)},
-	{Name: "agendar", Description: "Agenda la cita para recibir el vehículo (orden \"Por recibir\" con fecha y hora). Úsala apenas tengas la placa: te dice qué falta (día y hora, nombre), te devuelve el resumen para que el cliente confirme y, cuando el cliente dice que sí, agenda. Si ya tiene una orden por recibir, la cambia a la nueva fecha; si el vehículo ya está en el taller, devuelve su orden.",
+	{Name: "agendar", Description: "Agenda la cita para recibir el vehículo (orden \"Por recibir\" con fecha y hora). Úsala apenas tengas la placa: te dice qué falta (nombre, día y hora), te devuelve el resumen para que el cliente confirme y, cuando el cliente dice que sí, agenda. Si ya tiene una orden por recibir, la cambia a la nueva fecha; si el vehículo ya está en el taller, devuelve su orden.",
 		Params: obj(`"placa":{"type":"string","description":"placa tal como la escribió el cliente"},"sintoma":{"type":"string","description":"qué necesita o qué le pasa, en pocas palabras"},"fecha":{"type":"string","description":"día de la cita, AAAA-MM-DD (vacío si aún no lo sabes)"},"hora":{"type":"string","description":"hora de la cita, HH:MM en 24 horas (vacío si aún no la sabes)"},"nombre":{"type":"string","description":"nombre del cliente, solo si te lo dio y no lo tenías"}`, "placa", "sintoma")},
 	{Name: "apartar_producto", Description: "El cliente quiere comprar un producto de la vitrina: avisa al taller para que una persona confirme el apartado y el pago.",
 		Params: obj(`"producto":{"type":"string"},"cantidad":{"type":"integer","minimum":1,"maximum":20}`, "producto", "cantidad")},
@@ -191,11 +191,12 @@ func (t *turn) exec(ctx context.Context, name, kind, q, product, plate, symptom 
 }
 
 // book es la tool agendar (ADR-0029). Las reglas van en código y en este orden:
-//  1. la placa la escribió el cliente (HU-55); si es de otro cliente lo revisa una persona; si ya tiene una orden que
-//     no está por recibir, se devuelve esa;
-//  2. día y hora: no en el pasado, hasta 30 días y dentro del horario de ese día;
-//  3. el nombre, si el que tiene es de relleno;
-//  4. la confirmación: la orden solo se crea (o se reagenda) si el último mensaje del cliente dice que sí. Si no, se
+//  1. la placa la escribió el cliente (HU-55); si el vehículo ya está en el taller, se devuelve su orden;
+//  2. el nombre, si el que tiene es de relleno;
+//  3. día y hora: no en el pasado, hasta 30 días y dentro del horario de ese día;
+//  4. si la placa es de otro cliente, ya con la solicitud completa, una persona confirma la cita (HU-12): así recibe
+//     nombre, servicio, día y hora, y al cliente no se le dice nada del vehículo;
+//  5. la confirmación: la orden solo se crea (o se reagenda) si el último mensaje del cliente dice que sí. Si no, se
 //     devuelve el resumen para que el asesor le pregunte. Así el modelo no puede agendar sin que el cliente confirme.
 func (t *turn) book(ctx context.Context, plate, symptom, date, hour, name string) (any, error) {
 	p := domain.FindPlate(plate)
@@ -209,13 +210,11 @@ func (t *turn) book(ctx context.Context, plate, symptom, date, hour, name string
 	if err != nil {
 		return nil, err
 	}
-	switch {
-	case info.Owner == "ajena": // de otro cliente: no se dice nada del vehículo y lo revisa una persona (HU-12)
-		t.handed = true
-		return map[string]any{"resultado": "revision", "nota": "di solo que una persona del taller le escribe para confirmar"},
-			t.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true)
-	case info.Open != nil && info.Open.State != "por_recibir": // el vehículo ya está en el taller
+	if info.Owner != "ajena" && info.Open != nil && info.Open.State != "por_recibir" { // el vehículo ya está en el taller
 		return map[string]any{"resultado": "ya_tenia_orden", "orden": info.Code, "estado": stateText[info.Open.State]}, nil
+	}
+	if domain.IsPlaceholder(t.c.Name) && strings.TrimSpace(name) == "" {
+		return map[string]any{"resultado": "falta_nombre", "nota": "pregúntale su nombre para la cita"}, nil
 	}
 	if strings.TrimSpace(date) == "" || strings.TrimSpace(hour) == "" {
 		return map[string]any{"resultado": "falta_fecha", "nota": "pregunta qué día y a qué hora lo trae"}, nil
@@ -235,8 +234,13 @@ func (t *turn) book(ctx context.Context, plate, symptom, date, hour, name string
 		}
 		return map[string]any{"resultado": "fuera_de_horario", "nota": day + "; ofrece otra hora o día dentro del horario"}, nil
 	}
-	if domain.IsPlaceholder(t.c.Name) && strings.TrimSpace(name) == "" {
-		return map[string]any{"resultado": "falta_nombre", "nota": "pregúntale su nombre para la cita"}, nil
+	if info.Owner == "ajena" { // de otro cliente: no se dice nada del vehículo y una persona confirma la cita (HU-12)
+		if strings.TrimSpace(name) != "" {
+			if _, err := t.taller.SetCustomerName(ctx, t.tallerID, t.c.ID, name); err != nil {
+				return nil, err
+			}
+		}
+		return t.review(ctx, symptom, when)
 	}
 	summary := map[string]any{"placa": p, "servicio": symptom, "cita": domain.FormatWhen(when)}
 	if info.Open != nil {
@@ -259,9 +263,7 @@ func (t *turn) book(ctx context.Context, plate, symptom, date, hour, name string
 	summary["orden"] = res.Code
 	switch {
 	case res.Owner == "ajena": // cambió entre la consulta y la creación
-		t.handed = true
-		return map[string]any{"resultado": "revision", "nota": "di solo que una persona del taller le escribe para confirmar"},
-			t.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true)
+		return t.review(ctx, symptom, when)
 	case res.Rescheduled:
 		summary["resultado"] = "reagendado"
 	case res.Open != nil:
@@ -270,6 +272,16 @@ func (t *turn) book(ctx context.Context, plate, symptom, date, hour, name string
 		summary["resultado"] = "agendado"
 	}
 	return summary, nil
+}
+
+// review pasa a una persona la cita de una placa de otro cliente: la conversación ya tiene el nombre, el servicio, el
+// día y la hora, así que la persona solo confirma. Al cliente no se le dice nada de la placa ni del vehículo.
+func (t *turn) review(ctx context.Context, symptom string, when time.Time) (any, error) {
+	t.handed = true
+	cita := domain.FormatWhen(when)
+	return map[string]any{"resultado": "revision", "servicio": symptom, "cita": cita,
+			"nota": "dile que una persona del taller le confirma por este chat la cita del " + cita + "; no digas nada de la placa ni del vehículo"},
+		t.taller.SetMode(ctx, t.tallerID, t.in.ConversationID, "humano", true)
 }
 
 // product busca un producto de la vitrina por referencia (o nombre), aunque el modelo no haya listado antes.

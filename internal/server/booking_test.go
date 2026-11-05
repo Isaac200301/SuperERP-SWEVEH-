@@ -61,8 +61,8 @@ func TestAdvisor_BooksWithDateTimeAndName(t *testing.T) {
 		return owner.must(http.StatusOK, owner.do("GET", "/api/v1/orders?abiertas=1", nil)).body["ordenes"].([]any)
 	}
 
-	// Día que no abre: no se agenda nada y la tool lo dice.
-	step(book("MTO45E", closed, ""), "Ese día no abrimos, ¿te sirve otro?")
+	// Día que no abre: no se agenda nada y la tool lo dice (el nombre se pide antes que la cita).
+	step(book("MTO45E", closed, "Carlos Ruiz"), "Ese día no abrimos, ¿te sirve otro?")
 	w.write(phone, "Cliente de prueba", "sí, agéndame la MTO45E")
 	if len(open()) != 0 || !strings.Contains(results[len(results)-1], "fuera_de_horario") {
 		t.Fatalf("día cerrado: abiertas %d, %s", len(open()), results[len(results)-1])
@@ -116,5 +116,67 @@ func TestAdvisor_BooksWithDateTimeAndName(t *testing.T) {
 	w.pump()
 	if got := w.sentBy(phone, "AU-06"); len(got) != 1 {
 		t.Fatalf("recordatorio AU-06: %v; ejecuciones %v", got, w.runsOf("AU-06"))
+	}
+}
+
+// HU-12 / ADR-0029: si la placa que da el cliente es de otro cliente, el asesor igual reúne el nombre y la cita, y solo
+// con la solicitud completa pasa a una persona: no se crea ninguna orden y al cliente no se le dice nada del vehículo.
+func TestAdvisor_ForeignPlateHandsOffWithBooking(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550704", "Rosa Pérez")
+	adv := &fakeAdvisor{}
+	w := e.advisorWA(t, owner, adv)
+	sched := map[string]any{}
+	for _, k := range dayKeys {
+		sched[k] = map[string]any{"abre": "07:00", "cierra": "19:00"}
+	}
+	owner.must(http.StatusOK, owner.do("PUT", "/api/v1/workshop/schedule", map[string]any{"horario": sched}))
+	w.orderFor(w.customer("3001234705", "Gina Mora"), "GNO667")
+	open := func() int {
+		return len(owner.must(http.StatusOK, owner.do("GET", "/api/v1/orders?abiertas=1", nil)).body["ordenes"].([]any))
+	}
+	n := open()
+
+	const phone = "3001234704"
+	w.customer(phone, "Cliente de prueba")
+	now := e.clk.Now().In(domain.Bogota)
+	when := time.Date(now.Year(), now.Month(), now.Day()+2, 10, 0, 0, 0, domain.Bogota)
+	var results []string
+	step := func(msg assistantapp.ChatMessage, reply string) {
+		adv.step = func(r assistantapp.ChatRequest) (assistantapp.ChatMessage, error) {
+			if res := toolResult(r); res != "" {
+				results = append(results, res)
+				return say(reply), nil
+			}
+			return msg, nil
+		}
+	}
+
+	// Sin nombre ni cita: la tool los pide y la conversación sigue con el asesor.
+	step(call("agendar", `{"placa":"GNO667","sintoma":"pintura"}`), "¿Con quién tengo el gusto?")
+	w.write(phone, "Cliente de prueba", "es la gno667")
+	if res := results[len(results)-1]; !strings.Contains(res, "falta_nombre") {
+		t.Fatalf("sin nombre: %s", res)
+	}
+	if conv, _ := w.conversation(phone); conv["modo"] != "agente" {
+		t.Fatalf("pasó a persona antes de tener la cita: %v", conv)
+	}
+
+	// Con nombre y cita: pasa a una persona con la cita, sin crear orden ni nombrar el vehículo.
+	step(book("GNO667", when, "Pablo Ruiz"), "Una persona del taller te confirma la cita por este chat.")
+	w.write(phone, "Cliente de prueba", "soy Pablo Ruiz, el jueves a las 10")
+	res := results[len(results)-1]
+	if !strings.Contains(res, `"revision"`) || !strings.Contains(res, domain.FormatWhen(when)) || strings.Contains(res, "Gina") ||
+		strings.Contains(res, "OS-") {
+		t.Fatalf("placa ajena: %s", res)
+	}
+	if open() != n {
+		t.Fatalf("se creó una orden con placa ajena: %d→%d", n, open())
+	}
+	if conv, _ := w.conversation(phone); conv["modo"] != "humano" || conv["pideHumano"] != true {
+		t.Fatalf("no pasó a una persona: %v", conv)
+	}
+	if c := owner.must(http.StatusOK, owner.do("GET", "/api/v1/customers/by-phone/"+phone, nil)).body; c["nombre"] != "Pablo Ruiz" {
+		t.Fatalf("nombre: %v", c["nombre"])
 	}
 }

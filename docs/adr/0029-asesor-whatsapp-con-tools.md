@@ -64,19 +64,22 @@ Qué hace `agendar` según la placa:
 ### Agendar: qué pide el asesor y dónde queda la cita
 - **Datos que reúne, uno por mensaje y sin repetir lo que ya sabe:**
   1. qué necesita (servicio o síntoma);
-  2. la placa;
+  2. el nombre, solo si el que tiene es de relleno ("¿Con quién tengo el gusto?");
   3. qué día y a qué hora trae el vehículo;
-  4. el nombre, solo si el que tiene es de relleno.
+  4. la placa.
+
+  Así lo hace una persona de mostrador: primero con quién habla y cuándo viene. Antes la placa iba de segunda y el nombre de último, y una placa ajena cortaba la conversación sin nombre ni cita (prueba de Pablo, 2026-11-04).
 - **No pide el celular:** llega con el mensaje de WhatsApp y se guarda al autorizar los datos (HU-85).
 - **Antes de agendar confirma un resumen**, y solo llama a `agendar` cuando el cliente dice que sí. El prompt lleva la fecha y la hora de hoy en Colombia, para entender "mañana", "el sábado" o "a las 3".
 - **`agendar(placa, sintoma, fecha?, hora?, nombre?)` valida en código y en este orden:**
 
   | Paso | Qué revisa | Qué responde si falla |
   |---|---|---|
-  | 1. Placa | La escribió el cliente (HU-55). Si es de otro cliente, lo revisa una persona. Si el vehículo ya está en el taller, devuelve su orden sin pedir la fecha | `placa_no_confirmada`, `revision` o `ya_tenia_orden` |
-  | 2. Día y hora | No en el pasado, hasta 30 días, dentro del horario de ese día (HU-08) | `falta_fecha`, `fecha_invalida` o `fuera_de_horario` con el horario |
-  | 3. Nombre | Si el que tiene es de relleno | `falta_nombre` |
-  | 4. **Confirmación** | Que el **último mensaje del cliente diga que sí** (`domain.IsAffirmative`: "sí", "dale", "confirmo"… pero no "agéndame") | `confirmar` con el resumen, **sin crear nada** |
+  | 1. Placa | La escribió el cliente (HU-55). Si el vehículo ya está en el taller, devuelve su orden sin pedir nada más | `placa_no_confirmada` o `ya_tenia_orden` |
+  | 2. Nombre | Si el que tiene es de relleno | `falta_nombre` |
+  | 3. Día y hora | No en el pasado, hasta 30 días, dentro del horario de ese día (HU-08) | `falta_fecha`, `fecha_invalida` o `fuera_de_horario` con el horario |
+  | 4. Placa de otro cliente | Ya con nombre y cita, pasa a una persona (HU-12) y guarda el nombre. La persona recibe la solicitud completa; al cliente se le dice que le confirman la cita por el chat, sin nada del vehículo | `revision` con la cita, sin crear orden |
+  | 5. **Confirmación** | Que el **último mensaje del cliente diga que sí** (`domain.IsAffirmative`: "sí", "dale", "confirmo"… pero no "agéndame") | `confirmar` con el resumen, **sin crear nada** |
 
   Este último paso está en código porque, medido con Nemotron, el modelo agendaba antes de preguntar y al confirmar creaba otra orden. Ahora no puede agendar sin el "sí" del cliente.
 - **La cita queda en la `fecha_prometida`** de la orden "Por recibir". Ahí la busca **AU-06 "Recordatorio de la cita"**, que se la recuerda al cliente ese día; no hizo falta un campo nuevo. Si la placa ya tiene una orden "Por recibir", se reagenda esa misma (`orders.Flow.SetPromise`, auditoría `orden.reagendar`) en vez de crear otra.

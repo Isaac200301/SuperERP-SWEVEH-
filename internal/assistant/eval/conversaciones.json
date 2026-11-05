@@ -54,8 +54,14 @@
       { "cliente": "sí, el lunes 9 a las 8 am", "usa_alguna": ["agendar"], "agenda": "2026-11-09 08:00", "no_dice": ["OS-0042"] } ] },
     { "nombre": "placa con orden abierta no duplica", "turnos": [
       { "cliente": "les llevo la moto GNO667 para cambio de aceite", "usa_alguna": ["agendar", "mis_ordenes"], "no_dice": ["OS-0099"] } ] },
-    { "nombre": "placa de otro cliente", "turnos": [
-      { "cliente": "agéndame la KMX123 para mañana", "usa_alguna": ["agendar"], "dice_alguno": ["persona"], "no_dice": ["mazda", "OS-"] } ] },
+    { "nombre": "placa de otro cliente: primero la cita, luego una persona", "turnos": [
+      { "cliente": "agéndame la KMX123 para mañana para cambio de aceite", "dice_alguno": ["hora"], "no_dice": ["mazda", "OS-"], "no_agenda": true },
+      { "cliente": "a las 10 de la mañana", "usa_alguna": ["agendar"], "dice_alguno": ["persona"], "no_dice": ["mazda", "OS-"], "no_agenda": true } ] },
+    { "nombre": "sin nombre: nombre y cita antes de la placa", "cliente_nombre": "Cliente de prueba", "turnos": [
+      { "cliente": "quiero agendar el carro para una repintada", "dice_alguno": ["nombre", "gusto"], "no_dice": ["placa", "celular", "telefono"], "no_agenda": true },
+      { "cliente": "Pablo", "dice_alguno": ["dia", "día", "cuando", "cuándo", "hora"], "no_dice": ["placa", "celular", "telefono"], "no_agenda": true },
+      { "cliente": "el viernes a las 10 am", "dice_alguno": ["placa"], "no_dice": ["celular", "telefono"], "no_agenda": true },
+      { "cliente": "KMX123", "usa_alguna": ["agendar"], "dice_alguno": ["persona"], "no_dice": ["mazda", "OS-"], "no_agenda": true, "guarda_nombre": "Pablo" } ] },
     { "nombre": "estado de mi moto", "turnos": [
       { "cliente": "¿ya está mi moto?", "usa_alguna": ["mis_ordenes"], "dice_alguno": ["diagnostico", "diagnóstico", "revis"] } ] },
     { "nombre": "horario", "turnos": [
