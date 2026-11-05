@@ -526,7 +526,9 @@ func TestAgent_OutOfHours(t *testing.T) {
 	}
 	w.draftFor("cambio de aceite")
 	// HU-66: el panel cuenta las tarjetas que esperan para el contador y el sonido.
-	pending := func() any { return owner.must(http.StatusOK, owner.do("GET", "/api/v1/inbox/stats", nil)).body["pendientes"] }
+	pending := func() any {
+		return owner.must(http.StatusOK, owner.do("GET", "/api/v1/inbox/stats", nil)).body["pendientes"]
+	}
 	before := pending().(float64)
 
 	w.write(laura, "Laura Gómez", "¿y la alineación?")
