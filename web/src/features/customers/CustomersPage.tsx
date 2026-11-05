@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link } from 'react-router';
 
 import { api, unwrap, type Schemas } from '../../shared/api/client';
 import { CsvImport } from '../../shared/import/CsvImport';
+import { estados } from '../../shared/i18n/es-CO';
+import { formatoFechaHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { Field } from '../../shared/ui/Field';
@@ -25,6 +28,48 @@ const autorizacion: Record<string, string> = {
   revocada: 'Retiró la autorización',
 };
 
+/** HU-13 y HU-26: lo que se le ha hecho al vehículo; una orden cancelada sale tachada con su motivo. */
+function VehicleHistory({ id }: { id: string }) {
+  const q = useQuery({
+    queryKey: ['vehiculos', id, 'historial'],
+    queryFn: async () => unwrap(await api.GET('/vehicles/{id}/history', { params: { path: { id } } })).ordenes,
+  });
+  if (q.isPending) return <p role="status" className="text-sm text-ink-2">Cargando historial…</p>;
+  if (q.isError) return <Alert>{q.error.message}</Alert>;
+  if (q.data.length === 0) return <p className="text-sm text-ink-2">Todavía no tiene órdenes.</p>;
+  return (
+    <ul className="flex flex-col gap-1 text-sm">
+      {q.data.map(({ orden: o }) => (
+        <li key={o.id} className="flex flex-wrap gap-2">
+          <Link to={`/panel/ordenes/${o.id}`} className={`font-mono font-bold text-primary ${o.estado === 'cancelada' ? 'line-through' : ''}`}>
+            {o.codigo}
+          </Link>
+          <span className="text-ink-2">{formatoFechaHora(o.creadoEn)}</span>
+          <span className={o.estado === 'cancelada' ? 'line-through' : ''}>{estados[o.estado] ?? o.estado}</span>
+          {o.estado === 'cancelada' && o.motivoCancelacion ? <span className="text-err-ink">Motivo: {o.motivoCancelacion}</span> : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function VehicleRow({ v }: { v: Schemas['Vehiculo'] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <Plate value={v.placa} />
+        <span>{[v.marca, v.linea, v.modeloAnio].filter(Boolean).join(' ') || (v.tipo === 'moto' ? 'Moto' : 'Carro')}</span>
+        {v.motorPendiente ? <span className="rounded-full bg-warn-tint px-2 py-0.5 text-xs font-bold text-warn-ink">Motor pendiente</span> : null}
+        <button type="button" className="text-sm font-bold text-primary" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {open ? 'Ocultar historial' : 'Ver historial'}
+        </button>
+      </div>
+      {open ? <VehicleHistory id={v.id} /> : null}
+    </li>
+  );
+}
+
 /** Vehículos de un cliente (HU-12): se cargan al abrir el cliente. */
 function Vehicles({ id }: { id: string }) {
   const q = useQuery({
@@ -37,11 +82,7 @@ function Vehicles({ id }: { id: string }) {
   return (
     <ul className="flex flex-col gap-2">
       {q.data.map((v) => (
-        <li key={v.id} className="flex flex-wrap items-center gap-3">
-          <Plate value={v.placa} />
-          <span>{[v.marca, v.linea, v.modeloAnio].filter(Boolean).join(' ') || (v.tipo === 'moto' ? 'Moto' : 'Carro')}</span>
-          {v.motorPendiente ? <span className="rounded-full bg-warn-tint px-2 py-0.5 text-xs font-bold text-warn-ink">Motor pendiente</span> : null}
-        </li>
+        <VehicleRow key={v.id} v={v} />
       ))}
     </ul>
   );

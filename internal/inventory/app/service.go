@@ -271,6 +271,28 @@ func (s *Service) Return(ctx context.Context, actor shared.Actor, tallerID, part
 	return res, err
 }
 
+// ReturnAll devuelve a bodega todo lo que la orden descontó y no se ha devuelto (HU-26: cancelar después de aprobar).
+// Cada repuesto queda con su movimiento de devolución que apunta a la orden, como en HU-38. Devuelve las unidades.
+func (s *Service) ReturnAll(ctx context.Context, actor shared.Actor, tallerID, orderID shared.ID) (int, error) {
+	var n int
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		parts, err := s.repo.OrderParts(ctx, tallerID, orderID)
+		if err != nil {
+			return err
+		}
+		for _, p := range parts {
+			if left := p.ToReturn(); left > 0 {
+				if _, err := s.Return(ctx, actor, tallerID, p.PartID, orderID, left); err != nil {
+					return err
+				}
+				n += left
+			}
+		}
+		return nil
+	})
+	return n, err
+}
+
 // OrderParts resume por repuesto lo descontado, devuelto y pendiente de una orden (HU-33, HU-38).
 func (s *Service) OrderParts(ctx context.Context, tallerID, orderID shared.ID) ([]domain.OrderPart, error) {
 	var out []domain.OrderPart

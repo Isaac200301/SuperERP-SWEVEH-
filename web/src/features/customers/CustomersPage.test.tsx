@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { mockApi, owner, renderPage } from '../../test/api';
+import { mockApi, orden, owner, renderPage } from '../../test/api';
 import { CustomersPage } from './CustomersPage';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -99,5 +99,25 @@ describe('CustomersPage (HU-82)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('No se puede deshacer');
     await userEvent.click(screen.getByRole('button', { name: 'Sí, borrar sus datos' }));
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/customers/c1/anonymize')).toBe(true));
+  });
+
+  it('muestra el historial del vehículo con la orden cancelada tachada y su motivo (HU-26)', async () => {
+    mockApi({
+      'GET /me': owner,
+      'GET /customers': { clientes: [laura] },
+      'GET /customers/{id}/vehicles': {
+        vehiculos: [{ id: 'v1', clienteId: 'c1', tipo: 'carro', placa: 'CAN840', formatoPlaca: 'carro', marca: 'Renault', linea: 'Logan',
+          modeloAnio: 2015, kilometraje: null, cilindrajeCc: null, turbo: null, motorPendiente: false, version: 1, creadoEn: '2026-11-01T00:00:00Z' }],
+      },
+      'GET /vehicles/{id}/history': {
+        ordenes: [{ orden: orden({ id: 'o9', codigo: 'OS-0009', estado: 'cancelada', motivoCancelacion: 'El cliente no volvió' }), evidencias: [],
+          cotizacion: null }],
+      },
+    });
+    renderPage(<CustomersPage />);
+    await userEvent.click(await screen.findByRole('button', { name: /Laura Gómez/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Ver historial' }));
+    expect(await screen.findByText('Motivo: El cliente no volvió')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'OS-0009' })).toHaveClass('line-through');
   });
 });

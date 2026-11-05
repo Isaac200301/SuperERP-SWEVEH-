@@ -6,6 +6,7 @@ package server_test
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"sweveh/internal/shared"
 )
@@ -218,5 +219,64 @@ func TestReception_Permissions(t *testing.T) {
 		if _, ok := p.(map[string]any)["costo"]; ok {
 			t.Fatalf("recepción ve el costo: %v", p)
 		}
+	}
+}
+
+// HU-84: un mecánico desactivado ya no entra (ni con la sesión que tenía abierta) y lo que hizo sigue a su nombre: el
+// cambio de estado conserva su usuario y la lista del equipo lo muestra inactivo con su nombre.
+func TestTeam_DeactivatedUserKeepsHistory(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550860", "Rosa Pérez")
+	mecID := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/users", map[string]any{"celular": "3005550861", "nombre": "Andrés Mecánico", "rol": "mecanico"})).str("id")
+	st := owner.must(http.StatusOK, owner.do("GET", "/api/v1/workshop/settings", nil)).body
+	st["fotosMinimas"], st["kmObligatorio"] = 0, false
+	owner.must(http.StatusOK, owner.do("PUT", "/api/v1/workshop/settings", st))
+	_, _, id := seedOrder(t, owner, "3005550862", "DES862")
+	owner.must(http.StatusOK, owner.do("PUT", "/api/v1/orders/"+id+"/checklist", map[string]any{"combustible": "1/2"}))
+	owner.must(http.StatusOK, owner.do("PATCH", "/api/v1/orders/"+id+"/assignment", map[string]any{"mecanicoId": mecID}))
+	mec := e.login("3005550861")
+	mec.must(http.StatusOK, mec.do("POST", "/api/v1/orders/"+id+"/transition", map[string]any{"estado": "recibido", "version": r2v(mec, id)}))
+
+	owner.must(http.StatusOK, owner.do("PATCH", "/api/v1/users/"+mecID, map[string]any{"activo": false}))
+	// Las sesiones se revocan de inmediato; el token de acceso ya emitido vence en máximo 10 minutos (authn.AccessTTL).
+	e.clk.Advance(11 * time.Minute)
+	owner = e.login("3105550860")
+	if r := mec.do("GET", "/api/v1/orders/"+id, nil); r.status != http.StatusUnauthorized && r.status != http.StatusForbidden {
+		t.Fatalf("la sesión del desactivado sigue sirviendo: %d", r.status)
+	}
+	if r := mec.do("POST", "/api/v1/auth/refresh", nil); r.status == http.StatusOK {
+		t.Fatalf("el desactivado renovó su sesión: %v", r.body)
+	}
+	c := e.client()
+	c.must(http.StatusAccepted, c.do("POST", "/api/v1/auth/otp", map[string]any{"celular": "3005550861"}))
+	if code := e.otp.Last("+573005550861"); code != "" {
+		r := c.do("POST", "/api/v1/auth/otp/verify", map[string]any{"celular": "3005550861", "codigo": code})
+		if r.status == http.StatusOK {
+			if g := c.do("GET", "/api/v1/orders/"+id, nil); g.status == http.StatusOK {
+				t.Fatalf("el desactivado volvió a entrar al taller: %v", r.body)
+			}
+		}
+	}
+
+	o := owner.must(http.StatusOK, owner.do("GET", "/api/v1/orders/"+id, nil)).body
+	var byMechanic bool
+	for _, h := range o["historial"].([]any) {
+		h := h.(map[string]any)
+		if h["hacia"] == "recibido" && h["usuarioId"] == mecID {
+			byMechanic = true
+		}
+	}
+	if !byMechanic {
+		t.Fatalf("el cambio del mecánico perdió su autor: %v", o["historial"])
+	}
+	var listed bool
+	for _, u := range owner.must(http.StatusOK, owner.do("GET", "/api/v1/users", nil)).body["usuarios"].([]any) {
+		u := u.(map[string]any)
+		if u["id"] == mecID && u["nombre"] == "Andrés Mecánico" && u["activo"] == false {
+			listed = true
+		}
+	}
+	if !listed {
+		t.Fatal("el equipo ya no muestra al desactivado con su nombre")
 	}
 }

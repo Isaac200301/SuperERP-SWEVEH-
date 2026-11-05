@@ -27,7 +27,16 @@ type Flow struct {
 	clock    ports.Clock
 	stats    Stats
 	settings ports.SettingsReader
+	parts    PartsReturner // HU-26: al cancelar vuelven a bodega los repuestos descontados
 }
+
+// PartsReturner devuelve a bodega lo que una orden descontó y no se usó (fachada de inventory).
+type PartsReturner interface {
+	ReturnAll(ctx context.Context, tallerID, orderID shared.ID, by shared.Actor) (int, error)
+}
+
+// SetPartsReturner conecta la devolución de repuestos al cancelar (composition root).
+func (f *Flow) SetPartsReturner(p PartsReturner) { f.parts = p }
 
 // SetSettings conecta los parámetros del taller (tenancy). Sin lector se usan los valores por defecto.
 func (f *Flow) SetSettings(r ports.SettingsReader) { f.settings = r }
@@ -184,7 +193,15 @@ func (f *Flow) Cancel(ctx context.Context, tallerID, orderID shared.ID, actor sh
 		if err != nil {
 			return err
 		}
-		return f.persistMove(ctx, &o, prev, pv, actor, reason, &out)
+		if err := f.persistMove(ctx, &o, prev, pv, actor, reason, &out); err != nil {
+			return err
+		}
+		if f.parts == nil {
+			return nil
+		}
+		// HU-26: si ya se había aprobado y descontado, los repuestos vuelven a bodega con su movimiento.
+		_, err = f.parts.ReturnAll(ctx, tallerID, orderID, actor)
+		return err
 	})
 	return out, err
 }

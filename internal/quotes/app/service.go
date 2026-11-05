@@ -344,8 +344,14 @@ func (s *Quotes) Send(ctx context.Context, tallerID, orderID shared.ID, actor sh
 		if err := s.repo.Save(ctx, q, pv); err != nil {
 			return err
 		}
-		if o.State == "en_diagnostico" {
+		switch {
+		case o.State == "en_diagnostico":
 			if err := s.orders.Move(ctx, tallerID, orderID, "esperando_aprobacion", actor, "cotización enviada"); err != nil {
+				return err
+			}
+		case o.State == "en_reparacion" && q.Number > 1:
+			// HU-31: el adicional vuelve a pedir aprobación; lo ya aprobado sigue en pie.
+			if err := s.orders.Move(ctx, tallerID, orderID, "esperando_aprobacion", actor, "cotización adicional enviada"); err != nil {
 				return err
 			}
 		}
@@ -395,6 +401,18 @@ func (s *Quotes) Respond(ctx context.Context, c RespondCmd) (domain.Quote, error
 		q.Version++
 		if err := s.repo.Save(ctx, q, pv); err != nil {
 			return err
+		}
+		if !approved && c.Response.Decision == "rechazar" && q.Number > 1 {
+			// HU-31: si el cliente no aprueba el adicional, se sigue con lo que ya había aprobado.
+			o, err := s.orders.Load(ctx, c.TallerID, c.OrderID)
+			if err != nil {
+				return err
+			}
+			if o.State == "esperando_aprobacion" {
+				if err := s.orders.Move(ctx, c.TallerID, c.OrderID, "en_reparacion", c.Actor, "cotización adicional no aprobada"); err != nil {
+					return err
+				}
+			}
 		}
 		if approved {
 			o, err := s.orders.Load(ctx, c.TallerID, c.OrderID)

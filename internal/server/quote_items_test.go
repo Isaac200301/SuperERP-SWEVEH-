@@ -83,3 +83,64 @@ func TestWhatsApp_ApproveQuoteItemByItem(t *testing.T) {
 		}
 	}
 }
+
+// HU-31: con la orden En reparación, el adicional vuelve a pedir aprobación solo por lo nuevo y el cliente recibe el
+// detalle de eso; aprobado, vuelve a En reparación y el total de la orden suma las dos aprobaciones. Si el cliente no
+// aprueba otro adicional, se sigue con lo que ya había aprobado.
+func TestWhatsApp_AdditionalQuote(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550850", "Pablo Rodríguez")
+	w := e.whatsapp(t, owner, nil)
+	const phone = "3001234850"
+	cid := w.customer(phone, "Laura Gómez")
+	id, _ := w.orderFor(cid, "ADI850")
+	w.move(id, "recibido", nil)
+	w.move(id, "en_diagnostico", nil)
+	q := "/api/v1/orders/" + id + "/quote"
+	line := func(desc string, price int) {
+		owner.must(http.StatusOK, owner.do("POST", q+"/lines", map[string]any{"tipo": "servicio", "descripcion": desc, "cantidad": 1, "precioUnitario": price}))
+	}
+	state := func() string {
+		return owner.must(http.StatusOK, owner.do("GET", "/api/v1/orders/"+id, nil)).str("estado")
+	}
+
+	line("Cambio de pastillas", 100000)
+	owner.must(http.StatusOK, owner.do("POST", q+"/send", nil))
+	w.pump()
+	w.press(phone, "Laura Gómez", "quote:aprobar:"+id, "Aprobar")
+	if s := state(); s != "en_reparacion" {
+		t.Fatalf("primera aprobación: %s", s)
+	}
+
+	line("Cambio de líquido de frenos", 40000)
+	owner.must(http.StatusOK, owner.do("POST", q+"/send", nil))
+	w.pump()
+	if s := state(); s != "esperando_aprobacion" {
+		t.Fatalf("el adicional pide aprobación: %s", s)
+	}
+	var quotes []map[string]any // mensajes de cotización (con botones), no las respuestas
+	for _, m := range w.sentBy(phone, "AU-02") {
+		if len(buttons(m)) > 0 {
+			quotes = append(quotes, m)
+		}
+	}
+	extra := quotes[len(quotes)-1]["cuerpo"].(string)
+	if len(quotes) != 2 || !strings.Contains(extra, "líquido de frenos") || strings.Contains(extra, "pastillas") {
+		t.Fatalf("el cliente recibe solo lo nuevo: %q", extra)
+	}
+	w.press(phone, "Laura Gómez", "quote:aprobar:"+id, "Aprobar")
+	if s := state(); s != "en_reparacion" {
+		t.Fatalf("aprobado el adicional: %s", s)
+	}
+	totals := owner.must(http.StatusOK, owner.do("GET", "/api/v1/customers/"+cid+"/export", nil)).body["ordenes"].([]any)
+	if got := totals[0].(map[string]any)["totalAprobado"].(float64); got <= 100000 || got >= 200000 {
+		t.Fatalf("el total suma las dos aprobaciones (con IVA si aplica): %v", got)
+	}
+
+	line("Lavado de motor", 20000)
+	owner.must(http.StatusOK, owner.do("POST", q+"/send", nil))
+	owner.must(http.StatusOK, owner.do("POST", q+"/response", map[string]any{"decision": "rechazar", "canal": "telefono"}))
+	if s := state(); s != "en_reparacion" {
+		t.Fatalf("rechazado el adicional, sigue la reparación: %s", s)
+	}
+}

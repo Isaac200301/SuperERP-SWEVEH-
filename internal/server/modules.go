@@ -98,6 +98,7 @@ func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger
 	m.Inventory = inventoryapp.NewService(tx, inventorypg.Repository{}, m.Audit, m.Events, clk)
 	m.Inventory.SetPhotoStore(inventoryphotos.New(st))
 	m.InvF = inventory.New(m.Inventory)
+	m.Flow.SetPartsReturner(m.InvF) // HU-26: cancelar devuelve a bodega lo descontado
 	m.Quotes = quotesapp.NewService(tx, quotespg.Repository{}, quotesdeps.Orders{O: m.OrdersF}, quotesdeps.Catalog{C: m.CatalogF},
 		quotesdeps.Inventory{I: m.InvF}, m.Audit, m.Events, clk)
 	m.QuotesF = quotes.New(m.Quotes)

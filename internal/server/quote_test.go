@@ -209,12 +209,15 @@ func TestQuote_BuildSendApproveDiscountAndReturn(t *testing.T) {
 		t.Fatalf("aviso sin existencia: %v", r.body)
 	}
 	c.must(http.StatusOK, c.do("POST", q+"/send", nil))
-	if o := c.must(http.StatusOK, c.do("GET", "/api/v1/orders/"+id, nil)); o.str("estado") != "en_reparacion" {
-		t.Fatalf("la adicional no cambia el estado: %v", o.body)
+	if o := c.must(http.StatusOK, c.do("GET", "/api/v1/orders/"+id, nil)); o.str("estado") != "esperando_aprobacion" {
+		t.Fatalf("el adicional vuelve a pedir aprobación: %v", o.body)
 	}
 	c.must(http.StatusOK, c.do("POST", q+"/response", map[string]any{"decision": "aprobar", "canal": "telefono"}))
 	if s := partStock(t, c, "PF-20"); s != 5 {
 		t.Fatalf("sin existencia suficiente no debía descontar: %v", s)
+	}
+	if o := c.must(http.StatusOK, c.do("GET", "/api/v1/orders/"+id, nil)); o.str("estado") != "en_reparacion" {
+		t.Fatalf("aprobado el adicional, vuelve a En reparación: %v", o.body)
 	}
 }
 
