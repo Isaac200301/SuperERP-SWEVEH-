@@ -25,9 +25,12 @@ const nav = [
   { to: '/panel/tablero', label: 'Tablero', icon: IconCheck, perm: 'kpi:read' },
   { to: '/panel/piso', label: 'Piso', icon: IconClock, perm: 'order:read' },
   { to: '/panel/ordenes', label: 'Órdenes', icon: IconOrders, perm: 'order:read' },
+  // HU-82: dueño y recepción ven los clientes con sus vehículos.
+  { to: '/panel/clientes', label: 'Clientes', icon: IconTeam, perm: 'customer:read_all' },
   { to: '/panel/por-revisar', label: 'Por revisar', icon: IconWarn, perm: 'inbox:manage' },
   { to: '/panel/conversaciones', label: 'Conversaciones', icon: IconChat, perm: 'conversation:read' },
-  { to: '/panel/automatizaciones', label: 'Automatizaciones', icon: IconPlus, perm: 'order:read' },
+  // HU-82: la configuración de los avisos es solo del dueño; recepción y mecánico no la ven.
+  { to: '/panel/automatizaciones', label: 'Automatizaciones', icon: IconPlus, perm: 'automation:manage' },
   { to: '/panel/servicios', label: 'Servicios', icon: IconTool, perm: 'service:manage' },
   { to: '/panel/repuestos', label: 'Repuestos', icon: IconOrders, perm: 'part:manage' },
   { to: '/panel/equipo', label: 'Equipo', icon: IconTeam, perm: 'user:manage' },

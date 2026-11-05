@@ -115,6 +115,25 @@ describe('PanelLayout (HU-81)', () => {
     expect(screen.getByRole('link', { name: 'Mi taller' })).toBeInTheDocument();
   });
 
+  it('recepción ve clientes, órdenes y la bandeja, pero no costos ni la configuración (HU-82)', () => {
+    // Los permisos de recepción del servidor (identity/domain/roles.go: comunes + mostrador).
+    const reception = {
+      ...owner, roles: ['recepcion'], permisos: [
+        'order:create', 'order:read', 'order:update_state', 'order:diagnose', 'evidence:upload', 'customer:create', 'vehicle:create',
+        'vehicle:update', 'vehicle:read', 'service:read', 'part:read', 'part:return', 'quote:read', 'quote:edit', 'quote:send', 'order:cancel',
+        'order:assign', 'customer:read_all', 'vehicle:change_owner', 'quote:register_response', 'quote:discount', 'money:read', 'inbox:manage',
+        'conversation:read',
+      ],
+    };
+    renderPage(<PanelLayout session={reception as unknown as Sesion} />);
+    for (const name of ['Clientes', 'Órdenes', 'Piso', 'Por revisar', 'Conversaciones']) {
+      expect(screen.getByRole('link', { name })).toBeInTheDocument();
+    }
+    for (const name of ['Tablero', 'Automatizaciones', 'Servicios', 'Repuestos', 'Equipo', 'Mi taller']) {
+      expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
+    }
+  });
+
   it('si el taller es de una sola persona no muestra Equipo (HU-83)', () => {
     renderPage(<PanelLayout session={owner as unknown as Sesion} soloYo />);
     expect(screen.queryByRole('link', { name: 'Equipo' })).not.toBeInTheDocument();

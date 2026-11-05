@@ -184,3 +184,39 @@ func TestCustomers_ListSearchConsentAndOwnerChange(t *testing.T) {
 		t.Fatalf("vehículos del dueño nuevo: %v", r.body)
 	}
 }
+
+// HU-82: recepción registra clientes, vehículos y órdenes y atiende la bandeja; no ve costos, KPIs ni la configuración
+// de las automatizaciones.
+func TestReception_Permissions(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550170", "Rosa Pérez")
+	owner.must(http.StatusCreated, owner.do("POST", "/api/v1/users", map[string]any{"celular": "3005550171", "nombre": "Yesica Gómez", "rol": "recepcion"}))
+	owner.must(http.StatusCreated, owner.do("POST", "/api/v1/parts", map[string]any{"referencia": "FA-1", "nombre": "Filtro", "tipoVehiculo": "carro",
+		"costo": 9000, "precioVenta": 18000, "existencia": 3, "minimo": 1}))
+	rec := e.login("3005550171")
+
+	r := rec.must(http.StatusCreated, rec.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550172", "nombre": "Laura Gómez"}))
+	cid := nested(r.body, "cliente", "id").(string)
+	rec.must(http.StatusCreated, rec.do("POST", "/api/v1/vehicles", map[string]any{"placa": "REC172", "clienteId": cid}))
+	rec.must(http.StatusCreated, rec.do("POST", "/api/v1/orders", map[string]any{"placa": "REC172", "sintoma": "Cambio de aceite"}))
+	if n := len(rec.must(http.StatusOK, rec.do("GET", "/api/v1/customers", nil)).body["clientes"].([]any)); n != 1 {
+		t.Fatalf("clientes: %d", n)
+	}
+	rec.must(http.StatusOK, rec.do("GET", "/api/v1/customers/"+cid+"/vehicles", nil))
+	rec.must(http.StatusOK, rec.do("GET", "/api/v1/orders", nil))
+	rec.must(http.StatusOK, rec.do("GET", "/api/v1/inbox", nil))
+
+	for _, path := range []string{"/api/v1/dashboard", "/api/v1/automations/runs"} {
+		if r := rec.do("GET", path, nil); r.status != http.StatusForbidden {
+			t.Errorf("GET %s: %d; quiero 403", path, r.status)
+		}
+	}
+	if r := rec.do("PATCH", "/api/v1/automations/AU-01", map[string]any{"activa": false}); r.status != http.StatusForbidden {
+		t.Errorf("cambiar una automatización: %d; quiero 403", r.status)
+	}
+	for _, p := range rec.must(http.StatusOK, rec.do("GET", "/api/v1/parts", nil)).body["repuestos"].([]any) {
+		if _, ok := p.(map[string]any)["costo"]; ok {
+			t.Fatalf("recepción ve el costo: %v", p)
+		}
+	}
+}

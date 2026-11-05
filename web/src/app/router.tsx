@@ -11,6 +11,7 @@ const RegisterPage = page(() => import('../features/auth/RegisterPage'), 'Regist
 const LoginPage = page(() => import('../features/auth/LoginPage'), 'LoginPage');
 const PolicyPage = page(() => import('../features/auth/PolicyPage'), 'PolicyPage');
 const OrdersPage = page(() => import('../features/orders/OrdersPage'), 'OrdersPage');
+const CustomersPage = page(() => import('../features/customers/CustomersPage'), 'CustomersPage');
 const NewOrderPage = page(() => import('../features/orders/NewOrderPage'), 'NewOrderPage');
 const OrderDetailPage = page(() => import('../features/orders/OrderDetailPage'), 'OrderDetailPage');
 const FloorPage = page(() => import('../features/orders/FloorPage'), 'FloorPage');
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
       { path: 'ordenes/nueva', element: <Lazy Page={NewOrderPage} /> },
       { path: 'ordenes/:id', element: <Lazy Page={OrderDetailPage} /> },
       { path: 'piso', element: <Lazy Page={FloorPage} /> },
+      { path: 'clientes', element: <Lazy Page={CustomersPage} /> },
       { path: 'por-revisar', element: <Lazy Page={InboxPage} /> },
       { path: 'conversaciones', element: <Lazy Page={ConversationsPage} /> },
       { path: 'conversaciones/:id', element: <Lazy Page={ConversationPage} /> },
