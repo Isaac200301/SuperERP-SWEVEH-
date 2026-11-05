@@ -417,11 +417,16 @@ func (h *handler) resolve(r *http.Request, p reqctx.Principal) (int, any, error)
 
 func (h *handler) inboxStats(r *http.Request, p reqctx.Principal) (int, any, error) {
 	sent, edited, err := h.s.Assistant.Stats(r.Context(), p.TallerID)
+	if err != nil {
+		return 0, nil, err
+	}
 	pct := 0.0
 	if sent > 0 {
 		pct = float64(edited) * 100 / float64(sent)
 	}
-	return http.StatusOK, map[string]any{"enviados": sent, "editados": edited, "porcentajeEditados": pct}, err
+	// HU-66: el panel consulta las tarjetas pendientes para el contador y el sonido.
+	pending, err := h.s.Assistant.Drafts(r.Context(), p.TallerID, true)
+	return http.StatusOK, map[string]any{"enviados": sent, "editados": edited, "porcentajeEditados": pct, "pendientes": len(pending)}, err
 }
 
 // assistantSettings dice si el agente responde solo (ADR-0028).

@@ -1513,7 +1513,7 @@ paths:
   /inbox/stats:
     get:
       operationId: getDraftStats
-      summary: Qué tan seguido el dueño edita los borradores (HU-65). Permiso inbox:manage
+      summary: Qué tan seguido el dueño edita los borradores (HU-65) y cuántas tarjetas esperan (HU-66). Permiso inbox:manage
       responses:
         '200':
           description: OK
@@ -1521,11 +1521,12 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [enviados, editados, porcentajeEditados]
+                required: [enviados, editados, porcentajeEditados, pendientes]
                 properties:
                   enviados: { type: integer }
                   editados: { type: integer }
                   porcentajeEditados: { type: number }
+                  pendientes: { type: integer, description: 'Tarjetas por revisar (hasta 100)' }
 
   /assistant/settings:
     get:

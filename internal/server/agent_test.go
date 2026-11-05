@@ -525,10 +525,16 @@ func TestAgent_OutOfHours(t *testing.T) {
 		t.Fatalf("aviso: %v", m)
 	}
 	w.draftFor("cambio de aceite")
+	// HU-66: el panel cuenta las tarjetas que esperan para el contador y el sonido.
+	pending := func() any { return owner.must(http.StatusOK, owner.do("GET", "/api/v1/inbox/stats", nil)).body["pendientes"] }
+	before := pending().(float64)
 
 	w.write(laura, "Laura Gómez", "¿y la alineación?")
 	if n := len(w.closedNotices(laura)); n != 1 {
 		t.Fatalf("avisos de fuera de horario: %d; quiero 1", n)
 	}
 	w.draftFor("alineación")
+	if n := pending(); n != before+1 {
+		t.Fatalf("tarjetas pendientes: %v; antes %v", n, before)
+	}
 }

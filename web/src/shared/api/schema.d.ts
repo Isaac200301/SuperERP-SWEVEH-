@@ -1111,7 +1111,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Qué tan seguido el dueño edita los borradores (HU-65). Permiso inbox:manage */
+        /** Qué tan seguido el dueño edita los borradores (HU-65) y cuántas tarjetas esperan (HU-66). Permiso inbox:manage */
         get: operations["getDraftStats"];
         put?: never;
         post?: never;
@@ -4164,6 +4164,8 @@ export interface operations {
                         enviados: number;
                         editados: number;
                         porcentajeEditados: number;
+                        /** @description Tarjetas por revisar (hasta 100) */
+                        pendientes: number;
                     };
                 };
             };

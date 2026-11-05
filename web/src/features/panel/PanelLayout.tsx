@@ -16,6 +16,7 @@ import {
   IconWarn,
 } from '../../shared/ui/icons';
 import { can, useLogout } from '../auth/api';
+import { usePendingCards } from '../inbox/usePendingCards';
 
 /**
  * Navegación del panel. Solo aparecen las secciones que ya existen y que el rol puede usar
@@ -43,6 +44,8 @@ const nav = [
 export function PanelLayout({ session, soloYo = false }: { session: Sesion; soloYo?: boolean }) {
   const navigate = useNavigate();
   const logout = useLogout();
+  // HU-66: contador y sonido cuando llega una tarjeta a Por revisar (dueño y recepción).
+  const pending = usePendingCards(can(session, 'inbox:manage'));
   return (
     <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col gap-5 p-4 md:flex-row md:p-5">
       <aside className="flex flex-col gap-5 md:w-[240px] md:flex-none">
@@ -64,6 +67,12 @@ export function PanelLayout({ session, soloYo = false }: { session: Sesion; solo
               >
                 <n.icon />
                 {n.label}
+                {n.to === '/panel/por-revisar' && pending > 0 ? (
+                  <span className="ml-auto rounded-full bg-primary px-2 text-xs font-extrabold text-white">
+                    {pending}
+                    <span className="sr-only"> por revisar</span>
+                  </span>
+                ) : null}
               </NavLink>
             ))}
           <button
