@@ -32,7 +32,7 @@ type API struct {
 	JWTPrivateKeyPEM string // vacío solo en local: se genera una clave efímera
 	JWTKeyID         string
 	OTPPepper        string
-	OTPSender        string // "consola" (solo local) | "memoria" (solo pruebas)
+	OTPSender        string // "consola" (solo local) | "memoria" (solo pruebas) | "waha" (WhatsApp de prueba, solo demo)
 	AllowedOrigins   []string
 	TrustProxy       bool
 	WebDir           string
@@ -215,6 +215,10 @@ func LoadAPI() (API, error) {
 	}
 	switch c.OTPSender {
 	case "consola", "memoria":
+	case "waha": // el código sale por el WhatsApp de prueba (WAHA, ADR-0034); WAHA ya está vedado en producción
+		if !c.WhatsApp.WAHA.Enabled() {
+			errs = append(errs, errors.New("OTP_SENDER=waha necesita WAHA_URL, WAHA_API_KEY y WAHA_WEBHOOK_SECRET"))
+		}
 	default:
 		errs = append(errs, fmt.Errorf("OTP_SENDER=%q no es un canal conocido", c.OTPSender))
 	}
