@@ -144,3 +144,8 @@ type Filter = app.Filter
 func (o Orders) LastShownPhoto(ctx context.Context, tallerID, orderID shared.ID) (*shared.ID, error) {
 	return o.flow.LastShownPhoto(ctx, tallerID, orderID)
 }
+
+// MoveCustomer pasa las órdenes de un cliente a otro al unir clientes repetidos (HU-15).
+func (o Orders) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	return o.flow.MoveCustomer(ctx, tallerID, from, to)
+}

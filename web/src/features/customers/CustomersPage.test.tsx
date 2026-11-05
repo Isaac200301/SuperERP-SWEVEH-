@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -53,5 +53,29 @@ describe('CustomersPage (HU-82)', () => {
     expect(await screen.findByText('Listo: se importaron 1 vehículos (1 cliente nuevo).')).toBeInTheDocument();
     expect(confirmed).toBe(true);
     expect(calls.filter((c) => c.method === 'POST').map((c) => c.path)).toEqual(['/vehicles/import?confirmar=0', '/vehicles/import?confirmar=1']);
+  });
+
+  it('muestra los posibles repetidos lado a lado y une en el que el dueño elige (HU-15)', async () => {
+    const carlos2 = { ...laura, id: 'c2', nombre: 'carlos ruiz', celular: '3009999999', autorizacionEstado: 'pendiente' };
+    const carlos1 = { ...laura, id: 'c1', nombre: 'Carlos Ruiz', celular: '3001111111' };
+    let merged = false;
+    const calls = mockApi({
+      'GET /me': { ...owner, permisos: [...owner.permisos, 'customer:merge', 'customer:read_all'] },
+      'GET /customers': { clientes: [carlos1] },
+      'GET /customers/duplicates': () => ({ grupos: merged ? [] : [{ clientes: [carlos1, carlos2] }] }),
+      'GET /customers/{id}/vehicles': { vehiculos: [] },
+      'POST /customers/merge': () => {
+        merged = true;
+        return { cliente: carlos2, movidos: { vehiculos: 1, ordenes: 0, conversaciones: 1 } };
+      },
+    });
+    renderPage(<CustomersPage />);
+    await screen.findByText('Posibles repetidos');
+    await userEvent.click(screen.getByRole('radio', { name: /Conservar a carlos ruiz/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Unir en carlos ruiz' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Los vehículos, órdenes y conversaciones de Carlos Ruiz (3001111111) pasan a carlos ruiz (3009999999)');
+    await userEvent.click(screen.getByRole('button', { name: 'Sí, unir' }));
+    await waitFor(() => expect(screen.queryByText('Posibles repetidos')).not.toBeInTheDocument());
+    expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ conservar: 'c2', unir: 'c1' });
   });
 });

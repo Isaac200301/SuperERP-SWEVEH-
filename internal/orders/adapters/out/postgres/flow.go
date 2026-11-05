@@ -262,3 +262,8 @@ func (Flow) PhotoSides(ctx context.Context, tallerID, orderID shared.ID) ([]stri
 	}
 	return out, err
 }
+
+func (Flow) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	n, err := db.Exec(ctx, `UPDATE orders.orden SET cliente_id = $3 WHERE taller_id = $1 AND cliente_id = $2`, tallerID, from, to)
+	return int(n), err
+}

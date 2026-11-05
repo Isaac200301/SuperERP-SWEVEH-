@@ -586,3 +586,15 @@ func mergeItems(base, in []domain.ItemCheck) []domain.ItemCheck {
 	}
 	return out
 }
+
+// MoveCustomer pasa las órdenes del cliente repetido al que se conserva (HU-15): el historial de la persona queda
+// junto. Corre en la transacción de la unión; la bitácora la escribe customers.
+func (f *Flow) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	var n int
+	err := f.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = f.repo.MoveCustomer(ctx, tallerID, from, to)
+		return err
+	})
+	return n, err
+}

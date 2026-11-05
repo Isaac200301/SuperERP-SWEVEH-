@@ -10,6 +10,7 @@ import (
 	"sweveh/internal/customers/domain"
 	"sweveh/internal/platform/httpx"
 	"sweveh/internal/platform/reqctx"
+	"sweveh/internal/shared"
 )
 
 // Texto y versión de la autorización del cliente final. Borrador hasta la revisión jurídica (AQ-10).
@@ -22,6 +23,46 @@ const (
 func (h *Handler) ExtraRoutes(r chi.Router) {
 	r.With(h.guard.Require(permRead)).Get("/customers", httpx.JSON(h.log, h.list))
 	r.With(h.guard.Require(permCreate)).Post("/customers/{id}/consent", httpx.JSON(h.log, h.consent))
+	r.With(h.guard.Require("customer:merge")).Get("/customers/duplicates", httpx.JSON(h.log, h.duplicates))
+	r.With(h.guard.Require("customer:merge")).Post("/customers/merge", httpx.JSON(h.log, h.merge))
+}
+
+// duplicates lista los posibles repetidos agrupados por nombre (HU-15).
+func (h *Handler) duplicates(r *http.Request, p reqctx.Principal) (int, any, error) {
+	groups, err := h.svc.Duplicates(r.Context(), p.TallerID)
+	out := make([]map[string]any, 0, len(groups))
+	for _, g := range groups {
+		cs := make([]customerDTO, 0, len(g.Customers))
+		for _, c := range g.Customers {
+			cs = append(cs, toDTO(c))
+		}
+		out = append(out, map[string]any{"clientes": cs})
+	}
+	return http.StatusOK, map[string]any{"grupos": out}, err
+}
+
+// merge une el cliente "unir" al que se "conservar" (HU-15): sus vehículos, órdenes y conversaciones pasan al que queda.
+func (h *Handler) merge(r *http.Request, p reqctx.Principal) (int, any, error) {
+	var q struct {
+		Conservar string `json:"conservar"`
+		Unir      string `json:"unir"`
+	}
+	if err := httpx.Decode(r, &q); err != nil {
+		return 0, nil, err
+	}
+	keep, err := shared.ParseID(q.Conservar)
+	if err != nil {
+		return 0, nil, domain.ErrCustomerNotFound
+	}
+	drop, err := shared.ParseID(q.Unir)
+	if err != nil {
+		return 0, nil, domain.ErrCustomerNotFound
+	}
+	res, err := h.svc.Merge(r.Context(), p.TallerID, p.Actor(), keep, drop)
+	if err != nil {
+		return 0, nil, err
+	}
+	return http.StatusOK, map[string]any{"cliente": toDTO(res.Kept), "movidos": res.Moved}, nil
 }
 
 func (h *Handler) list(r *http.Request, p reqctx.Principal) (int, any, error) {

@@ -51,9 +51,10 @@ func (q *Queries) GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams
 }
 
 const getCustomerByPhone = `-- name: GetCustomerByPhone :one
-SELECT id, taller_id, celular, nombre, correo, autorizacion_estado, version, created_at
-FROM customers.cliente
-WHERE taller_id = $1 AND celular = $2
+SELECT c.id, c.taller_id, c.celular, c.nombre, c.correo, c.autorizacion_estado, c.version, c.created_at
+FROM customers.cliente c
+WHERE c.taller_id = $1 AND c.id = (SELECT COALESCE(x.fusionado_con, x.id) FROM customers.cliente x
+    WHERE x.taller_id = $1 AND x.celular = $2)
 `
 
 type GetCustomerByPhoneParams struct {
@@ -72,6 +73,7 @@ type GetCustomerByPhoneRow struct {
 	CreatedAt          time.Time
 }
 
+// Si el celular es de un cliente que se unió a otro (HU-15), devuelve el que se conservó.
 func (q *Queries) GetCustomerByPhone(ctx context.Context, arg GetCustomerByPhoneParams) (GetCustomerByPhoneRow, error) {
 	row := q.db.QueryRow(ctx, getCustomerByPhone, arg.TallerID, arg.Celular)
 	var i GetCustomerByPhoneRow

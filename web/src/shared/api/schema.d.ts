@@ -554,6 +554,40 @@ export interface paths {
         patch: operations["changeVehicleOwner"];
         trace?: never;
     };
+    "/customers/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Posibles clientes repetidos, agrupados por nombre (HU-15). Permiso customer:merge */
+        get: operations["listDuplicateCustomers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unir un cliente repetido al que se conserva (HU-15). Sus vehículos, órdenes y conversaciones pasan al que queda; queda en la bitácora. Permiso customer:merge */
+        post: operations["mergeCustomers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers/{id}/vehicles": {
         parameters: {
             query?: never;
@@ -3131,6 +3165,68 @@ export interface operations {
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    listDuplicateCustomers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        grupos: {
+                            clientes: components["schemas"]["Cliente"][];
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    mergeCustomers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    conservar: string;
+                    /** Format: uuid */
+                    unir: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Unidos */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        cliente: components["schemas"]["Cliente"];
+                        /** @description vehiculos, ordenes y conversaciones que pasaron al cliente */
+                        movidos: {
+                            [key: string]: number;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     listCustomerVehicles: {

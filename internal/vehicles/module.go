@@ -84,3 +84,8 @@ func snapshot(v domain.Vehicle) Snapshot {
 		EnginePending: v.Engine.Pending(v.Kind),
 	}
 }
+
+// MoveCustomer pasa los vehículos de un cliente a otro al unir clientes repetidos (HU-15).
+func (d Directory) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	return d.svc.MoveCustomer(ctx, tallerID, from, to)
+}

@@ -37,15 +37,45 @@ func cList(rows []cRow, err error) ([]domain.Customer, error) {
 
 func (Extra) Search(ctx context.Context, tallerID shared.ID, digits, text string, limit int) ([]domain.Customer, error) {
 	if digits != "" {
-		return cList(db.Many[cRow](ctx, `SELECT `+cCols+` FROM customers.cliente WHERE taller_id = $1 AND celular LIKE '%' || $2 || '%'
+		return cList(db.Many[cRow](ctx, `SELECT `+cCols+` FROM customers.cliente WHERE taller_id = $1 AND fusionado_con IS NULL AND celular LIKE '%' || $2 || '%'
 			ORDER BY nombre LIMIT $3`, tallerID, digits, limit))
 	}
-	return cList(db.Many[cRow](ctx, `SELECT `+cCols+` FROM customers.cliente WHERE taller_id = $1
+	return cList(db.Many[cRow](ctx, `SELECT `+cCols+` FROM customers.cliente WHERE taller_id = $1 AND fusionado_con IS NULL
 		AND nombre ILIKE '%' || replace(replace(replace($2, '\', '\\'), '%', '\%'), '_', '\_') || '%' ORDER BY nombre LIMIT $3`, tallerID, text, limit))
 }
 
 func (Extra) List(ctx context.Context, tallerID shared.ID, limit int) ([]domain.Customer, error) {
-	return cList(db.Many[cRow](ctx, `SELECT `+cCols+` FROM customers.cliente WHERE taller_id = $1 ORDER BY created_at DESC LIMIT $2`, tallerID, limit))
+	return cList(db.Many[cRow](ctx, `SELECT `+cCols+` FROM customers.cliente WHERE taller_id = $1 AND fusionado_con IS NULL
+		ORDER BY created_at DESC LIMIT $2`, tallerID, limit))
+}
+
+// Duplicates son los clientes vigentes que comparten nombre (sin tildes, mayúsculas ni espacios de más): los posibles
+// repetidos de HU-15, agrupados por nombre.
+func (Extra) Duplicates(ctx context.Context, tallerID shared.ID, limit int) ([]domain.Customer, error) {
+	return cList(db.Many[cRow](ctx, `WITH c AS (
+			SELECT `+cCols+`, lower(btrim(regexp_replace(translate(nombre, 'ÁÉÍÓÚÜÑáéíóúüñ', 'AEIOUUNaeiouun'), '\s+', ' ', 'g'))) AS clave
+			FROM customers.cliente WHERE taller_id = $1 AND fusionado_con IS NULL)
+		SELECT `+cCols+` FROM c WHERE clave IN (SELECT clave FROM c GROUP BY clave HAVING count(*) > 1)
+		ORDER BY clave, created_at LIMIT $2`, tallerID, limit))
+}
+
+// MarkMerged deja al cliente unido al que se conserva, y también a los que ya se habían unido a él.
+func (Extra) MarkMerged(ctx context.Context, tallerID, dropID, keepID shared.ID, at time.Time) error {
+	_, err := db.Exec(ctx, `UPDATE customers.cliente SET fusionado_con = $3, fusionado_en = $4, version = version + 1, updated_at = now()
+		WHERE taller_id = $1 AND (id = $2 OR fusionado_con = $2)`, tallerID, dropID, keepID, at)
+	return err
+}
+
+// Merged dice si el cliente ya se unió a otro.
+func (Extra) Merged(ctx context.Context, tallerID, id shared.ID) (bool, error) {
+	type r struct {
+		Merged bool `db:"unido"`
+	}
+	rows, err := db.Many[r](ctx, `SELECT fusionado_con IS NOT NULL AS unido FROM customers.cliente WHERE taller_id = $1 AND id = $2`, tallerID, id)
+	if err != nil || len(rows) == 0 {
+		return false, err
+	}
+	return rows[0].Merged, nil
 }
 
 func (Extra) SetName(ctx context.Context, tallerID, id shared.ID, name string) error {

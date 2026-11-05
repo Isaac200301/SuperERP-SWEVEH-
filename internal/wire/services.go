@@ -3,6 +3,7 @@
 package wire
 
 import (
+	"context"
 	"time"
 
 	"sweveh/internal/assistant/adapters/out/llm/openrouter"
@@ -20,6 +21,7 @@ import (
 	messagingapp "sweveh/internal/messaging/app"
 	"sweveh/internal/platform/config"
 	"sweveh/internal/server"
+	"sweveh/internal/shared"
 )
 
 // Services son los servicios del motor (mensajería, automatizaciones, agente).
@@ -92,5 +94,25 @@ func BuildWith(m *server.Modules, ch messagingapp.Channel, it assistantapp.Inter
 		cap = 5_000_000
 	}
 	s.Assistant = assistantapp.NewService(m.Tx, assistantpg.Repository{}, &taller{s: s}, m.Audit, m.Clock, it, rules.Interpreter{}, cap)
+	m.Customers.SetMover(customerMover{s}) // unir clientes repetidos (HU-15)
 	return s
+}
+
+// customerMover pasa al cliente que se conserva los vehículos, órdenes y conversaciones del repetido (HU-15), cada
+// cosa por la fachada de su módulo y en la transacción de la unión.
+type customerMover struct{ s *Services }
+
+func (c customerMover) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (map[string]int, error) {
+	out := map[string]int{}
+	var err error
+	if out["vehiculos"], err = c.s.M.VehDir.MoveCustomer(ctx, tallerID, from, to); err != nil {
+		return nil, err
+	}
+	if out["ordenes"], err = c.s.M.OrdersF.MoveCustomer(ctx, tallerID, from, to); err != nil {
+		return nil, err
+	}
+	if out["conversaciones"], err = c.s.Messaging.MoveCustomer(ctx, tallerID, from, to); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

@@ -1,9 +1,10 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { api, unwrap, type Schemas } from '../../shared/api/client';
 import { CsvImport } from '../../shared/import/CsvImport';
 import { Alert } from '../../shared/ui/Alert';
+import { Button } from '../../shared/ui/Button';
 import { Field } from '../../shared/ui/Field';
 import { Plate } from '../../shared/ui/Plate';
 import { usePermission } from '../auth/api';
@@ -65,12 +66,76 @@ function Row({ c }: { c: Cliente }) {
   );
 }
 
+/**
+ * HU-15: clientes que parecen la misma persona (mismo nombre con otro celular), lado a lado con sus vehículos. El dueño
+ * elige cuál se conserva; al unir, los vehículos, órdenes y conversaciones del otro pasan a ese.
+ */
+function Duplicates() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['clientes', 'repetidos'], queryFn: async () => unwrap(await api.GET('/customers/duplicates')).grupos });
+  const [keep, setKeep] = useState<Record<number, string>>({});
+  const [confirm, setConfirm] = useState<number | null>(null);
+  const unir = useMutation({
+    mutationFn: async (v: { conservar: string; unir: string }) => unwrap(await api.POST('/customers/merge', { body: v })),
+    onSuccess: async () => {
+      setConfirm(null);
+      await qc.invalidateQueries({ queryKey: ['clientes'] });
+    },
+  });
+  if (!q.data || q.data.length === 0) return null;
+  return (
+    <section className="flex flex-col gap-4 rounded-card bg-white p-5" aria-labelledby="repetidos">
+      <div>
+        <h2 id="repetidos" className="text-[17px] font-extrabold">Posibles repetidos</h2>
+        <p className="text-sm text-ink-2">Tienen el mismo nombre con otro celular. Elige cuál queda: el otro le pasa sus vehículos, órdenes y conversaciones.</p>
+      </div>
+      {q.data.map((g, i) => {
+        const [a, b] = g.clientes;
+        const conservar = keep[i] ?? a.id;
+        const otro = g.clientes.find((c) => c.id !== conservar) ?? b;
+        const queda = g.clientes.find((c) => c.id === conservar) ?? a;
+        return (
+          <div key={g.clientes.map((c) => c.id).join()} className="flex flex-col gap-3 rounded-2xl border border-line p-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {g.clientes.slice(0, 2).map((c) => (
+                <label key={c.id} className={`flex flex-col gap-2 rounded-xl p-3 ${conservar === c.id ? 'bg-primary-tint' : 'bg-surface'}`}>
+                  <span className="flex items-center gap-2 font-bold">
+                    <input type="radio" name={`conservar-${i}`} checked={conservar === c.id} onChange={() => setKeep({ ...keep, [i]: c.id })} />
+                    Conservar a {c.nombre} · {c.celular}
+                  </span>
+                  <span className="text-sm text-ink-2">{autorizacion[c.autorizacionEstado] ?? c.autorizacionEstado}</span>
+                  <Vehicles id={c.id} />
+                </label>
+              ))}
+            </div>
+            {confirm === i ? (
+              <div role="alert" className="flex flex-col gap-2 rounded-2xl bg-warn-tint p-3 text-warn-ink">
+                <b>Los vehículos, órdenes y conversaciones de {otro.nombre} ({otro.celular}) pasan a {queda.nombre} ({queda.celular}). No se puede deshacer.</b>
+                <div className="flex flex-wrap gap-2">
+                  <Button busy={unir.isPending} onClick={() => unir.mutate({ conservar: queda.id, unir: otro.id })}>Sí, unir</Button>
+                  <Button variant="secondary" onClick={() => setConfirm(null)}>Cancelar</Button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Button variant="secondary" onClick={() => setConfirm(i)}>Unir en {queda.nombre}</Button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {unir.isError ? <Alert>{unir.error.message}</Alert> : null}
+    </section>
+  );
+}
+
 /** HU-82: clientes y vehículos del taller, para el dueño y la recepción (customer:read_all). */
 export function CustomersPage() {
   const [q, setQ] = useState('');
   const term = q.trim();
   const qc = useQueryClient();
   const puedeImportar = usePermission('import:run');
+  const puedeUnir = usePermission('customer:merge');
   const list = useQuery({
     queryKey: ['clientes', term],
     queryFn: async () => unwrap(await api.GET('/customers', { params: { query: term ? { q: term } : {} } })).clientes,
@@ -94,6 +159,7 @@ export function CustomersPage() {
           ))}
         </ul>
       </section>
+      {puedeUnir ? <Duplicates /> : null}
       {puedeImportar ? (
         <CsvImport endpoint="/vehicles/import" title="Subir clientes y vehículos (CSV)" noun="vehículos"
           help="Trae tus clientes desde Excel: guárdalo como CSV. Los clientes nuevos quedan con la autorización de datos pendiente."

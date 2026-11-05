@@ -16,6 +16,9 @@ type Extra interface {
 	List(ctx context.Context, tallerID shared.ID, limit int) ([]domain.Customer, error)
 	SetConsent(ctx context.Context, tallerID, id shared.ID, st domain.ConsentStatus, rec ConsentRecord) error
 	SetName(ctx context.Context, tallerID, id shared.ID, name string) error
+	Duplicates(ctx context.Context, tallerID shared.ID, limit int) ([]domain.Customer, error)
+	MarkMerged(ctx context.Context, tallerID, dropID, keepID shared.ID, at time.Time) error
+	Merged(ctx context.Context, tallerID, id shared.ID) (bool, error)
 }
 
 // ConsentRecord es la prueba de la autorización del cliente (Ley 1581, Decreto 1377 art. 8).

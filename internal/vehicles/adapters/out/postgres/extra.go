@@ -86,3 +86,9 @@ func (Extra) ChangeOwner(ctx context.Context, v domain.Vehicle, prev, next share
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`, shared.NewID(), v.TallerID, v.ID, prev, next, at, by)
 	return err
 }
+
+func (Extra) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	n, err := db.Exec(ctx, `UPDATE vehicles.vehiculo SET cliente_id = $3, version = version + 1, updated_at = now()
+		WHERE taller_id = $1 AND cliente_id = $2`, tallerID, from, to)
+	return int(n), err
+}

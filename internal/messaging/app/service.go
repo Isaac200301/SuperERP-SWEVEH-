@@ -58,6 +58,8 @@ type Repository interface {
 	MarkWebhook(ctx context.Context, id shared.ID, errMsg *string) error
 	ChannelByNumber(ctx context.Context, phoneNumberID string) (ChannelInfo, bool, error)
 	ChannelOf(ctx context.Context, tallerID shared.ID) (ChannelInfo, bool, error)
+	// MoveCustomer pasa las conversaciones de un cliente a otro (unir clientes repetidos, HU-15).
+	MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error)
 	UpsertChannel(ctx context.Context, c ChannelInfo) error
 	Conversation(ctx context.Context, tallerID shared.ID, phone string) (Conversation, error) // crea si no existe
 	ConversationByID(ctx context.Context, tallerID, id shared.ID) (Conversation, error)
@@ -532,4 +534,16 @@ func (s *Service) ResponseMinutes(ctx context.Context, tallerID shared.ID, since
 		return err
 	})
 	return out, err
+}
+
+// MoveCustomer pasa las conversaciones del cliente repetido al que se conserva (HU-15). Cada conversación sigue con su
+// celular; solo cambia de quién es.
+func (s *Service) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	var n int
+	err := s.tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = s.repo.MoveCustomer(ctx, tallerID, from, to)
+		return err
+	})
+	return n, err
 }

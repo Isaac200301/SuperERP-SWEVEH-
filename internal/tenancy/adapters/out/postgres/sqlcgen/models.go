@@ -141,6 +141,8 @@ type CustomersCliente struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	CreatedBy          *uuid.UUID
+	FusionadoCon       *uuid.UUID
+	FusionadoEn        *time.Time
 }
 
 type IdentityAutorizacionTitular struct {

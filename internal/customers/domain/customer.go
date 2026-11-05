@@ -97,3 +97,11 @@ func NewCustomer(id, tallerID shared.ID, rawPhone, rawName string, rawEmail *str
 		CreatedAt: now,
 	}, nil
 }
+
+// NameKey deja el nombre comparable para encontrar repetidos (HU-15): sin tildes, en minúscula y con espacios simples.
+// Debe coincidir con la clave de Duplicates en el repositorio.
+func NameKey(name string) string {
+	r := strings.NewReplacer("Á", "A", "É", "E", "Í", "I", "Ó", "O", "Ú", "U", "Ü", "U", "Ñ", "N",
+		"á", "a", "é", "e", "í", "i", "ó", "o", "ú", "u", "ü", "u", "ñ", "n")
+	return strings.ToLower(strings.Join(strings.Fields(r.Replace(name)), " "))
+}

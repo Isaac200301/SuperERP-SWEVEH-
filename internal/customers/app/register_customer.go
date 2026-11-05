@@ -34,6 +34,7 @@ type Service struct {
 	events ports.EventPublisher
 	clock  ports.Clock
 	extra  Extra
+	mover  CustomerMover // unir clientes repetidos (HU-15)
 }
 
 func NewService(uow ports.UnitOfWork, repo ports.CustomerRepository, a ports.AuditLog, e ports.EventPublisher, c ports.Clock) *Service {

@@ -244,3 +244,8 @@ func (Repository) ResponseMinutes(ctx context.Context, tallerID shared.ID, since
 	}
 	return out, err
 }
+
+func (Repository) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
+	n, err := db.Exec(ctx, `UPDATE messaging.conversacion SET cliente_id = $3 WHERE taller_id = $1 AND cliente_id = $2`, tallerID, from, to)
+	return int(n), err
+}
