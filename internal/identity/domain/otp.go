@@ -26,6 +26,8 @@ var (
 	ErrPhoneLocked = shared.RateLimited("celular_bloqueado",
 		"Por seguridad bloqueamos este celular 15 minutos. Intenta más tarde.")
 	ErrResendTooSoon = shared.RateLimited("reenvio_muy_pronto", "Espera un minuto antes de pedir otro código.")
+	// ErrCodeNotSent: el canal no entregó el código (p. ej. el WhatsApp de prueba estaba dormido, ADR-0034).
+	ErrCodeNotSent = shared.Rule("codigo_no_enviado", "No pudimos enviarte el código por WhatsApp. Intenta de nuevo en un minuto.")
 )
 
 // ErrCodeWrong arma el error de código equivocado diciendo cuántos intentos quedan.

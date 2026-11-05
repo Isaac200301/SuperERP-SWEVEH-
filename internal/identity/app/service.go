@@ -95,7 +95,11 @@ func (s *Service) RequestCode(ctx context.Context, rawPhone string) (time.Time, 
 	}
 	// El envío va después del commit: nunca una llamada externa dentro de la transacción.
 	if err := s.sender.Send(ctx, phone, code); err != nil {
-		return time.Time{}, fmt.Errorf("enviar código: %w", err)
+		// La persona ve un mensaje claro; el detalle va al log (el error del canal no trae el código ni el celular).
+		if s.log != nil {
+			s.log.WarnContext(ctx, "no se pudo enviar el código de entrada", "error", err.Error())
+		}
+		return time.Time{}, domain.ErrCodeNotSent
 	}
 	return ch.ExpiresAt, nil
 }

@@ -286,8 +286,9 @@ func TestRequestCode_PropagatesFailures(t *testing.T) {
 			t.Errorf("%s: %v", m, err)
 		}
 	}
+	// Si el canal no entrega el código, la persona ve un mensaje claro en vez de un error interno (ADR-0034).
 	f := newFixture(opts{sendErr: errBoom})
-	if _, err := f.svc.RequestCode(context.Background(), phone); !errors.Is(err, errBoom) {
+	if _, err := f.svc.RequestCode(context.Background(), phone); !errors.Is(err, domain.ErrCodeNotSent) {
 		t.Errorf("envío fallido: %v", err)
 	}
 }
