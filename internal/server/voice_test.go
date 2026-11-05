@@ -43,6 +43,7 @@ func TestWhatsApp_VoiceNoteTranscribed(t *testing.T) {
 	e := newEnvWith(t, cfg)
 	owner := e.register("3105550870", "Pablo Rodríguez")
 	owner.must(http.StatusOK, owner.do("PUT", "/api/v1/whatsapp/channel", map[string]any{"proveedor": "waha"}))
+	sess := "t-" + tallerOf(t, owner).String() // sesión de WAHA del taller (ADR-0035)
 	w := e.whatsapp(t, owner, wire.Channel(cfg.WhatsApp))
 	w.s.Assistant.SetTranscriber(groq.New(groqSrv.URL, "k", "whisper-large-v3-turbo", 5*time.Second))
 
@@ -52,8 +53,8 @@ func TestWhatsApp_VoiceNoteTranscribed(t *testing.T) {
 		t.Helper()
 		e.clk.Advance(time.Minute)
 		n++
-		body := fmt.Sprintf(`{"event":"message","session":"default","engine":"GOWS","payload":{"id":"false_%s_IN%d","timestamp":%d,"from":%q,`+
-			`"fromMe":false,%s,"_data":{"notifyName":"Laura Gómez"}}}`, chat, n, e.clk.Now().Unix(), chat, payload)
+		body := fmt.Sprintf(`{"event":"message","session":%q,"engine":"GOWS","payload":{"id":"false_%s_IN%d","timestamp":%d,"from":%q,`+
+			`"fromMe":false,%s,"_data":{"notifyName":"Laura Gómez"}}}`, sess, chat, n, e.clk.Now().Unix(), chat, payload)
 		if s := postWAHA(t, e, []byte(body), "secreto-hook"); s != http.StatusOK {
 			t.Fatalf("webhook: %d", s)
 		}

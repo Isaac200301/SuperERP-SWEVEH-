@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -250,7 +251,11 @@ func (h *handler) setChannel(r *http.Request, p reqctx.Principal) (int, any, err
 		if !h.cfg.WhatsApp.WAHA.Enabled() {
 			return 0, nil, errNoWAHA
 		}
-		ch.Provider, ch.PhoneNumberID = "waha", waha.Prefix+h.cfg.WhatsApp.WAHA.Session
+		session, err := h.wahaSession(r.Context(), p.TallerID)
+		if err != nil {
+			return 0, nil, err
+		}
+		ch.Provider, ch.PhoneNumberID = "waha", waha.Prefix+session
 	default:
 		return 0, nil, shared.Validation("proveedor_invalido", "Elige prueba_local o waha.").WithField("proveedor")
 	}
@@ -260,9 +265,22 @@ func (h *handler) setChannel(r *http.Request, p reqctx.Principal) (int, any, err
 	return h.channel(r, p)
 }
 
+// wahaSession es la sesión de WAHA del taller (ADR-0035): cada taller vincula su propio número. Si el taller ya usa un
+// canal de WAHA, se respeta su sesión (los talleres de antes de ADR-0035 siguen con la que tenían); si no, la suya.
+func (h *handler) wahaSession(ctx context.Context, tallerID shared.ID) (string, error) {
+	ch, ok, err := h.s.Messaging.Channel(ctx, tallerID)
+	if err != nil {
+		return "", err
+	}
+	if ok && ch.Provider == "waha" && strings.HasPrefix(ch.PhoneNumberID, waha.Prefix) {
+		return waha.Session(ch.PhoneNumberID), nil
+	}
+	return waha.SessionFor(tallerID), nil
+}
+
 // wahaStatus dice si WAHA está configurado, el estado de la sesión y, si espera el escaneo, el QR como imagen
 // (data URL). La clave de WAHA nunca sale al navegador.
-func (h *handler) wahaStatus(r *http.Request, _ reqctx.Principal) (int, any, error) {
+func (h *handler) wahaStatus(r *http.Request, p reqctx.Principal) (int, any, error) {
 	if err := h.demoOnly(); err != nil {
 		return 0, nil, err
 	}
@@ -270,18 +288,22 @@ func (h *handler) wahaStatus(r *http.Request, _ reqctx.Principal) (int, any, err
 	if !w.Enabled() {
 		return http.StatusOK, map[string]any{"configurado": false}, nil
 	}
+	session, err := h.wahaSession(r.Context(), p.TallerID)
+	if err != nil {
+		return 0, nil, err
+	}
 	c := WAHAClient(w)
-	st, err := c.SessionStatus(r.Context(), w.Session)
+	st, err := c.SessionStatus(r.Context(), session)
 	if err != nil {
 		h.log.WarnContext(r.Context(), "WAHA no responde", "error", err)
-		return http.StatusOK, map[string]any{"configurado": true, "sesion": w.Session, "estado": "SIN_CONEXION"}, nil
+		return http.StatusOK, map[string]any{"configurado": true, "sesion": session, "estado": "SIN_CONEXION"}, nil
 	}
-	out := map[string]any{"configurado": true, "sesion": w.Session, "estado": st.Status}
+	out := map[string]any{"configurado": true, "sesion": session, "estado": st.Status}
 	if st.Me != nil {
 		out["numero"] = st.Me.ID
 	}
 	if st.Status == "SCAN_QR_CODE" {
-		if png, err := c.QR(r.Context(), w.Session); err == nil {
+		if png, err := c.QR(r.Context(), session); err == nil {
 			out["qr"] = "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
 		}
 	}
@@ -297,7 +319,11 @@ func (h *handler) wahaStart(r *http.Request, p reqctx.Principal) (int, any, erro
 	if !w.Enabled() {
 		return 0, nil, errNoWAHA
 	}
-	if err := WAHAClient(w).StartSession(r.Context(), w.Session); err != nil {
+	session, err := h.wahaSession(r.Context(), p.TallerID)
+	if err != nil {
+		return 0, nil, err
+	}
+	if err := WAHAClient(w).StartSession(r.Context(), session); err != nil {
 		h.log.WarnContext(r.Context(), "no se pudo arrancar la sesión de WAHA", "error", err)
 		return 0, nil, shared.Rule("waha_sin_conexion", "No pudimos conectar con WAHA. Revisa que esté corriendo (make waha).")
 	}

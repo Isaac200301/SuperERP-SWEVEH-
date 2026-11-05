@@ -11,6 +11,7 @@ El código de 6 números para entrar solo tenía el adaptador `consola`, que lo 
 ## Decisión
 - `OTP_SENDER=waha`: el código sale por el WhatsApp de prueba de WAHA, con el texto "Tu código de SWEVEH es *123456*. Vence en 10 minutos. No lo compartas con nadie."
 - **Vive en `wire`** (`wire.WAHAOTP`), no en `identity`: junta el puerto `OTPSender` de identity con el cliente de messaging, y las reglas de arquitectura no dejan que un módulo importe adaptadores de otro.
+- **Número de la plataforma:** el código sale por la sesión `WAHA_SESSION` (por defecto `default`), que no es de ningún taller; los talleres vinculan cada uno su sesión (ADR-0035).
 - **Configuración:** `OTP_SENDER=waha` exige `WAHA_URL`, `WAHA_API_KEY` y `WAHA_WEBHOOK_SECRET`. Como WAHA ya está vedado en producción (ADR-0027), `waha` tampoco llega a producción; allí falta el canal oficial.
 - **El código nunca sale en logs ni en errores:** el cliente de WAHA devuelve solo el estado HTTP.
 - `WHATSAPP_PROVIDER` se queda en `local`: WAHA se activa solo con `WAHA_URL`; `waha` no es un valor válido de ese proveedor.
