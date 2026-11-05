@@ -269,3 +269,25 @@ func (Repository) MessagesOf(ctx context.Context, tallerID, customerID shared.ID
 		AND conversacion_id IN (SELECT id FROM messaging.conversacion WHERE taller_id = $1 AND cliente_id = $2) ORDER BY created_at, id`,
 		tallerID, customerID))
 }
+
+func (Repository) MessagesByPhone(ctx context.Context, tallerID shared.ID, phone string, limit int) ([]app.Message, error) {
+	return msgs(db.Many[msgRow](ctx, `SELECT `+msgCols+` FROM messaging.mensaje WHERE taller_id = $1
+		AND conversacion_id IN (SELECT id FROM messaging.conversacion WHERE taller_id = $1 AND celular = $2)
+		ORDER BY created_at DESC, id DESC LIMIT $3`, tallerID, phone, limit))
+}
+
+func (Repository) WebhooksMentioning(ctx context.Context, digits string, since time.Time, limit int) ([]app.WebhookTrace, error) {
+	type r struct {
+		ID          shared.ID  `db:"id"`
+		ReceivedAt  time.Time  `db:"recibido_en"`
+		ProcessedAt *time.Time `db:"procesado_en"`
+		Error       *string    `db:"error"`
+	}
+	rows, err := db.Many[r](ctx, `SELECT id, recibido_en, procesado_en, error FROM messaging.webhook_evento
+		WHERE recibido_en >= $2 AND strpos(cuerpo::text, $1) > 0 ORDER BY recibido_en DESC LIMIT $3`, digits, since, limit)
+	out := make([]app.WebhookTrace, 0, len(rows))
+	for _, x := range rows {
+		out = append(out, app.WebhookTrace{ID: x.ID, ReceivedAt: x.ReceivedAt, ProcessedAt: x.ProcessedAt, Error: x.Error})
+	}
+	return out, err
+}

@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { mockApi, owner, renderPage } from '../../test/api';
@@ -67,5 +68,30 @@ describe('PanelLayout (HU-74)', () => {
     unmount();
     renderPage(<PanelLayout session={{ ...owner, adminPlataforma: true } as never} />);
     expect(screen.getByRole('link', { name: /Plataforma/ })).toHaveAttribute('href', '/panel/plataforma');
+  });
+
+  it('busca un número en el registro técnico y muestra estado, error y webhooks (HU-100)', async () => {
+    const calls = mockApi({
+      'GET /me': { ...owner, adminPlataforma: true },
+      'GET /platform/usage': { mes: '2026-11', incluidos: 1000, pesosPorDolar: 4000, talleres: [] },
+      'GET /platform/messages': {
+        celular: '3001234567', diasWebhooks: 7,
+        mensajes: [
+          { taller: 'Servitaller El Pistón', fecha: '2026-11-04T15:00:00Z', direccion: 'saliente', tipo: 'texto', estado: 'fallido', origen: 'automatizacion',
+            error: 'número no tiene WhatsApp', enviadoEn: null, wamid: null },
+          { taller: 'Servitaller El Pistón', fecha: '2026-11-04T14:00:00Z', direccion: 'entrante', tipo: 'texto', estado: 'recibido', origen: 'cliente',
+            error: null, enviadoEn: null, wamid: 'wamid.1' },
+        ],
+        webhooks: [{ id: 'w1', recibido: '2026-11-04T14:00:00Z', procesado: null, error: 'sin canal' }],
+      },
+    });
+    renderPage(<PlatformPage />);
+    await userEvent.type(await screen.findByLabelText('Celular del cliente'), '300 123 4567');
+    await userEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    expect(await screen.findByText('número no tiene WhatsApp')).toBeInTheDocument();
+    expect(screen.getByText('Falló')).toBeInTheDocument();
+    expect(screen.getByText('Sin procesar')).toBeInTheDocument();
+    expect(screen.getByText('sin canal')).toBeInTheDocument();
+    expect(calls.some((c) => c.path === '/platform/messages?celular=300+123+4567' || c.path === '/platform/messages?celular=300%20123%204567')).toBe(true);
   });
 });

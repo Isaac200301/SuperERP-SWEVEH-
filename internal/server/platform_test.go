@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"testing"
 
@@ -73,4 +74,72 @@ func itoaThousands(n int) string {
 		out += string(c)
 	}
 	return out
+}
+
+// HU-100: el administrador busca un número y ve qué entró y salió en cada taller con su estado, el error y la hora,
+// y si el webhook llegó y se procesó. Sin el texto de los mensajes. Un dueño de taller no lo ve.
+func TestPlatform_MessageLogByPhone(t *testing.T) {
+	cfg := config.API{Env: config.EnvLocal, Platform: config.Platform{Admins: []string{"+573105550650"}}}
+	e := newEnvWith(t, cfg)
+	admin := e.register("3105550650", "Admin ERP")
+	owner := e.register("3105550651", "Rosa Pérez")
+	ch := &flaky{}
+	w := e.whatsapp(t, owner, ch)
+	cid := w.customer("3001234651", "Laura Gómez")
+	ch.fail, ch.retryable = 1, false
+	id, _ := w.orderFor(cid, "LOG651")
+	w.move(id, "recibido", nil) // AU-01 falla del todo
+
+	if r := owner.do("GET", "/api/v1/platform/messages?celular=3001234651", nil); r.status != http.StatusForbidden {
+		t.Fatalf("el dueño ve el registro técnico: %d", r.status)
+	}
+	if r := admin.do("GET", "/api/v1/platform/messages?celular=123", nil); r.status != http.StatusBadRequest {
+		t.Fatalf("celular inválido: %d", r.status)
+	}
+	body := admin.must(http.StatusOK, admin.do("GET", "/api/v1/platform/messages?celular=300%20123%204651", nil)).body
+	var failed, in map[string]any
+	for _, m := range body["mensajes"].([]any) {
+		m := m.(map[string]any)
+		if m["taller"] != "Taller de Rosa" && m["taller"] == nil {
+			t.Fatalf("mensaje sin taller: %v", m)
+		}
+		if _, ok := m["texto"]; ok {
+			t.Fatalf("el registro técnico muestra el texto: %v", m)
+		}
+		switch {
+		case m["estado"] == "fallido":
+			failed = m
+		case m["direccion"] == "entrante":
+			in = m
+		}
+	}
+	if failed == nil || failed["error"] == nil || failed["fecha"] == nil || in == nil {
+		t.Fatalf("registro: %v", body["mensajes"])
+	}
+	if body["celular"] != "3001234651" || body["diasWebhooks"] != float64(7) {
+		t.Fatalf("encabezado: %v", body)
+	}
+}
+
+// HU-100: el webhook crudo que menciona el número sale en el registro técnico con la hora en que llegó y si se procesó.
+func TestPlatform_MessageLogShowsWebhooks(t *testing.T) {
+	f := &fakeWAHA{status: "WORKING"}
+	srv := httptest.NewServer(f.handler(t))
+	t.Cleanup(srv.Close)
+	cfg := config.API{Env: config.EnvLocal, Platform: config.Platform{Admins: []string{"+573105550660"}},
+		WhatsApp: config.WhatsApp{Provider: "local", WAHA: config.WAHA{URL: srv.URL, APIKey: "k", WebhookSecret: "s", Session: "default"}}}
+	e := newEnvWith(t, cfg)
+	admin := e.register("3105550660", "Admin ERP")
+	body := `{"event":"message","session":"otra","engine":"GOWS","payload":{"id":"x1","timestamp":1,"from":"573001234661@c.us",` +
+		`"fromMe":false,"body":"hola","hasMedia":false}}`
+	if s := postWAHA(t, e, []byte(body), "s"); s != http.StatusOK {
+		t.Fatalf("webhook: %d", s)
+	}
+	hooks := admin.must(http.StatusOK, admin.do("GET", "/api/v1/platform/messages?celular=3001234661", nil)).body["webhooks"].([]any)
+	if len(hooks) != 1 || hooks[0].(map[string]any)["recibido"] == nil {
+		t.Fatalf("webhooks: %v", hooks)
+	}
+	if other := admin.must(http.StatusOK, admin.do("GET", "/api/v1/platform/messages?celular=3001234662", nil)).body["webhooks"].([]any); len(other) != 0 {
+		t.Fatalf("webhooks de otro número: %v", other)
+	}
 }

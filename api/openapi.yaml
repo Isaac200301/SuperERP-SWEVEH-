@@ -1853,6 +1853,51 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
 
+  /platform/messages:
+    get:
+      operationId: getPlatformMessageLog
+      summary: 'Registro técnico de mensajes (HU-100): por celular, qué entró y salió en cada taller con su estado, error y hora, y los webhooks crudos de los últimos 7 días que lo mencionan. Sin el texto de los mensajes. Solo administradores del ERP (PLATFORM_ADMINS)'
+      parameters:
+        - { name: celular, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [celular, mensajes, webhooks, diasWebhooks]
+                properties:
+                  celular: { type: string }
+                  diasWebhooks: { type: integer }
+                  mensajes:
+                    type: array
+                    items:
+                      type: object
+                      required: [taller, fecha, direccion, tipo, estado, origen, error, enviadoEn, wamid]
+                      properties:
+                        taller: { type: string }
+                        fecha: { type: string, format: date-time }
+                        direccion: { type: string, enum: [entrante, saliente] }
+                        tipo: { type: string }
+                        estado: { type: string, enum: [recibido, pendiente, enviado, entregado, leido, fallido] }
+                        origen: { type: string }
+                        error: { type: string, nullable: true }
+                        enviadoEn: { type: string, format: date-time, nullable: true }
+                        wamid: { type: string, nullable: true }
+                  webhooks:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, recibido, procesado, error]
+                      properties:
+                        id: { type: string, format: uuid }
+                        recibido: { type: string, format: date-time }
+                        procesado: { type: string, format: date-time, nullable: true }
+                        error: { type: string, nullable: true }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
   /platform/usage:
     get:
       operationId: getPlatformUsage

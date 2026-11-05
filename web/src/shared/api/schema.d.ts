@@ -1362,6 +1362,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/platform/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Registro técnico de mensajes (HU-100): por celular, qué entró y salió en cada taller con su estado, error y hora, y los webhooks crudos de los últimos 7 días que lo mencionan. Sin el texto de los mensajes. Solo administradores del ERP (PLATFORM_ADMINS) */
+        get: operations["getPlatformMessageLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/platform/usage": {
         parameters: {
             query?: never;
@@ -4727,6 +4744,57 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    getPlatformMessageLog: {
+        parameters: {
+            query: {
+                celular: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        celular: string;
+                        diasWebhooks: number;
+                        mensajes: {
+                            taller: string;
+                            /** Format: date-time */
+                            fecha: string;
+                            /** @enum {string} */
+                            direccion: "entrante" | "saliente";
+                            tipo: string;
+                            /** @enum {string} */
+                            estado: "recibido" | "pendiente" | "enviado" | "entregado" | "leido" | "fallido";
+                            origen: string;
+                            error: string | null;
+                            /** Format: date-time */
+                            enviadoEn: string | null;
+                            wamid: string | null;
+                        }[];
+                        webhooks: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: date-time */
+                            recibido: string;
+                            /** Format: date-time */
+                            procesado: string | null;
+                            error: string | null;
+                        }[];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
         };
     };
     getPlatformUsage: {

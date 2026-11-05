@@ -64,6 +64,10 @@ type Repository interface {
 	AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID) (int, error)
 	// MessagesOf son los mensajes de las conversaciones del cliente, en orden (copia de sus datos, HU-87).
 	MessagesOf(ctx context.Context, tallerID, customerID shared.ID) ([]Message, error)
+	// MessagesByPhone son los últimos mensajes de la conversación con ese celular (registro técnico, HU-100).
+	MessagesByPhone(ctx context.Context, tallerID shared.ID, phone string, limit int) ([]Message, error)
+	// WebhooksMentioning son los webhooks crudos recibidos desde since que mencionan esos dígitos (HU-100).
+	WebhooksMentioning(ctx context.Context, digits string, since time.Time, limit int) ([]WebhookTrace, error)
 	UpsertChannel(ctx context.Context, c ChannelInfo) error
 	Conversation(ctx context.Context, tallerID shared.ID, phone string) (Conversation, error) // crea si no existe
 	ConversationByID(ctx context.Context, tallerID, id shared.ID) (Conversation, error)
@@ -570,6 +574,37 @@ func (s *Service) MessagesOf(ctx context.Context, tallerID, customerID shared.ID
 	err := s.tx.Do(ctx, func(ctx context.Context) error {
 		var err error
 		out, err = s.repo.MessagesOf(ctx, tallerID, customerID)
+		return err
+	})
+	return out, err
+}
+
+// WebhookTrace es un webhook crudo en el registro técnico: cuándo llegó, si se procesó y el error (HU-100).
+type WebhookTrace struct {
+	ID          shared.ID
+	ReceivedAt  time.Time
+	ProcessedAt *time.Time
+	Error       *string
+}
+
+// MessagesByPhone son los últimos mensajes con ese celular en el taller, con su estado y error (HU-100).
+func (s *Service) MessagesByPhone(ctx context.Context, tallerID shared.ID, phone string) ([]Message, error) {
+	var out []Message
+	err := s.tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.MessagesByPhone(ctx, tallerID, phone, 50)
+		return err
+	})
+	return out, err
+}
+
+// WebhooksMentioning busca en los webhooks crudos de los últimos días los que mencionan el celular (HU-100). No
+// tienen taller: solo lo usa el registro técnico de plataforma.
+func (s *Service) WebhooksMentioning(ctx context.Context, digits string, since time.Time) ([]WebhookTrace, error) {
+	var out []WebhookTrace
+	err := s.tx.DoWithSettings(ctx, map[string]string{"app.admin_plataforma": "on"}, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.WebhooksMentioning(ctx, digits, since, 50)
 		return err
 	})
 	return out, err
