@@ -380,6 +380,27 @@ func photoCaption(o Order) string {
 	return strings.TrimSpace("Así va tu " + o.Vehicle + " " + o.Plate)
 }
 
+// closedWindow es cuánto dura un aviso de fuera de horario: si ya se le dijo al cliente en ese lapso, no se repite
+// aunque escriba varias veces en la noche (HU-61).
+const closedWindow = 12 * time.Hour
+
+// closedNotice manda el aviso de fuera de horario con la próxima apertura, salvo que ya haya salido en esta
+// conversación en las últimas 12 horas.
+func (s *Service) closedNotice(ctx context.Context, tallerID shared.ID, in Inbound, nextOpening string) error {
+	history, err := s.taller.History(ctx, tallerID, in.ConversationID, in.At, historyTurns)
+	if err != nil {
+		return err
+	}
+	prefix := strings.SplitN(closedTxt, "%", 2)[0]
+	for _, h := range history {
+		if !h.FromCustomer && strings.HasPrefix(h.Text, prefix) && in.At.Sub(h.At) < closedWindow {
+			return nil
+		}
+	}
+	_, err = s.taller.Send(ctx, tallerID, in.Phone, sprintf(closedTxt, nextOpening), nil, "AU-04", nil)
+	return err
+}
+
 // process clasifica y responde: plantillas exactas salen solas; las respuestas armadas con datos del taller salen
 // solas con el envío automático (ADR-0028) o quedan como borrador. Las notas para el dueño siempre esperan.
 func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c Customer) error {
@@ -418,8 +439,8 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 		return s.saveDraft(ctx, tallerID, in, "otro", cantAnswer, nil, nil, "plantilla")
 	}
 	intent := u.ToIntent(in.Text)
-	if !open { // HU-61: aviso de fuera de horario (una vez por mensaje) y se sigue con el borrador
-		if _, err := s.taller.Send(ctx, tallerID, in.Phone, sprintf(closedTxt, nextOpening), nil, "AU-04", nil); err != nil {
+	if !open { // HU-61: aviso fijo de fuera de horario (sin IA), una vez por noche; el borrador queda para la mañana
+		if err := s.closedNotice(ctx, tallerID, in, nextOpening); err != nil {
 			return err
 		}
 	}

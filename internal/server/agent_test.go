@@ -505,8 +505,8 @@ func TestAgent_OwnerDecisionsAndStatusOff(t *testing.T) {
 	}
 }
 
-// HU-61: fuera de horario el cliente recibe el aviso fijo con la próxima apertura y su pregunta igual queda como
-// borrador para el dueño.
+// HU-61: fuera de horario el cliente recibe el aviso fijo con la próxima apertura (una sola vez aunque escriba varias
+// veces en la noche) y cada pregunta igual queda como borrador para el dueño en la mañana.
 func TestAgent_OutOfHours(t *testing.T) {
 	e := newEnv(t)
 	owner := e.register("3105550580", "Rosa Pérez")
@@ -525,4 +525,10 @@ func TestAgent_OutOfHours(t *testing.T) {
 		t.Fatalf("aviso: %v", m)
 	}
 	w.draftFor("cambio de aceite")
+
+	w.write(laura, "Laura Gómez", "¿y la alineación?")
+	if n := len(w.closedNotices(laura)); n != 1 {
+		t.Fatalf("avisos de fuera de horario: %d; quiero 1", n)
+	}
+	w.draftFor("alineación")
 }

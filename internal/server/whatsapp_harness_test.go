@@ -126,6 +126,17 @@ func (w *wa) sent(phone string) []map[string]any {
 	return out
 }
 
+// closedNotices son los avisos de fuera de horario que le mandamos (HU-61).
+func (w *wa) closedNotices(phone string) []map[string]any {
+	var out []map[string]any
+	for _, m := range w.sent(phone) {
+		if b, _ := m["cuerpo"].(string); strings.Contains(b, "fuera de horario") {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
 // last es el último mensaje que le mandamos; falla si no hay ninguno.
 func (w *wa) last(phone string) map[string]any {
 	w.t.Helper()
