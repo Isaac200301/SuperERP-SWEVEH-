@@ -102,6 +102,7 @@ type dto struct {
 	Atiende            string          `json:"atiende"`
 	Especialidades     []string        `json:"especialidades"`
 	Ciudad             string          `json:"ciudad"`
+	Direccion          string          `json:"direccion"`
 	Tamano             string          `json:"tamano"`
 	Horario            domain.Schedule `json:"horario"`
 	ContratoVersion    *string         `json:"contratoVersion"`
@@ -111,7 +112,7 @@ type dto struct {
 
 func toDTO(s tenancy.Settings) dto {
 	d := dto{ID: s.ID.String(), Nombre: s.Name, Atiende: s.Profile.Attends, Especialidades: s.Profile.Specialties, Ciudad: s.Profile.City,
-		Tamano: s.Profile.Size, Horario: s.Schedule, ContratoVersion: s.ContractVersion, ContratoAceptadoEn: s.ContractAcceptedAt,
+		Direccion: s.Profile.Address, Tamano: s.Profile.Size, Horario: s.Schedule, ContratoVersion: s.ContractVersion, ContratoAceptadoEn: s.ContractAcceptedAt,
 		OnboardingCompleto: s.Onboarded}
 	if d.Especialidades == nil {
 		d.Especialidades = []string{}
@@ -132,6 +133,7 @@ type onboardReq struct {
 	Atiende          string   `json:"atiende"`
 	Especialidades   []string `json:"especialidades"`
 	Ciudad           string   `json:"ciudad"`
+	Direccion        string   `json:"direccion"`
 	Tamano           string   `json:"tamano"`
 	ContratoAceptado bool     `json:"contratoAceptado"`
 }
@@ -142,7 +144,8 @@ func (h *Handler) onboard(r *http.Request, p reqctx.Principal) (int, any, error)
 		return 0, nil, err
 	}
 	s, err := h.admin.Onboard(r.Context(), p.TallerID, p.Actor(), tenancy.OnboardInput{Name: q.Nombre, ContractAccepted: q.ContratoAceptado,
-		Profile: domain.Profile{Attends: q.Atiende, Specialties: q.Especialidades, City: q.Ciudad, Size: q.Tamano}})
+		Profile: domain.Profile{Attends: q.Atiende, Specialties: q.Especialidades, City: q.Ciudad, Size: q.Tamano,
+			Address: q.Direccion}})
 	return http.StatusOK, toDTO(s), err
 }
 

@@ -45,7 +45,7 @@ type autoWorkshops struct{ m *server.Modules }
 
 func (a autoWorkshops) Get(ctx context.Context, tallerID shared.ID) (automationsapp.Workshop, error) {
 	s, err := a.m.Admin.LoadIn(ctx, tallerID)
-	w := automationsapp.Workshop{Name: s.Name, Schedule: map[string]*[2]string{}}
+	w := automationsapp.Workshop{Name: s.Name, Address: s.Profile.Address, Schedule: map[string]*[2]string{}}
 	for d, sl := range s.Schedule {
 		if sl != nil {
 			w.Schedule[d] = &[2]string{sl.Opens, sl.Closes}

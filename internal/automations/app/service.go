@@ -73,6 +73,7 @@ type Customers interface {
 
 type Workshop struct {
 	Name     string
+	Address  string                // opcional (HU-44)
 	Schedule map[string]*[2]string // día → [abre, cierra]
 }
 

@@ -175,7 +175,7 @@ Una pantalla con tarjetas. Cada tarjeta dice qué hace, cuándo se dispara, qué
 | AU-03 | Aviso "vehículo listo" con total y horario de entrega. | La orden pasa a Listo. | `[Must]` | Metro Frenos lo hace a mano |
 | AU-04 | **Agente de WhatsApp**: lee el mensaje, extrae vehículo, síntoma, servicio y fecha, redacta borrador con los precios del taller y crea la orden "Por recibir" al aprobar. | Llega un mensaje de alguien que no tiene orden abierta. | `[Must]` | H-03; flujo v0 |
 | AU-05 | Respuesta a "¿ya está mi carro?" con el estado real, la fecha prometida y la última foto. | Llega un mensaje de un cliente con orden abierta y la intención es "estado". | `[Must]` | H-04, R-06 |
-| AU-06 | Recordatorio de cita la mañana del día. | Orden "Por recibir" con fecha de hoy. | `[Should]` | Flujo v0 |
+| AU-06 | Recordatorio de cita la mañana del día (desde las 7:00 a. m., con la hora de la cita y la dirección del taller). | Orden "Por recibir" con fecha de hoy. | `[Should]` | Flujo v0 |
 | AU-07 | Vehículo listo sin recoger. | Orden en Listo hace 3 días (configurable). | `[Should]` | H-05, N-05 |
 | AU-08 | Alerta interna de repuesto bajo el mínimo (al dueño, dentro de la app; no cuesta mensajes). | El inventario baja del mínimo. | `[Should]` | M4 |
 | AU-09 | Seguimiento de garantía. | N días después de Entregado. | `[Later]` | H-05 |

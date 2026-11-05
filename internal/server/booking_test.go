@@ -101,21 +101,40 @@ func TestAdvisor_BooksWithDateTimeAndName(t *testing.T) {
 		t.Fatalf("un nombre real no se cambia: %v", c["nombre"])
 	}
 
-	// El día de la cita, AU-06 le recuerda al cliente. Sin plantilla aprobada por Meta (Q-07) solo sale con la ventana
-	// de 24 h abierta (HU-47): aquí el cliente escribió esa mañana.
+	// HU-44: el día de la cita, AU-06 le recuerda al cliente desde las 7:00 a. m., con la hora de la cita y la dirección
+	// del taller (que se pide en Mi taller, no en el registro). Sin plantilla aprobada por Meta (Q-07) solo sale con la
+	// ventana de 24 h abierta (HU-47): aquí el cliente escribió esa madrugada.
 	tid := tallerOf(t, owner)
-	e.clk.Advance(later.Sub(e.clk.Now()) - 7*time.Hour)
-	w.owner = e.login("3105550703") // pasaron dos días: la sesión del dueño venció
+	e.clk.Advance(later.Sub(e.clk.Now()) - 8*time.Hour) // 6:00 a. m. del día de la cita
+	w.owner = e.login("3105550703")                     // pasaron dos días: la sesión del dueño venció
+	ws := w.owner.must(http.StatusOK, w.owner.do("GET", "/api/v1/workshop", nil)).body
+	w.owner.must(http.StatusOK, w.owner.do("POST", "/api/v1/workshop/onboarding", map[string]any{"nombre": ws["nombre"],
+		"atiende": "ambos", "especialidades": ws["especialidades"], "ciudad": "Medellín", "tamano": "solo",
+		"direccion": "  Calle 10 #  43-12, El Poblado ", "contratoAceptado": true}))
 	adv.step = func(assistantapp.ChatRequest) (assistantapp.ChatMessage, error) {
 		return say("¡Te esperamos hoy!"), nil
 	}
 	w.write(phone, "Carlos Ruiz", "hoy voy para allá")
-	if err := w.s.Automations.Daily(context.Background(), []shared.ID{tid}, reqctx.WithTenant); err != nil {
-		t.Fatal(err)
+	daily := func() {
+		if err := w.s.Automations.Daily(context.Background(), []shared.ID{tid}, reqctx.WithTenant); err != nil {
+			t.Fatal(err)
+		}
+		w.pump()
 	}
-	w.pump()
-	if got := w.sentBy(phone, "AU-06"); len(got) != 1 {
+	daily()
+	if got := w.sentBy(phone, "AU-06"); len(got) != 0 {
+		t.Fatalf("recordatorio antes de las 7:00: %v", got)
+	}
+	e.clk.Advance(time.Hour)
+	w.owner = e.login("3105550703")
+	daily()
+	daily() // la corrida de la hora siguiente no lo repite
+	got := w.sentBy(phone, "AU-06")
+	if len(got) != 1 {
 		t.Fatalf("recordatorio AU-06: %v; ejecuciones %v", got, w.runsOf("AU-06"))
+	}
+	if body := got[0]["cuerpo"].(string); !strings.Contains(body, "a las 2:00 p. m.") || !strings.Contains(body, "Calle 10 # 43-12, El Poblado") {
+		t.Fatalf("recordatorio sin hora o dirección: %q", body)
 	}
 }
 

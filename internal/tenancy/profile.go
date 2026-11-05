@@ -38,6 +38,7 @@ type settingsRow struct {
 	Atiende    *string         `db:"atiende"`
 	Especial   []string        `db:"especialidades"`
 	Ciudad     *string         `db:"ciudad"`
+	Direccion  *string         `db:"direccion"`
 	Tamano     *string         `db:"tamano"`
 	Horario    json.RawMessage `db:"horario"`
 	ContratoV  *string         `db:"contrato_version"`
@@ -66,13 +67,13 @@ func str(p *string) string {
 }
 
 func (a *Admin) load(ctx context.Context, id shared.ID) (Settings, error) {
-	r, err := db.One[settingsRow](ctx, domain.ErrWorkshopNotFound, `SELECT id, nombre, atiende, especialidades, ciudad, tamano, horario,
+	r, err := db.One[settingsRow](ctx, domain.ErrWorkshopNotFound, `SELECT id, nombre, atiende, especialidades, ciudad, direccion, tamano, horario,
 		contrato_version, contrato_aceptado_en, onboarding_completo, version FROM tenancy.taller WHERE id = $1`, id)
 	if err != nil {
 		return Settings{}, err
 	}
 	s := Settings{ID: r.ID, Name: r.Nombre, Profile: domain.Profile{Attends: str(r.Atiende), Specialties: r.Especial, City: str(r.Ciudad),
-		Size: str(r.Tamano)}, ContractVersion: r.ContratoV, ContractAcceptedAt: r.ContratoEn, Onboarded: r.Onboarding, Version: r.Version}
+		Size: str(r.Tamano), Address: str(r.Direccion)}, ContractVersion: r.ContratoV, ContractAcceptedAt: r.ContratoEn, Onboarded: r.Onboarding, Version: r.Version}
 	if err := json.Unmarshal(r.Horario, &s.Schedule); err != nil {
 		return s, err
 	}
@@ -126,8 +127,9 @@ func (a *Admin) Onboard(ctx context.Context, id shared.ID, actor shared.Actor, i
 		ver := domain.ContractVersionDraft
 		if _, err := db.Exec(ctx, `UPDATE tenancy.taller SET nombre = $2, atiende = $3, especialidades = $4, ciudad = $5, tamano = $6,
 			contrato_version = COALESCE(contrato_version, $7), contrato_aceptado_en = COALESCE(contrato_aceptado_en, $8),
-			onboarding_completo = true, version = version + 1, updated_at = now() WHERE id = $1`,
-			id, name, in.Profile.Attends, in.Profile.Specialties, nilIfEmpty(in.Profile.City), in.Profile.Size, ver, now); err != nil {
+			onboarding_completo = true, direccion = $9, version = version + 1, updated_at = now() WHERE id = $1`,
+			id, name, in.Profile.Attends, in.Profile.Specialties, nilIfEmpty(in.Profile.City), in.Profile.Size, ver, now,
+			nilIfEmpty(in.Profile.Address)); err != nil {
 			return err
 		}
 		if err := a.catalog.Preload(ctx, id, in.Profile.Attends, in.Profile.Specialties); err != nil {

@@ -52,6 +52,8 @@ describe('WorkshopPage (HU-03, HU-08, HU-89)', () => {
     });
     renderPage(<WorkshopPage />);
     expect(await screen.findByText('Escoge qué vehículos atiendes.')).toBeInTheDocument();
+    // HU-06: la dirección no se pide en el registro (sale en Mi taller, para el recordatorio de la cita).
+    expect(screen.queryByLabelText('Dirección (opcional)')).not.toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Ciudad'), 'Medellín');
     await userEvent.click(screen.getByRole('radio', { name: 'Motos' }));
     expect(screen.getByText('Para continuar acepta el contrato.')).toBeInTheDocument();
@@ -70,7 +72,8 @@ describe('WorkshopPage (HU-03, HU-08, HU-89)', () => {
     expect(await screen.findByText('Horario guardado.')).toBeInTheDocument();
 
     expect(calls.find((c) => c.method === 'POST')?.body).toEqual({
-      nombre: 'El Pistón', atiende: 'moto', especialidades: ['frenos_suspension'], ciudad: 'Medellín', tamano: '2a5', contratoAceptado: true,
+      nombre: 'El Pistón', atiende: 'moto', especialidades: ['frenos_suspension'], ciudad: 'Medellín', direccion: '', tamano: '2a5',
+      contratoAceptado: true,
     });
     const h = (calls.find((c) => c.method === 'PUT')?.body as { horario: Record<string, unknown> }).horario;
     expect(h.lun).toBeNull();

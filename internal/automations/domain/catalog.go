@@ -42,8 +42,8 @@ var Catalog = []Definition{
 		Placeholders: []string{"cliente", "modelo", "vehiculo", "placa", "estado", "prometida", "taller"}},
 	{Code: "AU-06", Name: "Recordatorio de la cita", Trigger: "Orden Por recibir con fecha de hoy (en la mañana)", SendsMessage: true, Editable: true,
 		OutsideWindow: true,
-		DefaultText:   "Hola {cliente}, te esperamos hoy en {taller} con tu {vehiculo} {placa}. Horario: {horario}.",
-		Placeholders:  []string{"cliente", "modelo", "taller", "vehiculo", "placa", "horario"}},
+		DefaultText:   "Hola {cliente}, te esperamos hoy a las {hora} en {taller} con tu {vehiculo} {placa}. {direccion}",
+		Placeholders:  []string{"cliente", "modelo", "taller", "vehiculo", "placa", "hora", "direccion", "horario"}},
 	{Code: "AU-07", Name: "Vehículo sin recoger", Trigger: "Orden en Listo hace 3 días", SendsMessage: true, Editable: true,
 		OutsideWindow: true,
 		DefaultText:   "Hola {cliente}, tu {vehiculo} {placa} está listo desde hace {dias} días. Te esperamos en {taller}, {horario}.",
@@ -95,3 +95,6 @@ func (d Definition) ValidateText(t string) error {
 func Render(text string, data map[string]string) string {
 	return rePH.ReplaceAllStringFunc(text, func(m string) string { return data[m[1:len(m)-1]] })
 }
+
+// DailyHour es la hora de Colombia desde la que salen los avisos del día (AU-06 en la mañana, HU-44).
+const DailyHour = 7

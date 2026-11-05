@@ -455,6 +455,7 @@ type TenancyTaller struct {
 	ContratoVersion    *string
 	ContratoAceptadoEn *time.Time
 	OnboardingCompleto bool
+	Direccion          *string
 }
 
 type VehiclesPropietarioHistorial struct {

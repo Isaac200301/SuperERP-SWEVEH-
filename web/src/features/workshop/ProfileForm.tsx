@@ -30,7 +30,7 @@ type Atiende = 'carro' | 'moto' | 'ambos' | '';
 export function ProfileForm({ t, onSaved }: { t: Taller; onSaved?: () => void }) {
   const qc = useQueryClient();
   const guardar = useMutation({
-    mutationFn: async (b: { nombre: string; atiende: string; especialidades: string[]; ciudad: string; tamano: string; contratoAceptado: boolean }) =>
+    mutationFn: async (b: { nombre: string; atiende: string; especialidades: string[]; ciudad: string; direccion: string; tamano: string; contratoAceptado: boolean }) =>
       unwrap(await api.POST('/workshop/onboarding', { body: b })),
     onSuccess: async () => {
       await qc.invalidateQueries();
@@ -38,7 +38,7 @@ export function ProfileForm({ t, onSaved }: { t: Taller; onSaved?: () => void })
     },
   });
   const [f, setF] = useState({
-    nombre: t.nombre, atiende: (t.atiende || '') as Atiende, ciudad: t.ciudad, tamano: t.tamano || 'solo', esp: t.especialidades,
+    nombre: t.nombre, atiende: (t.atiende || '') as Atiende, ciudad: t.ciudad, direccion: t.direccion ?? '', tamano: t.tamano || 'solo', esp: t.especialidades,
     contrato: t.contratoAceptadoEn != null,
   });
   // HU-03 criterio 2: el tipo de vehículo es obligatorio antes de seguir.
@@ -48,7 +48,7 @@ export function ProfileForm({ t, onSaved }: { t: Taller; onSaved?: () => void })
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (missing) return;
-    guardar.mutate({ nombre: f.nombre, atiende: f.atiende, especialidades: f.esp, ciudad: f.ciudad, tamano: f.tamano, contratoAceptado: f.contrato });
+    guardar.mutate({ nombre: f.nombre, atiende: f.atiende, especialidades: f.esp, ciudad: f.ciudad, direccion: f.direccion, tamano: f.tamano, contratoAceptado: f.contrato });
   };
   return (
     <section className={card} aria-labelledby="perfil">
@@ -56,6 +56,14 @@ export function ProfileForm({ t, onSaved }: { t: Taller; onSaved?: () => void })
       <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
         <Field label="Nombre del taller" value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} />
         <Field label="Ciudad" value={f.ciudad} onChange={(e) => setF({ ...f, ciudad: e.target.value })} />
+        {/* HU-06: la dirección no se pide en el registro; en Mi taller es opcional y sale en el recordatorio de la cita (HU-44). */}
+        {t.onboardingCompleto && (
+          <div className="sm:col-span-2">
+            <Field label="Dirección (opcional)" value={f.direccion} maxLength={160}
+              hint="Sale en el recordatorio de la cita que le llega al cliente."
+              onChange={(e) => setF({ ...f, direccion: e.target.value })} />
+          </div>
+        )}
         <div className="sm:col-span-2">
           <Segmented
             label="¿Qué vehículos atiendes?"

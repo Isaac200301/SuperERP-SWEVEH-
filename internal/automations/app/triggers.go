@@ -201,10 +201,15 @@ func (s *Service) LowStock(ctx context.Context, tallerID, partID shared.ID, ref 
 	})
 }
 
-// Daily corre AU-06 (cita de hoy) y AU-07 (listo hace 3 días) en todos los talleres. El worker la llama
-// con un candado consultivo para que corra en una sola instancia (R-07).
+// Daily corre AU-06 (cita de hoy) y AU-07 (listo hace 3 días) en todos los talleres. El worker la llama cada hora
+// con un candado consultivo para que corra en una sola instancia (R-07). Antes de las 7:00 a. m. (hora de Colombia) no
+// hace nada: el recordatorio sale en la mañana (HU-44) y nadie recibe avisos de madrugada. La clave por día evita
+// repetirlo en las corridas siguientes.
 func (s *Service) Daily(ctx context.Context, ids []shared.ID, withTenant func(context.Context, shared.ID) context.Context) error {
 	now := s.clock.Now()
+	if now.In(s.loc).Hour() < domain.DailyHour {
+		return nil
+	}
 	today := now.In(s.loc).Format("2006-01-02")
 	for _, tid := range ids {
 		tctx := withTenant(ctx, tid)
@@ -227,7 +232,11 @@ func (s *Service) Daily(ctx context.Context, ids []shared.ID, withTenant func(co
 			if err := s.fire(tctx, tid, "AU-06", "cita:"+o.ID.String()+":"+today, o, func(w Workshop, c Customer, t string) (string, []Button, error) {
 				d := s.base(w, c, o)
 				d["horario"] = s.ScheduleText(w, now)
-				return domain.Render(t, d), nil, nil
+				d["hora"] = hour(o.PromisedAt.In(s.loc).Format("15:04"))
+				if w.Address != "" {
+					d["direccion"] = "Estamos en " + w.Address + "."
+				}
+				return strings.TrimSpace(domain.Render(t, d)), nil, nil
 			}); err != nil {
 				return err
 			}

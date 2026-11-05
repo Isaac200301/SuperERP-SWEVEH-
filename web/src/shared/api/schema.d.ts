@@ -1700,6 +1700,7 @@ export interface components {
             atiende: string;
             especialidades: string[];
             ciudad: string;
+            direccion: string;
             tamano: string;
             horario: components["schemas"]["Horario"];
             contratoVersion: string | null;
@@ -3889,6 +3890,8 @@ export interface operations {
                     atiende: string;
                     especialidades?: string[];
                     ciudad: string;
+                    /** @description Opcional; sale en el recordatorio de la cita (HU-44) */
+                    direccion?: string;
                     tamano: string;
                     contratoAceptado: boolean;
                 };

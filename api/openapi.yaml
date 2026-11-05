@@ -1331,6 +1331,7 @@ paths:
                 atiende: { type: string }
                 especialidades: { type: array, items: { type: string } }
                 ciudad: { type: string }
+                direccion: { type: string, maxLength: 160, description: 'Opcional; sale en el recordatorio de la cita (HU-44)' }
                 tamano: { type: string }
                 contratoAceptado: { type: boolean }
       responses:
@@ -2258,13 +2259,14 @@ components:
 
     Taller:
       type: object
-      required: [id, nombre, atiende, especialidades, ciudad, tamano, horario, contratoVersion, contratoAceptadoEn, onboardingCompleto]
+      required: [id, nombre, atiende, especialidades, ciudad, direccion, tamano, horario, contratoVersion, contratoAceptadoEn, onboardingCompleto]
       properties:
         id: { type: string, format: uuid }
         nombre: { type: string }
         atiende: { type: string }
         especialidades: { type: array, items: { type: string } }
         ciudad: { type: string }
+        direccion: { type: string }
         tamano: { type: string }
         horario: { $ref: '#/components/schemas/Horario' }
         contratoVersion: { type: string, nullable: true }
