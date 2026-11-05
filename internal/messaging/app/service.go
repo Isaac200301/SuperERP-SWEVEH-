@@ -60,6 +60,10 @@ type Repository interface {
 	ChannelOf(ctx context.Context, tallerID shared.ID) (ChannelInfo, bool, error)
 	// MoveCustomer pasa las conversaciones de un cliente a otro (unir clientes repetidos, HU-15).
 	MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error)
+	// AnonymizeCustomer borra el celular y el texto de las conversaciones del cliente (HU-87).
+	AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID) (int, error)
+	// MessagesOf son los mensajes de las conversaciones del cliente, en orden (copia de sus datos, HU-87).
+	MessagesOf(ctx context.Context, tallerID, customerID shared.ID) ([]Message, error)
 	UpsertChannel(ctx context.Context, c ChannelInfo) error
 	Conversation(ctx context.Context, tallerID shared.ID, phone string) (Conversation, error) // crea si no existe
 	ConversationByID(ctx context.Context, tallerID, id shared.ID) (Conversation, error)
@@ -546,4 +550,27 @@ func (s *Service) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID
 		return err
 	})
 	return n, err
+}
+
+// AnonymizeCustomer borra lo que identifica al titular en sus conversaciones (HU-87): el celular queda como
+// "anonimo-<id>" y los mensajes sin texto. Lo que estaba por enviarse no sale.
+func (s *Service) AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID) (int, error) {
+	var n int
+	err := s.tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = s.repo.AnonymizeCustomer(ctx, tallerID, customerID)
+		return err
+	})
+	return n, err
+}
+
+// MessagesOf son los mensajes del cliente para la copia de sus datos (HU-87).
+func (s *Service) MessagesOf(ctx context.Context, tallerID, customerID shared.ID) ([]Message, error) {
+	var out []Message
+	err := s.tx.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.MessagesOf(ctx, tallerID, customerID)
+		return err
+	})
+	return out, err
 }

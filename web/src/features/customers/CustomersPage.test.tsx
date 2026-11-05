@@ -78,4 +78,26 @@ describe('CustomersPage (HU-82)', () => {
     await waitFor(() => expect(screen.queryByText('Posibles repetidos')).not.toBeInTheDocument());
     expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ conservar: 'c2', unir: 'c1' });
   });
+
+  it('el dueño descarga los datos del cliente y los borra con confirmación (HU-87)', async () => {
+    const calls = mockApi({
+      'GET /me': { ...owner, permisos: [...owner.permisos, 'data_request:manage', 'customer:read_all'] },
+      'GET /customers': { clientes: [laura] },
+      'GET /customers/{id}/vehicles': { vehiculos: [] },
+      'GET /customers/{id}/export': { generadoEn: '2026-11-04T00:00:00Z', cliente: { nombre: 'Laura Gómez' }, autorizaciones: [], vehiculos: [],
+        ordenes: [], mensajes: [] },
+      'POST /customers/{id}/anonymize': { anonimizados: { vehiculos: 1, ordenes: 1, borradores: 0, mensajes: 3 } },
+    });
+    const createObjectURL = vi.fn(() => 'blob:datos');
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+    renderPage(<CustomersPage />);
+    await userEvent.click(await screen.findByRole('button', { name: /Laura Gómez/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Descargar sus datos' }));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Borrar sus datos' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('No se puede deshacer');
+    await userEvent.click(screen.getByRole('button', { name: 'Sí, borrar sus datos' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/customers/c1/anonymize')).toBe(true));
+  });
 });

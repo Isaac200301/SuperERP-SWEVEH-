@@ -25,6 +25,17 @@ func (h *Handler) ExtraRoutes(r chi.Router) {
 	r.With(h.guard.Require(permCreate)).Post("/customers/{id}/consent", httpx.JSON(h.log, h.consent))
 	r.With(h.guard.Require("customer:merge")).Get("/customers/duplicates", httpx.JSON(h.log, h.duplicates))
 	r.With(h.guard.Require("customer:merge")).Post("/customers/merge", httpx.JSON(h.log, h.merge))
+	r.With(h.guard.Require("data_request:manage")).Post("/customers/{id}/anonymize", httpx.JSON(h.log, h.anonymize))
+}
+
+// anonymize atiende la solicitud de borrado del titular (HU-87): no se puede deshacer.
+func (h *Handler) anonymize(r *http.Request, p reqctx.Principal) (int, any, error) {
+	id, err := httpx.PathID(r, "id", domain.ErrCustomerNotFound)
+	if err != nil {
+		return 0, nil, err
+	}
+	out, err := h.svc.Anonymize(r.Context(), p.TallerID, p.Actor(), id)
+	return http.StatusOK, map[string]any{"anonimizados": out}, err
 }
 
 // duplicates lista los posibles repetidos agrupados por nombre (HU-15).

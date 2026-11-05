@@ -598,3 +598,26 @@ func (f *Flow) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (
 	})
 	return n, err
 }
+
+// AnonymizeCustomer quita de las órdenes lo que identifica al titular (HU-87): la placa (la nueva del vehículo) y el
+// nombre de quien recogió. Las órdenes, sus estados y montos se conservan.
+func (f *Flow) AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID, plates map[shared.ID]string) (int, error) {
+	var n int
+	err := f.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = f.repo.AnonymizeCustomer(ctx, tallerID, customerID, plates)
+		return err
+	})
+	return n, err
+}
+
+// ByCustomer son todas las órdenes del cliente, la más reciente primero (copia de sus datos, HU-87).
+func (f *Flow) ByCustomer(ctx context.Context, tallerID, customerID shared.ID) ([]domain.Order, error) {
+	var out []domain.Order
+	err := f.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = f.repo.ByCustomer(ctx, tallerID, customerID)
+		return err
+	})
+	return out, err
+}

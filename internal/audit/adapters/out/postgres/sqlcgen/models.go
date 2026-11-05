@@ -143,6 +143,7 @@ type CustomersCliente struct {
 	CreatedBy          *uuid.UUID
 	FusionadoCon       *uuid.UUID
 	FusionadoEn        *time.Time
+	AnonimizadoEn      *time.Time
 }
 
 type IdentityAutorizacionTitular struct {

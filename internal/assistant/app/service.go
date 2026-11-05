@@ -160,6 +160,8 @@ const AITimeout = 30 * time.Second
 
 type Repository interface {
 	InsertDraft(ctx context.Context, d DraftRecord) (bool, error) // false si el mensaje ya tenía borrador
+	// AnonymizePhone borra el celular y los textos de los borradores de ese celular (HU-87).
+	AnonymizePhone(ctx context.Context, tallerID shared.ID, phone string) (int, error)
 	AutoReply(ctx context.Context, tallerID shared.ID) (bool, error)
 	SetAutoReply(ctx context.Context, tallerID shared.ID, on bool, at time.Time) error
 	Draft(ctx context.Context, tallerID, id shared.ID) (DraftRecord, error)
@@ -793,3 +795,15 @@ func (s *Service) Stats(ctx context.Context, tallerID shared.ID) (sent, edited i
 }
 
 var sprintf = fmt.Sprintf
+
+// AnonymizePhone borra el celular y los textos de los borradores del titular (HU-87). La intención y el estado se
+// conservan para las estadísticas de la bandeja.
+func (s *Service) AnonymizePhone(ctx context.Context, tallerID shared.ID, phone string) (int, error) {
+	var n int
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = s.repo.AnonymizePhone(ctx, tallerID, phone)
+		return err
+	})
+	return n, err
+}

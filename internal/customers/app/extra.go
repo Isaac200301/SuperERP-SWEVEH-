@@ -19,6 +19,9 @@ type Extra interface {
 	Duplicates(ctx context.Context, tallerID shared.ID, limit int) ([]domain.Customer, error)
 	MarkMerged(ctx context.Context, tallerID, dropID, keepID shared.ID, at time.Time) error
 	Merged(ctx context.Context, tallerID, id shared.ID) (bool, error)
+	Anonymize(ctx context.Context, tallerID, id shared.ID, at time.Time) error
+	Anonymized(ctx context.Context, tallerID, id shared.ID) (bool, error)
+	Consents(ctx context.Context, tallerID, id shared.ID) ([]ConsentEntry, error)
 }
 
 // ConsentRecord es la prueba de la autorización del cliente (Ley 1581, Decreto 1377 art. 8).

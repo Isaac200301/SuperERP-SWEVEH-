@@ -267,3 +267,27 @@ func (Flow) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int
 	n, err := db.Exec(ctx, `UPDATE orders.orden SET cliente_id = $3 WHERE taller_id = $1 AND cliente_id = $2`, tallerID, from, to)
 	return int(n), err
 }
+
+func (Flow) AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID, plates map[shared.ID]string) (int, error) {
+	var total int64
+	for vid, plate := range plates {
+		n, err := db.Exec(ctx, `UPDATE orders.orden SET placa = $3 WHERE taller_id = $1 AND vehiculo_id = $2`, tallerID, vid, plate)
+		if err != nil {
+			return 0, err
+		}
+		total += n
+	}
+	n, err := db.Exec(ctx, `UPDATE orders.orden SET entregado_a = NULL WHERE taller_id = $1 AND cliente_id = $2 AND entregado_a IS NOT NULL`,
+		tallerID, customerID)
+	return int(total + n), err
+}
+
+func (Flow) ByCustomer(ctx context.Context, tallerID, customerID shared.ID) ([]domain.Order, error) {
+	rows, err := db.Many[orderRow](ctx, `SELECT `+orderCols+` FROM orders.orden WHERE taller_id = $1 AND cliente_id = $2
+		ORDER BY created_at DESC, id DESC`, tallerID, customerID)
+	out := make([]domain.Order, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, r.domain())
+	}
+	return out, err
+}

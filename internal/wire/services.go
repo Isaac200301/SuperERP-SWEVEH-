@@ -94,7 +94,8 @@ func BuildWith(m *server.Modules, ch messagingapp.Channel, it assistantapp.Inter
 		cap = 5_000_000
 	}
 	s.Assistant = assistantapp.NewService(m.Tx, assistantpg.Repository{}, &taller{s: s}, m.Audit, m.Clock, it, rules.Interpreter{}, cap)
-	m.Customers.SetMover(customerMover{s}) // unir clientes repetidos (HU-15)
+	m.Customers.SetMover(customerMover{s})   // unir clientes repetidos (HU-15)
+	m.Customers.SetEraser(customerEraser{s}) // borrar los datos del titular (HU-87)
 	return s
 }
 

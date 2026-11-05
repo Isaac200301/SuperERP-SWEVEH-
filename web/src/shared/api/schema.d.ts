@@ -588,6 +588,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/customers/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Copia de los datos del titular (HU-87) con autorizaciones, vehículos, órdenes y mensajes. Permiso data_request:manage */
+        get: operations["exportCustomerData"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/anonymize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Borrar los datos del titular (HU-87). Anonimiza nombre, celular, correo, placas, conversaciones y borradores; conserva órdenes y montos. No se puede deshacer. Permiso data_request:manage */
+        post: operations["anonymizeCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers/{id}/vehicles": {
         parameters: {
             query?: never;
@@ -3225,6 +3259,76 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    exportCustomerData: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        generadoEn: string;
+                        cliente: {
+                            [key: string]: unknown;
+                        };
+                        autorizaciones: {
+                            [key: string]: unknown;
+                        }[];
+                        vehiculos: {
+                            [key: string]: unknown;
+                        }[];
+                        ordenes: {
+                            [key: string]: unknown;
+                        }[];
+                        mensajes: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    anonymizeCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Anonimizado */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description vehiculos, ordenes, borradores y mensajes tocados */
+                        anonimizados: {
+                            [key: string]: number;
+                        };
+                    };
+                };
+            };
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };

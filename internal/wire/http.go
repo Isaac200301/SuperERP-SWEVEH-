@@ -65,6 +65,7 @@ func (h *handler) routes(r chi.Router) {
 	r.With(h.g.Require("inbox:manage")).Get("/assistant/settings", j(h.assistantSettings))
 	r.With(h.g.Require("automation:manage")).Put("/assistant/settings", j(h.setAssistantSettings))
 	r.With(h.g.Require("audit:read")).Get("/audit", j(h.audit))
+	r.With(h.g.Require("data_request:manage")).Get("/customers/{id}/export", j(h.exportCustomer))
 	r.Get("/platform/usage", j(h.usage)) // HU-74: lo decide PlatformAdmin, no un permiso de taller
 }
 

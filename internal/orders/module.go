@@ -149,3 +149,18 @@ func (o Orders) LastShownPhoto(ctx context.Context, tallerID, orderID shared.ID)
 func (o Orders) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID) (int, error) {
 	return o.flow.MoveCustomer(ctx, tallerID, from, to)
 }
+
+// AnonymizeCustomer quita de las órdenes la placa real y quién recogió (HU-87).
+func (o Orders) AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID, plates map[shared.ID]string) (int, error) {
+	return o.flow.AnonymizeCustomer(ctx, tallerID, customerID, plates)
+}
+
+// ByCustomer son las órdenes del cliente para la copia de sus datos (HU-87).
+func (o Orders) ByCustomer(ctx context.Context, tallerID, customerID shared.ID) ([]Summary, error) {
+	list, err := o.flow.ByCustomer(ctx, tallerID, customerID)
+	out := make([]Summary, 0, len(list))
+	for _, x := range list {
+		out = append(out, summary(x))
+	}
+	return out, err
+}

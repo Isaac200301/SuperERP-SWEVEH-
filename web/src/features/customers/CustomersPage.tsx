@@ -47,8 +47,51 @@ function Vehicles({ id }: { id: string }) {
   );
 }
 
+/** HU-87: el titular pide una copia de sus datos o que los borren; lo atiende el dueño (data_request:manage). */
+function DataRequest({ c }: { c: Cliente }) {
+  const qc = useQueryClient();
+  const [confirm, setConfirm] = useState(false);
+  const exportar = useMutation({
+    mutationFn: async () => unwrap(await api.GET('/customers/{id}/export', { params: { path: { id: c.id } } })),
+    onSuccess: (data) => {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `datos-${c.celular}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+  const borrar = useMutation({
+    mutationFn: async () => unwrap(await api.POST('/customers/{id}/anonymize', { params: { path: { id: c.id } } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['clientes'] }),
+  });
+  return (
+    <div className="flex flex-col gap-2 border-t border-line pt-3">
+      <b className="text-sm">Solicitud de datos del cliente</b>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" busy={exportar.isPending} onClick={() => exportar.mutate()}>Descargar sus datos</Button>
+        {!confirm ? <Button variant="secondary" onClick={() => setConfirm(true)}>Borrar sus datos</Button> : null}
+      </div>
+      {confirm ? (
+        <div role="alert" className="flex flex-col gap-2 rounded-2xl bg-warn-tint p-3 text-warn-ink">
+          <b>Se borran el nombre, el celular, el correo, las placas y las conversaciones de {c.nombre}. Las órdenes y los montos se
+            conservan sin identificarlo. No se puede deshacer.</b>
+          <div className="flex flex-wrap gap-2">
+            <Button busy={borrar.isPending} onClick={() => borrar.mutate()}>Sí, borrar sus datos</Button>
+            <Button variant="secondary" onClick={() => setConfirm(false)}>Cancelar</Button>
+          </div>
+        </div>
+      ) : null}
+      {exportar.isError ? <Alert>{exportar.error.message}</Alert> : null}
+      {borrar.isError ? <Alert>{borrar.error.message}</Alert> : null}
+    </div>
+  );
+}
+
 function Row({ c }: { c: Cliente }) {
   const [open, setOpen] = useState(false);
+  const puedeDatos = usePermission('data_request:manage');
   return (
     <li className="rounded-2xl border border-line">
       <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}
@@ -58,8 +101,9 @@ function Row({ c }: { c: Cliente }) {
         <span className="text-sm text-ink-2">{autorizacion[c.autorizacionEstado] ?? c.autorizacionEstado}</span>
       </button>
       {open ? (
-        <div className="border-t border-line px-4 py-3">
+        <div className="flex flex-col gap-3 border-t border-line px-4 py-3">
           <Vehicles id={c.id} />
+          {puedeDatos ? <DataRequest c={c} /> : null}
         </div>
       ) : null}
     </li>

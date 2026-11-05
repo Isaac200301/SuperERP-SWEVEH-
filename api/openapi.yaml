@@ -818,6 +818,46 @@ paths:
         '404': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
 
+  /customers/{id}/export:
+    get:
+      operationId: exportCustomerData
+      summary: Copia de los datos del titular (HU-87) con autorizaciones, vehículos, órdenes y mensajes. Permiso data_request:manage
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [generadoEn, cliente, autorizaciones, vehiculos, ordenes, mensajes]
+                properties:
+                  generadoEn: { type: string, format: date-time }
+                  cliente: { type: object, additionalProperties: true }
+                  autorizaciones: { type: array, items: { type: object, additionalProperties: true } }
+                  vehiculos: { type: array, items: { type: object, additionalProperties: true } }
+                  ordenes: { type: array, items: { type: object, additionalProperties: true } }
+                  mensajes: { type: array, items: { type: object, additionalProperties: true } }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /customers/{id}/anonymize:
+    post:
+      operationId: anonymizeCustomer
+      summary: Borrar los datos del titular (HU-87). Anonimiza nombre, celular, correo, placas, conversaciones y borradores; conserva órdenes y montos. No se puede deshacer. Permiso data_request:manage
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: Anonimizado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [anonimizados]
+                properties:
+                  anonimizados: { type: object, additionalProperties: { type: integer }, description: 'vehiculos, ordenes, borradores y mensajes tocados' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
   /customers/{id}/vehicles:
     get:
       operationId: listCustomerVehicles

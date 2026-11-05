@@ -249,3 +249,23 @@ func (Repository) MoveCustomer(ctx context.Context, tallerID, from, to shared.ID
 	n, err := db.Exec(ctx, `UPDATE messaging.conversacion SET cliente_id = $3 WHERE taller_id = $1 AND cliente_id = $2`, tallerID, from, to)
 	return int(n), err
 }
+
+func (Repository) AnonymizeCustomer(ctx context.Context, tallerID, customerID shared.ID) (int, error) {
+	n, err := db.Exec(ctx, `UPDATE messaging.mensaje SET cuerpo = NULL, payload = '{}'::jsonb, wamid = NULL,
+			estado = CASE WHEN estado = 'pendiente' THEN 'fallido' ELSE estado END,
+			error = CASE WHEN estado = 'pendiente' THEN 'cliente anonimizado' ELSE error END
+		WHERE taller_id = $1 AND conversacion_id IN (SELECT id FROM messaging.conversacion WHERE taller_id = $1 AND cliente_id = $2)`,
+		tallerID, customerID)
+	if err != nil {
+		return 0, err
+	}
+	_, err = db.Exec(ctx, `UPDATE messaging.conversacion SET celular = 'anonimo-' || id::text WHERE taller_id = $1 AND cliente_id = $2`,
+		tallerID, customerID)
+	return int(n), err
+}
+
+func (Repository) MessagesOf(ctx context.Context, tallerID, customerID shared.ID) ([]app.Message, error) {
+	return msgs(db.Many[msgRow](ctx, `SELECT `+msgCols+` FROM messaging.mensaje WHERE taller_id = $1
+		AND conversacion_id IN (SELECT id FROM messaging.conversacion WHERE taller_id = $1 AND cliente_id = $2) ORDER BY created_at, id`,
+		tallerID, customerID))
+}

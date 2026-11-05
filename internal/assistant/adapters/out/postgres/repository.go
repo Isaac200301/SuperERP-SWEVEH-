@@ -131,3 +131,9 @@ func (Repository) EditStats(ctx context.Context, tallerID shared.ID, since time.
 	}
 	return rows[0].Enviados, rows[0].Editados, nil
 }
+
+func (Repository) AnonymizePhone(ctx context.Context, tallerID shared.ID, phone string) (int, error) {
+	n, err := db.Exec(ctx, `UPDATE assistant.borrador SET celular = 'anonimo', texto_entrante = NULL, texto_propuesto = '(borrado a pedido del titular)',
+		texto_final = NULL WHERE taller_id = $1 AND celular = $2`, tallerID, phone)
+	return int(n), err
+}
