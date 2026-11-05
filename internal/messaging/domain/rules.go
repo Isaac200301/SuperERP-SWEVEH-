@@ -55,5 +55,6 @@ const (
 	BtnConsentNo  = "consent:no"
 	BtnQuoteOK    = "quote:aprobar:"
 	BtnQuoteAsk   = "quote:dudas:"
+	BtnQuotePick  = "quote:elegir:" // HU-30: aprobar solo algunos ítems
 	BtnHuman      = "humano"
 )

@@ -31,6 +31,9 @@ type Taller interface {
 	StatusReply(ctx context.Context, tallerID shared.ID, o Order, c Customer) (string, bool, error) // texto, AU-05 encendida
 	AgentOn(ctx context.Context, tallerID shared.ID) (bool, error)
 	RespondQuote(ctx context.Context, tallerID, orderID shared.ID, decision, ref string) error
+	// RespondQuoteItems aprueba solo los ítems con esos números (1 = el primero del mensaje, HU-30). ok=false si algún
+	// número no está en la cotización; entonces no registra nada.
+	RespondQuoteItems(ctx context.Context, tallerID, orderID shared.ID, picks []int, ref string) (res QuotePick, ok bool, err error)
 	// AnswerReceipt guarda "Está bien" (ok) o "Algo no cuadra" de la constancia; false si ya había respuesta.
 	AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, ok bool, ref string) (bool, error)
 	// PlateOf dice de quién es la placa en el taller: "nueva", "propia" (con su orden abierta, si tiene) o "ajena".
@@ -243,6 +246,9 @@ func (s *Service) HandleInbound(ctx context.Context, tallerID, msgID shared.ID) 
 	if c.Consent == "rechazada" || in.Mode == "humano" {
 		return nil // lo atiende una persona desde la conversación
 	}
+	if done, err := s.quotePick(ctx, tallerID, in, *c); done || err != nil {
+		return err
+	}
 	return s.process(ctx, tallerID, in, *c)
 }
 
@@ -303,6 +309,13 @@ func (s *Service) button(ctx context.Context, tallerID shared.ID, in Inbound, c 
 			}
 		}
 		_, err = s.taller.Send(ctx, tallerID, in.Phone, reply, nil, "AU-02", &oid)
+		return err
+	case strings.HasPrefix(in.ButtonID, "quote:elegir:"): // HU-30: el cliente escribe los números de lo que aprueba
+		oid, err := shared.ParseID(strings.TrimPrefix(in.ButtonID, "quote:elegir:"))
+		if err != nil || c == nil {
+			return nil
+		}
+		_, err = s.taller.Send(ctx, tallerID, in.Phone, quotePickAsk, nil, "AU-02", &oid)
 		return err
 	case strings.HasPrefix(in.ButtonID, "recibo:ok:") || strings.HasPrefix(in.ButtonID, "recibo:revisar:"):
 		return s.receipt(ctx, tallerID, in, c)
@@ -806,4 +819,68 @@ func (s *Service) AnonymizePhone(ctx context.Context, tallerID shared.ID, phone 
 		return err
 	})
 	return n, err
+}
+
+// QuotePick es el resultado de aprobar solo algunos ítems (HU-30).
+type QuotePick struct {
+	Approved, Lines int
+	Total           int64 // lo aprobado, con descuentos e IVA
+}
+
+// Textos de la aprobación por ítems (HU-30). Son plantillas, no IA.
+const (
+	quotePickAsk   = "Escribe los números de los ítems que apruebas, por ejemplo: 1 y 3."
+	quotePickAgain = "No encontré esos números en la cotización. Escribe los de los ítems que apruebas, por ejemplo: 1 y 3."
+	quotePickOK    = "Listo, aprobaste %d de %d ítems. El total queda en %s. Seguimos con lo que aprobaste."
+)
+
+// quotePick atiende la respuesta a "Elegir ítems" (HU-30): si lo último que le dijimos fue que escribiera los números
+// y el texto son números, aprueba esos ítems de la cotización que espera respuesta y confirma el total. done=false si
+// el mensaje no es eso y debe seguir el flujo normal.
+func (s *Service) quotePick(ctx context.Context, tallerID shared.ID, in Inbound, c Customer) (bool, error) {
+	if in.Kind != "texto" {
+		return false, nil
+	}
+	picks, ok := domain.ParsePicks(in.Text)
+	if !ok {
+		return false, nil
+	}
+	history, err := s.taller.History(ctx, tallerID, in.ConversationID, in.At, 4)
+	if err != nil {
+		return false, err
+	}
+	var last *Turn
+	for i := len(history) - 1; i >= 0; i-- {
+		if !history[i].FromCustomer {
+			last = &history[i]
+			break
+		}
+	}
+	if last == nil || (last.Text != quotePickAsk && last.Text != quotePickAgain) {
+		return false, nil
+	}
+	orders, err := s.taller.OpenOrders(ctx, tallerID, c.ID)
+	if err != nil {
+		return false, err
+	}
+	var oid *shared.ID
+	for _, o := range orders {
+		if o.State == "esperando_aprobacion" {
+			id := o.ID
+			oid = &id
+		}
+	}
+	if oid == nil {
+		return false, nil
+	}
+	res, ok, err := s.taller.RespondQuoteItems(ctx, tallerID, *oid, picks, in.ID.String())
+	if err != nil {
+		return true, err
+	}
+	reply := quotePickAgain
+	if ok {
+		reply = sprintf(quotePickOK, res.Approved, res.Lines, domain.Money(res.Total))
+	}
+	_, err = s.taller.Send(ctx, tallerID, in.Phone, reply, nil, "AU-02", oid)
+	return true, err
 }

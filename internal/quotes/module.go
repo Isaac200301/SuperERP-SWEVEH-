@@ -57,6 +57,16 @@ func (q Quotes) ApprovedTotals(ctx context.Context, tallerID shared.ID, ids []sh
 	return quotespg.Stats{}.ApprovedTotals(ctx, tallerID, ids)
 }
 
+// RespondItems aprueba solo los ítems marcados (HU-30) y devuelve la cotización con el total de lo aprobado.
+func (q Quotes) RespondItems(ctx context.Context, tallerID, orderID shared.ID, items map[shared.ID]bool, channel, ref string, actor shared.Actor) (*Summary, error) {
+	x, err := q.svc.Respond(ctx, app.RespondCmd{TallerID: tallerID, OrderID: orderID, Actor: actor,
+		Response: domain.Response{Decision: "aprobar", Items: items, Channel: channel, Ref: ref}})
+	if err != nil {
+		return nil, err
+	}
+	return toSummary(&x), nil
+}
+
 // Respond registra la respuesta del cliente (botón de WhatsApp, HU-28).
 func (q Quotes) Respond(ctx context.Context, tallerID, orderID shared.ID, decision, channel, ref string, actor shared.Actor) error {
 	_, err := q.svc.Respond(ctx, app.RespondCmd{TallerID: tallerID, OrderID: orderID, Actor: actor,

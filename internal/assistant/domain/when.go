@@ -3,6 +3,8 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -90,4 +92,30 @@ func IsAffirmative(text string) bool {
 		}
 	}
 	return false
+}
+
+// ParsePicks lee los números de ítems que escribe el cliente ("1 y 3", "1,3", "2"): solo dígitos, espacios, comas,
+// puntos, guiones e "y"/"e". Devuelve los números sin repetir, en orden; ok=false si el texto es otra cosa.
+func ParsePicks(text string) ([]int, bool) {
+	t := strings.ToLower(strings.TrimSpace(text))
+	if t == "" {
+		return nil, false
+	}
+	var out []int
+	seen := map[int]bool{}
+	for _, f := range strings.FieldsFunc(t, func(r rune) bool { return r == ' ' || r == ',' || r == '.' || r == '-' || r == ';' }) {
+		if f == "y" || f == "e" {
+			continue
+		}
+		n, err := strconv.Atoi(f)
+		if err != nil || n < 1 || n > 99 {
+			return nil, false
+		}
+		if !seen[n] {
+			seen[n] = true
+			out = append(out, n)
+		}
+	}
+	sort.Ints(out)
+	return out, len(out) > 0
 }

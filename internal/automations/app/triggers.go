@@ -146,12 +146,22 @@ func (s *Service) OnQuoteSent(ctx context.Context, tallerID, orderID shared.ID, 
 			return "", nil, err
 		}
 		d := s.base(w, c, o)
-		if q != nil {
-			d["items"] = "• " + strings.Join(q.Lines, "\n• ")
-			d["total"] = Money(q.Total)
-		}
 		id := orderID.String()
-		return domain.Render(t, d), []Button{{ID: "quote:aprobar:" + id, Title: "Aprobar"}, {ID: "quote:dudas:" + id, Title: "Tengo dudas"}}, nil
+		btns := []Button{{ID: "quote:aprobar:" + id, Title: "Aprobar"}}
+		if q != nil {
+			// Numerados: con 2 o más ítems el cliente puede aprobar solo algunos escribiendo sus números (HU-30).
+			items := make([]string, len(q.Lines))
+			for i, l := range q.Lines {
+				items[i] = itoa(i+1) + ". " + l
+			}
+			d["items"] = strings.Join(items, "\n")
+			d["total"] = Money(q.Total)
+			if len(q.Lines) > 1 {
+				btns = append(btns, Button{ID: "quote:elegir:" + id, Title: "Elegir ítems"})
+			}
+		}
+		btns = append(btns, Button{ID: "quote:dudas:" + id, Title: "Tengo dudas"})
+		return domain.Render(t, d), btns, nil
 	})
 }
 

@@ -183,6 +183,30 @@ func (t *taller) RespondQuote(ctx context.Context, tallerID, orderID shared.ID, 
 	return t.s.M.QuotesF.Respond(ctx, tallerID, orderID, decision, "whatsapp", ref, agent)
 }
 
+// RespondQuoteItems aprueba los ítems con esos números, en el orden en que salieron en el mensaje (HU-30).
+func (t *taller) RespondQuoteItems(ctx context.Context, tallerID, orderID shared.ID, picks []int, ref string) (assistantapp.QuotePick, bool, error) {
+	var out assistantapp.QuotePick
+	q, err := t.s.M.QuotesF.ForOrder(ctx, tallerID, orderID)
+	if err != nil || q == nil {
+		return out, false, err
+	}
+	items := make(map[shared.ID]bool, len(q.Lines))
+	for _, l := range q.Lines {
+		items[l.ID] = false
+	}
+	for _, n := range picks {
+		if n > len(q.Lines) {
+			return out, false, nil
+		}
+		items[q.Lines[n-1].ID] = true
+	}
+	res, err := t.s.M.QuotesF.RespondItems(ctx, tallerID, orderID, items, "whatsapp", ref, agent)
+	if err != nil {
+		return out, false, err
+	}
+	return assistantapp.QuotePick{Approved: len(picks), Lines: len(q.Lines), Total: res.Total}, true, nil
+}
+
 func (t *taller) AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, ok bool, ref string) (bool, error) {
 	return t.s.M.OrdersF.AnswerReceipt(ctx, tallerID, orderID, agent, ok, ref)
 }

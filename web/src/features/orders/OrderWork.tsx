@@ -471,6 +471,8 @@ export function QuotePanel({ orden }: { orden: Orden }) {
                   {l.descripcion}
                   {l.horas != null ? <span className="ml-2 text-ink-2">({l.horas} h)</span> : null}
                   {l.sinStock ? <span className="ml-2 font-bold text-warn-ink">sin existencia</span> : null}
+                  {/* HU-30: el cliente aprobó solo algunos ítems; los demás no se hacen ni suman. */}
+                  {l.aprobada === false ? <span className="ml-2 font-bold text-err-ink">no aprobado</span> : null}
                   {editable && puedeDescontar ? (
                     <label className="mt-1 flex items-center gap-2 text-xs text-ink-2">
                       Descuento %
