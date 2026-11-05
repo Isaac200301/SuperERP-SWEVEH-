@@ -1241,6 +1241,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/conversations/{id}/messages/{mid}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nota de voz del cliente para escucharla en el panel (HU-60). Se descarga del canal la primera vez. Permiso conversation:read */
+        get: operations["getVoiceNote"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/conversations/{id}": {
         parameters: {
             query?: never;
@@ -1520,7 +1537,14 @@ export interface components {
             /** Format: uuid */
             conversacionId: string;
             celular: string;
+            /** @description Lo que escribió el cliente; si mandó una nota de voz, su transcripción (HU-60) */
             mensajeCliente: string;
+            /**
+             * Format: uuid
+             * @description Mensaje del cliente: con notaDeVoz, el audio está en /conversations/{conversacionId}/messages/{mensajeId}/audio
+             */
+            mensajeId?: string;
+            notaDeVoz?: boolean;
             intencion: string;
             /** @description Texto que propone la IA o la plantilla; no sale sin aprobación (RF-18) */
             propuesto: string;
@@ -4499,6 +4523,30 @@ export interface operations {
                     };
                 };
             };
+        };
+    };
+    getVoiceNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                mid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El audio */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/ogg": string;
+                };
+            };
+            404: components["responses"]["Problem"];
         };
     };
     getConversation: {

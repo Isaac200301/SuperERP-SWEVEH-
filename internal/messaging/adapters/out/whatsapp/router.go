@@ -48,3 +48,11 @@ func (r Router) SendTemplate(ctx context.Context, pnid, to string, t app.Templat
 func (r Router) SendImage(ctx context.Context, pnid, to string, img app.Image) (string, error) {
 	return r.pick(pnid).SendImage(ctx, pnid, to, img)
 }
+
+// FetchMedia descarga el archivo con el canal del número; el simulador no tiene archivos (HU-60).
+func (r Router) FetchMedia(ctx context.Context, pnid, ref string) (app.Media, error) {
+	if f, ok := r.pick(pnid).(app.MediaFetcher); ok {
+		return f.FetchMedia(ctx, pnid, ref)
+	}
+	return app.Media{}, app.ErrNoMedia
+}

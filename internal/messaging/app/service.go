@@ -66,6 +66,8 @@ type Repository interface {
 	MessagesOf(ctx context.Context, tallerID, customerID shared.ID) ([]Message, error)
 	// MessagesByPhone son los últimos mensajes de la conversación con ese celular (registro técnico, HU-100).
 	MessagesByPhone(ctx context.Context, tallerID shared.ID, phone string, limit int) ([]Message, error)
+	// SetTranscript guarda la transcripción de una nota de voz como texto del mensaje (HU-60).
+	SetTranscript(ctx context.Context, tallerID, id shared.ID, text string) error
 	// WebhooksMentioning son los webhooks crudos recibidos desde since que mencionan esos dígitos (HU-100).
 	WebhooksMentioning(ctx context.Context, digits string, since time.Time, limit int) ([]WebhookTrace, error)
 	UpsertChannel(ctx context.Context, c ChannelInfo) error
@@ -138,6 +140,8 @@ type Inbound struct {
 	ButtonID      string
 	At            time.Time
 	Name          string
+	Media         string // referencia del archivo en el canal (id de Meta, URL de WAHA): notas de voz, HU-60
+	Mime          string
 }
 
 // ProcessWebhooks interpreta los cuerpos pendientes (los llama el worker).
@@ -212,7 +216,11 @@ func (s *Service) storeInbound(ctx context.Context, in Inbound) error {
 		if in, err = s.menuReply(ctx, tallerID, conv.ID, in); err != nil {
 			return err
 		}
-		payload, _ := json.Marshal(map[string]any{"boton": in.ButtonID, "nombre": in.Name})
+		p := map[string]any{"boton": in.ButtonID, "nombre": in.Name}
+		if in.Media != "" { // HU-60: el audio se descarga después (para transcribirlo y para escucharlo en el panel)
+			p["media"], p["mime"] = in.Media, in.Mime
+		}
+		payload, _ := json.Marshal(p)
 		wamid := in.WAMID
 		m := Message{ID: shared.NewID(), TallerID: tallerID, ConversationID: conv.ID, Direction: "entrante", WAMID: &wamid,
 			Kind: in.Kind, Body: in.Text, Payload: payload, State: "recibido", Origin: "cliente", CreatedAt: in.At}
@@ -608,4 +616,45 @@ func (s *Service) WebhooksMentioning(ctx context.Context, digits string, since t
 		return err
 	})
 	return out, err
+}
+
+// VoiceNote descarga del canal el audio de una nota de voz (HU-60). La descarga va fuera de la transacción.
+func (s *Service) VoiceNote(ctx context.Context, tallerID, msgID shared.ID) (Media, error) {
+	var (
+		m   Message
+		ch  ChannelInfo
+		ok  bool
+		err error
+	)
+	if err = s.tx.Do(ctx, func(ctx context.Context) error {
+		if m, err = s.repo.GetMessage(ctx, tallerID, msgID); err != nil {
+			return err
+		}
+		ch, ok, err = s.repo.ChannelOf(ctx, tallerID)
+		return err
+	}); err != nil {
+		return Media{}, err
+	}
+	var p struct {
+		Media string `json:"media"`
+		Mime  string `json:"mime"`
+	}
+	_ = json.Unmarshal(m.Payload, &p)
+	f, can := s.channel.(MediaFetcher)
+	if !ok || p.Media == "" || m.Kind != "audio" || !can {
+		return Media{}, ErrNoMedia
+	}
+	media, err := f.FetchMedia(ctx, ch.PhoneNumberID, p.Media)
+	if err != nil {
+		return Media{}, err
+	}
+	if media.Mime == "" {
+		media.Mime = p.Mime
+	}
+	return media, nil
+}
+
+// SetTranscript guarda la transcripción de la nota de voz en el mensaje: la conversación la muestra junto al audio.
+func (s *Service) SetTranscript(ctx context.Context, tallerID, msgID shared.ID, text string) error {
+	return s.tx.Do(ctx, func(ctx context.Context) error { return s.repo.SetTranscript(ctx, tallerID, msgID, text) })
 }

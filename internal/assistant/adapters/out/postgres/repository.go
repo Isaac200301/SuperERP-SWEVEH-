@@ -30,11 +30,13 @@ type row struct {
 	Resuelto  *time.Time      `db:"resuelto_en"`
 	Entrante  *string         `db:"entrante"`
 	Celular   string          `db:"celular"`
+	Voz       bool            `db:"nota_de_voz"`
 }
 
 func (r row) record() app.DraftRecord {
 	d := app.DraftRecord{ID: r.ID, TallerID: r.TallerID, ConversationID: r.ConvID, InboundID: r.InboundID, Intent: r.Intencion,
-		Proposed: r.Propuesto, Final: r.Final, State: r.Estado, Origin: r.Origen, CreatedAt: r.CreatedAt, ResolvedAt: r.Resuelto, Phone: r.Celular}
+		Proposed: r.Propuesto, Final: r.Final, State: r.Estado, Origin: r.Origen, CreatedAt: r.CreatedAt, ResolvedAt: r.Resuelto, Phone: r.Celular,
+		Voice: r.Voz}
 	_ = json.Unmarshal(r.Fuentes, &d.Sources)
 	if d.Sources == nil {
 		d.Sources = []domain.Source{}
@@ -52,8 +54,8 @@ func (r row) record() app.DraftRecord {
 }
 
 const sel = `SELECT b.id, b.taller_id, b.conversacion_id, b.mensaje_entrante_id, b.intencion, b.texto_propuesto, b.texto_final, b.fuentes,
-	b.accion, b.estado, b.origen, b.created_at, b.resuelto_en, b.texto_entrante AS entrante, b.celular
-	FROM assistant.borrador b`
+	b.accion, b.estado, b.origen, b.created_at, b.resuelto_en, b.texto_entrante AS entrante, b.celular,
+	b.nota_de_voz FROM assistant.borrador b`
 
 // InsertDraft guarda el borrador; false si ese mensaje ya tenía uno (el evento llegó otra vez).
 func (Repository) InsertDraft(ctx context.Context, d app.DraftRecord) (bool, error) {
@@ -64,10 +66,10 @@ func (Repository) InsertDraft(ctx context.Context, d app.DraftRecord) (bool, err
 		act = json.RawMessage(b)
 	}
 	n, err := db.Exec(ctx, `INSERT INTO assistant.borrador (id, taller_id, conversacion_id, mensaje_entrante_id, intencion, texto_propuesto,
-		fuentes, accion, estado, origen, created_at, celular, texto_entrante) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		fuentes, accion, estado, origen, created_at, celular, texto_entrante, nota_de_voz) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		ON CONFLICT ON CONSTRAINT borrador_por_mensaje DO NOTHING`,
 		d.ID, d.TallerID, d.ConversationID, d.InboundID, d.Intent, d.Proposed, json.RawMessage(src), act, d.State, d.Origin, d.CreatedAt,
-		d.Phone, d.InboundText)
+		d.Phone, d.InboundText, d.Voice)
 	return n == 1, err
 }
 

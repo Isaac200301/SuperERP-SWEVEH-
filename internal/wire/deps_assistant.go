@@ -207,6 +207,16 @@ func (t *taller) RespondQuoteItems(ctx context.Context, tallerID, orderID shared
 	return assistantapp.QuotePick{Approved: len(picks), Lines: len(q.Lines), Total: res.Total}, true, nil
 }
 
+// VoiceNote descarga la nota de voz por el canal del taller (HU-60).
+func (t *taller) VoiceNote(ctx context.Context, tallerID, msgID shared.ID) ([]byte, string, error) {
+	m, err := t.s.Messaging.VoiceNote(ctx, tallerID, msgID)
+	return m.Data, m.Mime, err
+}
+
+func (t *taller) SetTranscript(ctx context.Context, tallerID, msgID shared.ID, text string) error {
+	return t.s.Messaging.SetTranscript(ctx, tallerID, msgID, text)
+}
+
 func (t *taller) AnswerReceipt(ctx context.Context, tallerID, orderID shared.ID, ok bool, ref string) (bool, error) {
 	return t.s.M.OrdersF.AnswerReceipt(ctx, tallerID, orderID, agent, ok, ref)
 }

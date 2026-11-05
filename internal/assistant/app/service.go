@@ -31,6 +31,10 @@ type Taller interface {
 	StatusReply(ctx context.Context, tallerID shared.ID, o Order, c Customer) (string, bool, error) // texto, AU-05 encendida
 	AgentOn(ctx context.Context, tallerID shared.ID) (bool, error)
 	RespondQuote(ctx context.Context, tallerID, orderID shared.ID, decision, ref string) error
+	// VoiceNote descarga del canal el audio de una nota de voz (HU-60).
+	VoiceNote(ctx context.Context, tallerID, msgID shared.ID) (audio []byte, mime string, err error)
+	// SetTranscript guarda la transcripción como texto del mensaje: la conversación la muestra junto al audio (HU-60).
+	SetTranscript(ctx context.Context, tallerID, msgID shared.ID, text string) error
 	// RespondQuoteItems aprueba solo los ítems con esos números (1 = el primero del mensaje, HU-30). ok=false si algún
 	// número no está en la cotización; entonces no registra nada.
 	RespondQuoteItems(ctx context.Context, tallerID, orderID shared.ID, picks []int, ref string) (res QuotePick, ok bool, err error)
@@ -72,6 +76,7 @@ type Inbound struct {
 	ProfileName    string
 	Mode           string
 	At             time.Time
+	Voice          bool // era una nota de voz: Text es su transcripción (HU-60)
 }
 
 type Customer struct {
@@ -119,6 +124,7 @@ type DraftRecord struct {
 	ResolvedAt     *time.Time
 	InboundText    string
 	Phone          string
+	Voice          bool // el cliente mandó una nota de voz (HU-60)
 }
 
 // Action es lo que se ejecuta si el dueño envía el borrador (HU-55: crear la orden con la placa).
@@ -186,6 +192,7 @@ type Clock interface{ Now() time.Time }
 type Service struct {
 	uow     UnitOfWork
 	repo    Repository
+	stt     Transcriber // notas de voz (HU-60); nil = sin transcripción
 	taller  Taller
 	audit   AuditLog
 	clock   Clock
@@ -427,8 +434,15 @@ func (s *Service) process(ctx context.Context, tallerID shared.ID, in Inbound, c
 	if err != nil {
 		return err
 	}
-	if in.Kind == "audio" { // HU-60: sin transcripción todavía (proveedor Sin dato)
-		return s.saveDraft(ctx, tallerID, in, "nota_de_voz", "Recibimos una nota de voz. Escúchala en la conversación y responde tú.", nil, nil, "plantilla")
+	if in.Kind == "audio" { // HU-60: se transcribe y sigue el mismo flujo del texto
+		text, err := s.transcribe(ctx, tallerID, in)
+		if err != nil {
+			return err
+		}
+		if text == "" {
+			return s.saveDraft(ctx, tallerID, in, "nota_de_voz", voiceNoteCard, nil, nil, "plantilla")
+		}
+		in.Kind, in.Text, in.Voice = "texto", text, true
 	}
 	if in.Kind != "texto" {
 		return nil
@@ -641,7 +655,7 @@ func (s *Service) draft(tallerID shared.ID, in Inbound, intent, text string, src
 	}
 	return DraftRecord{ID: shared.NewID(), TallerID: tallerID, ConversationID: in.ConversationID, InboundID: in.ID,
 		Intent: intent, Proposed: text, Sources: src, Action: a, State: "pendiente", Origin: origin, CreatedAt: s.clock.Now(),
-		Phone: in.Phone, InboundText: in.Text}
+		Phone: in.Phone, InboundText: in.Text, Voice: in.Voice || in.Kind == "audio"}
 }
 
 var errInvalidDraft = shared.Rule("borrador_invalido", "El borrador no pasó la validación de precios. Edítalo antes de enviar.")
@@ -883,4 +897,47 @@ func (s *Service) quotePick(ctx context.Context, tallerID shared.ID, in Inbound,
 	}
 	_, err = s.taller.Send(ctx, tallerID, in.Phone, reply, nil, "AU-02", oid)
 	return true, err
+}
+
+// Transcriber pasa una nota de voz a texto en español (HU-60, ADR-0033).
+type Transcriber interface {
+	Transcribe(ctx context.Context, audio []byte, mime string) (string, error)
+}
+
+// SetTranscriber conecta la transcripción de notas de voz (composition root). Sin ella, la nota de voz queda como
+// tarjeta para que el dueño la escuche.
+func (s *Service) SetTranscriber(t Transcriber) { s.stt = t }
+
+const (
+	// voiceNoteCard es la tarjeta cuando no hay transcripción (sin proveedor o si falló).
+	voiceNoteCard = "Recibimos una nota de voz y no la pudimos transcribir. Escúchala en la conversación y responde tú."
+	// transcribeTimeout acota la descarga y la transcripción, fuera de la transacción.
+	transcribeTimeout = 60 * time.Second
+	// maxTranscript: una nota de voz larga se recorta para la IA (el texto completo queda en la conversación).
+	maxTranscript = 2000
+)
+
+// transcribe descarga la nota de voz y la transcribe (HU-60). Devuelve "" si no hay transcriptor, si el canal no
+// tiene el audio o si la transcripción falla: entonces queda la tarjeta para el dueño. Solo un error de la base corta.
+func (s *Service) transcribe(ctx context.Context, tallerID shared.ID, in Inbound) (string, error) {
+	if s.stt == nil {
+		return "", nil
+	}
+	tctx, cancel := context.WithTimeout(ctx, transcribeTimeout)
+	defer cancel()
+	audio, mime, err := s.taller.VoiceNote(tctx, tallerID, in.ID)
+	if err != nil || len(audio) == 0 {
+		return "", nil
+	}
+	text, err := s.stt.Transcribe(tctx, audio, mime)
+	if text = strings.TrimSpace(text); err != nil || text == "" {
+		return "", nil
+	}
+	if err := s.taller.SetTranscript(ctx, tallerID, in.ID, text); err != nil {
+		return "", err
+	}
+	if r := []rune(text); len(r) > maxTranscript {
+		text = string(r[:maxTranscript])
+	}
+	return text, nil
 }

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -151,4 +152,34 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 		return errors.New("waha: respuesta que no es JSON")
 	}
 	return nil
+}
+
+// FetchMedia descarga el archivo de un mensaje (HU-60). WAHA manda la URL con su nombre público; se usa solo la ruta
+// contra WAHA_URL, con la clave: así nunca se llama a otro servidor con ella.
+func (c *Client) FetchMedia(ctx context.Context, _, ref string) (app.Media, error) {
+	u, err := url.Parse(ref)
+	if err != nil || u.Path == "" || !strings.HasPrefix(u.Path, "/api/files/") {
+		return app.Media{}, app.ErrNoMedia
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+u.EscapedPath(), nil)
+	if err != nil {
+		return app.Media{}, err
+	}
+	req.Header.Set("X-Api-Key", c.key)
+	res, err := c.http.Do(req)
+	if err != nil {
+		return app.Media{}, netError{err}
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode >= 300 {
+		return app.Media{}, &APIError{Status: res.StatusCode}
+	}
+	data, err := io.ReadAll(io.LimitReader(res.Body, app.MaxMediaBytes+1))
+	if err != nil {
+		return app.Media{}, netError{err}
+	}
+	if len(data) > app.MaxMediaBytes {
+		return app.Media{}, app.ErrNoMedia
+	}
+	return app.Media{Data: data, Mime: strings.TrimSpace(strings.Split(res.Header.Get("Content-Type"), ";")[0])}, nil
 }

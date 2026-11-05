@@ -9,6 +9,7 @@ import (
 	"sweveh/internal/assistant/adapters/out/llm/openrouter"
 	"sweveh/internal/assistant/adapters/out/llm/rules"
 	assistantpg "sweveh/internal/assistant/adapters/out/postgres"
+	"sweveh/internal/assistant/adapters/out/stt/groq"
 	assistantapp "sweveh/internal/assistant/app"
 	automationspg "sweveh/internal/automations/adapters/out/postgres"
 	automationsapp "sweveh/internal/automations/app"
@@ -94,6 +95,9 @@ func BuildWith(m *server.Modules, ch messagingapp.Channel, it assistantapp.Inter
 		cap = 5_000_000
 	}
 	s.Assistant = assistantapp.NewService(m.Tx, assistantpg.Repository{}, &taller{s: s}, m.Audit, m.Clock, it, rules.Interpreter{}, cap)
+	if ai.STTProvider == "groq" { // HU-60: notas de voz (ADR-0033)
+		s.Assistant.SetTranscriber(groq.New(ai.STTAPIBase, ai.STTAPIKey, ai.STTModel, 45*time.Second))
+	}
 	m.Customers.SetMover(customerMover{s})   // unir clientes repetidos (HU-15)
 	m.Customers.SetEraser(customerEraser{s}) // borrar los datos del titular (HU-87)
 	return s

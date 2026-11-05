@@ -45,6 +45,9 @@ func (f *fakeWAHA) handler(t *testing.T) http.HandlerFunc {
 			_, _ = fmt.Fprintf(w, `{"id":"true_%s_OUT%d"}`, b["chatId"], f.n)
 		case "/api/sessions/default":
 			_, _ = fmt.Fprintf(w, `{"name":"default","status":%q}`, f.status)
+		case "/api/files/default/nota.oga": // nota de voz que WAHA guardó (HU-60)
+			w.Header().Set("Content-Type", "audio/ogg")
+			_, _ = io.WriteString(w, "OggS-nota-de-voz")
 		case "/api/default/auth/qr":
 			_, _ = io.WriteString(w, `{"mimetype":"image/png","data":"`+base64.StdEncoding.EncodeToString([]byte("png"))+`"}`)
 		default:

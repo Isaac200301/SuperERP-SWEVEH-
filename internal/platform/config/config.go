@@ -86,6 +86,8 @@ type AI struct {
 	MonthlyCapMicroUSD int64
 	// VisionModel lee la foto de la lista de precios (HU-93, ADR-0032): uno o varios modelos con imagen, por coma.
 	VisionModel string
+	// Transcripción de notas de voz (HU-60, ADR-0033): STT_PROVIDER vacío = sin transcripción; groq = Whisper en Groq.
+	STTProvider, STTAPIKey, STTModel, STTAPIBase string
 }
 
 // Worker es la configuración del proceso worker.
@@ -129,7 +131,17 @@ func engine(env Env, errs *[]error) (WhatsApp, AI) {
 func aiConfig(env Env, errs *[]error) AI {
 	ai := AI{Provider: get("AI_PROVIDER", "reglas"), APIKey: os.Getenv("AI_API_KEY"), Model: os.Getenv("AI_MODEL"),
 		APIBase: get("AI_API_BASE", "https://openrouter.ai/api/v1"), MonthlyCapMicroUSD: int64(getInt("AI_MONTHLY_CAP_MICRO_USD", 5_000_000, errs)),
-		VisionModel: get("AI_VISION_MODEL", "google/gemma-4-31b-it:free,nvidia/nemotron-3.5-super-vl:free")}
+		VisionModel: get("AI_VISION_MODEL", "google/gemma-4-31b-it:free,nvidia/nemotron-3.5-super-vl:free"),
+		STTProvider: os.Getenv("STT_PROVIDER"), STTAPIKey: os.Getenv("STT_API_KEY"), STTModel: get("STT_MODEL", "whisper-large-v3-turbo"),
+		STTAPIBase: get("STT_API_BASE", "https://api.groq.com/openai/v1")}
+	switch {
+	case ai.STTProvider != "" && ai.STTProvider != "groq":
+		*errs = append(*errs, fmt.Errorf("STT_PROVIDER=%q no es un proveedor conocido (groq)", ai.STTProvider))
+	case ai.STTProvider == "groq" && ai.STTAPIKey == "":
+		*errs = append(*errs, errors.New("STT_PROVIDER=groq necesita STT_API_KEY"))
+	case ai.STTProvider == "groq" && env == EnvProduction:
+		*errs = append(*errs, errors.New("STT_PROVIDER=groq es solo para la demo: falta cerrar AQ-09 (voz de clientes a un tercero) antes de producción"))
+	}
 	switch {
 	case ai.Provider != "reglas" && ai.Provider != "openrouter":
 		*errs = append(*errs, fmt.Errorf("AI_PROVIDER=%q no es un proveedor conocido (reglas, openrouter)", ai.Provider))

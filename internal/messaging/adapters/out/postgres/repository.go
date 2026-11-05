@@ -291,3 +291,9 @@ func (Repository) WebhooksMentioning(ctx context.Context, digits string, since t
 	}
 	return out, err
 }
+
+func (Repository) SetTranscript(ctx context.Context, tallerID, id shared.ID, text string) error {
+	_, err := db.Exec(ctx, `UPDATE messaging.mensaje SET cuerpo = $3, payload = payload || '{"transcripcion": true}'::jsonb
+		WHERE taller_id = $1 AND id = $2`, tallerID, id, text)
+	return err
+}

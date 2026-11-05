@@ -50,6 +50,7 @@ func (h *handler) routes(r chi.Router) {
 	r.With(h.g.Require("conversation:read")).Get("/conversations/{id}", j(h.conversation))
 	r.With(h.g.Require("inbox:manage")).Post("/conversations/{id}/messages", j(h.reply))
 	r.With(h.g.Require("inbox:manage")).Patch("/conversations/{id}", j(h.mode))
+	r.With(h.g.Require("conversation:read")).Get("/conversations/{id}/messages/{mid}/audio", h.voiceNote) // HU-60
 	r.With(h.g.Require("order:read")).Get("/orders/{id}/messages", j(h.orderMessages))
 	r.With(h.g.Require("workshop:manage")).Get("/whatsapp/channel", j(h.channel))
 	r.With(h.g.Require("workshop:manage")).Put("/whatsapp/channel", j(h.setChannel))
@@ -386,7 +387,8 @@ func (h *handler) runs(r *http.Request, p reqctx.Principal) (int, any, error) {
 func draftOut(d assistantapp.DraftRecord) map[string]any {
 	return map[string]any{"id": d.ID.String(), "conversacionId": d.ConversationID.String(), "celular": shared.NationalNumber(d.Phone),
 		"mensajeCliente": d.InboundText, "intencion": d.Intent, "propuesto": d.Proposed, "final": d.Final, "fuentes": d.Sources,
-		"accion": d.Action, "estado": d.State, "origen": d.Origin, "creadoEn": d.CreatedAt, "resueltoEn": d.ResolvedAt}
+		"accion": d.Action, "estado": d.State, "origen": d.Origin, "creadoEn": d.CreatedAt, "resueltoEn": d.ResolvedAt,
+		"mensajeId": d.InboundID.String(), "notaDeVoz": d.Voice}
 }
 
 func (h *handler) inbox(r *http.Request, p reqctx.Principal) (int, any, error) {

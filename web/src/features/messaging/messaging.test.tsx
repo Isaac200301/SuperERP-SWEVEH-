@@ -86,3 +86,15 @@ describe('SimulatorPage', () => {
     expect(screen.getByRole('button', { name: 'Enviar' })).toBeDisabled();
   });
 });
+
+describe('Thread (HU-60)', () => {
+  it('muestra la nota de voz con su reproductor y la transcripción', () => {
+    renderPage(
+      <Thread conversacionId="c1" mensajes={[{ id: 'm1', direccion: 'entrante', tipo: 'audio', cuerpo: 'Hola, ¿tienen cupo mañana?', estado: 'recibido',
+        origen: 'cliente', creadoEn: '2026-11-05T15:00:00Z' } as Mensaje]} />,
+    );
+    expect(screen.getByText('Hola, ¿tienen cupo mañana?')).toBeInTheDocument();
+    expect(screen.getByText('Nota de voz · transcripción')).toBeInTheDocument();
+    expect(screen.getByLabelText('Escuchar la nota de voz')).toHaveAttribute('src', '/api/v1/conversations/c1/messages/m1/audio');
+  });
+});

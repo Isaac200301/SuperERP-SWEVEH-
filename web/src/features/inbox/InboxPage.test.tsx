@@ -69,4 +69,18 @@ describe('InboxPage (HU-62, HU-63, HU-64)', () => {
     expect(await screen.findByRole('switch', { name: 'El asistente responde solo' })).toBeDisabled();
     expect(screen.getByText(/Solo el dueño lo cambia/)).toBeInTheDocument();
   });
+
+  it('HU-60: la nota de voz se escucha en la tarjeta junto a su transcripción', async () => {
+    const voz = { ...borrador, id: 'b9', mensajeId: 'm9', notaDeVoz: true, mensajeCliente: 'Necesito cambiar las pastillas de la moto' };
+    mockApi({
+      'GET /me': owner,
+      'GET /inbox': { borradores: [voz] },
+      'GET /inbox/stats': { enviados: 0, editados: 0, porcentajeEditados: 0 },
+      'GET /assistant/settings': { autoEnvio: false },
+    });
+    renderPage(<InboxPage />);
+    expect(await screen.findByText('Necesito cambiar las pastillas de la moto')).toBeInTheDocument();
+    expect(screen.getByText(/mandó una nota de voz/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Escuchar la nota de voz')).toHaveAttribute('src', '/api/v1/conversations/c1/messages/m9/audio');
+  });
 });

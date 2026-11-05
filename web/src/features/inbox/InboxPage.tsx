@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { api, unwrap, type Schemas } from '../../shared/api/client';
 import { usePermission } from '../auth/api';
 import { PriceListReview } from '../catalog/PriceList';
+import { audioURL } from '../messaging/Thread';
 import { formatoCelular, formatoFechaHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
@@ -44,9 +45,19 @@ function DraftCard({ d }: { d: Borrador }) {
           {d.intencion} · {formatoFechaHora(d.creadoEn)}
         </span>
       </div>
-      <p className="rounded-2xl bg-surface p-3">
-        <b>El cliente escribió:</b> {d.mensajeCliente}
-      </p>
+      <div className="flex flex-col gap-2 rounded-2xl bg-surface p-3">
+        {d.notaDeVoz && d.mensajeId ? (
+          <>
+            <b>El cliente mandó una nota de voz{d.mensajeCliente ? '. Dice:' : '.'}</b>
+            <audio controls preload="none" src={audioURL(d.conversacionId, d.mensajeId)} aria-label="Escuchar la nota de voz" />
+            {d.mensajeCliente ? <p>{d.mensajeCliente}</p> : null}
+          </>
+        ) : (
+          <p>
+            <b>El cliente escribió:</b> {d.mensajeCliente}
+          </p>
+        )}
+      </div>
       <label htmlFor={`b-${d.id}`} className="text-[15px] font-extrabold">
         Respuesta propuesta (puedes editarla)
       </label>

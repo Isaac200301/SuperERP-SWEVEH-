@@ -46,6 +46,7 @@ type event struct {
 		HasMedia  bool    `json:"hasMedia"`
 		Media     *struct {
 			Mimetype string `json:"mimetype"`
+			URL      string `json:"url"`
 		} `json:"media"`
 		Ack  int `json:"ack"`
 		Data struct {
@@ -89,7 +90,7 @@ func (Parser) Parse(body []byte) ([]app.Inbound, []app.Status, error) {
 		if p.HasMedia {
 			in.Kind = "imagen"
 			if p.Media != nil && strings.HasPrefix(p.Media.Mimetype, "audio/") {
-				in.Kind = "audio"
+				in.Kind, in.Media, in.Mime = "audio", p.Media.URL, p.Media.Mimetype
 			}
 		}
 		return []app.Inbound{in}, nil, nil

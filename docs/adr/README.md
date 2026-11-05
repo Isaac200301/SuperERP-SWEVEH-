@@ -35,5 +35,6 @@ Los **ADR-01 a ADR-21** nacen en `docs/06-arquitectura.md`, sección 14.1 (1-nov
 | [ADR-0030](0030-administrador-del-erp.md) | Administrador del ERP por `PLATFORM_ADMINS`, medidor de mensajes y costo de IA por taller (HU-74) con una excepción de RLS que solo lista talleres | Equipo / Propuesta | Propuesto |
 | [ADR-0031](0031-taller-ficticio-de-la-demo.md) | Taller ficticio de la demo: carga por la API real con reloj controlado; reiniciar archiva (la bitácora es inmutable) y vuelve a cargar; `make seed-demo` / `make reset-demo` | Equipo / Propuesta | Propuesto |
 | [ADR-0032](0032-lista-de-precios-por-foto.md) | Lista de precios por foto (HU-93): la IA de visión lee la foto, cada fila es una propuesta que el dueño corrige y aprueba; solo entonces es servicio | Equipo / Propuesta | Propuesto |
+| [ADR-0033](0033-notas-de-voz-con-groq.md) | Notas de voz (HU-60): se descargan del canal, se transcriben con Groq (Whisper, solo demo) y siguen el flujo del texto; el audio se escucha en el panel | Pablo / Propuesta | Propuesto |
 
 Cuando una propuesta se acepta o se cambia: actualizar la columna Estado, crear el ADR en este directorio si el cambio es nuevo y reflejarlo en `docs/06-arquitectura.md`.

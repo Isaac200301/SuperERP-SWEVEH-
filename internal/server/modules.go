@@ -41,11 +41,12 @@ import (
 
 // Modules son los servicios de negocio ya cableados. Los comparten el api y el worker.
 type Modules struct {
-	Tx     *db.TxManager
-	Audit  audit.Log
-	Events outbox.Publisher
-	Clock  clock.Clock
-	Log    *slog.Logger
+	Storage storage.Store // archivos (notas de voz que se escuchan en el panel, HU-60)
+	Tx      *db.TxManager
+	Audit   audit.Log
+	Events  outbox.Publisher
+	Clock   clock.Clock
+	Log     *slog.Logger
 
 	Workshops tenancy.Workshops
 	Admin     *tenancy.Admin
@@ -70,7 +71,7 @@ type Modules struct {
 
 // Build arma los módulos sobre una conexión (rol sweveh_api o sweveh_worker).
 func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger) *Modules {
-	m := &Modules{Tx: tx, Audit: audit.NewLog(), Events: outbox.NewPublisher(), Clock: clk, Log: log}
+	m := &Modules{Storage: st, Tx: tx, Audit: audit.NewLog(), Events: outbox.NewPublisher(), Clock: clk, Log: log}
 	m.Workshops = tenancy.NewWorkshops(tenancypg.NewRepository(), m.Audit)
 	m.Catalog = catalogapp.NewService(tx, catalogpg.Repository{}, m.Audit, clk)
 	m.Catalog.SetPriceList(catalogphotos.New(st), catalogpg.Proposals{}) // HU-93; el lector lo pone wire si hay IA
