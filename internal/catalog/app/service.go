@@ -81,6 +81,28 @@ func (s *Service) Create(ctx context.Context, actor shared.Actor, in domain.Serv
 	return in, err
 }
 
+// FillPrice pone el precio que se escribió al cotizar un servicio que no tenía precio de lista (HU-06): así no se
+// vuelve a pedir. Nunca cambia un precio que ya existe ni un servicio inactivo; queda en la bitácora.
+func (s *Service) FillPrice(ctx context.Context, actor shared.Actor, tallerID, id shared.ID, price int64) error {
+	return s.uow.Do(ctx, func(ctx context.Context) error {
+		cur, err := s.repo.Get(ctx, tallerID, id)
+		if err != nil || cur.Price != nil || !cur.Active {
+			return err
+		}
+		next := cur
+		next.Price = &price
+		if err := next.Validate(); err != nil {
+			return err
+		}
+		if err := s.repo.Update(ctx, next, cur.Version); err != nil {
+			return err
+		}
+		next.Version++
+		return s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "servicio.precio_desde_cotizacion",
+			Entity: "servicio", EntityID: id, Before: view(cur), After: view(next), OccurredAt: s.clock.Now()})
+	})
+}
+
 // Patch son los cambios permitidos de un servicio.
 type Patch struct {
 	Name        *string

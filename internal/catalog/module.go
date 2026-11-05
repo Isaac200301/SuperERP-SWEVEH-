@@ -36,6 +36,12 @@ func (c Catalog) Active(ctx context.Context, tallerID shared.ID) ([]Item, error)
 	return out, err
 }
 
+// FillPrice guarda en la lista el precio escrito al cotizar un servicio que no tenía (HU-06). No cambia un precio
+// que ya existe.
+func (c Catalog) FillPrice(ctx context.Context, actor shared.Actor, tallerID, id shared.ID, price int64) error {
+	return c.svc.FillPrice(ctx, actor, tallerID, id, price)
+}
+
 // Preload carga los servicios iniciales (HU-04) dentro de la transacción en curso.
 func (c Catalog) Preload(ctx context.Context, tallerID shared.ID, attends string, specialties []string) error {
 	return c.svc.Preload(ctx, tallerID, attends, specialties)

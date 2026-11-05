@@ -56,10 +56,11 @@ var Catalog = []Definition{
 const ReadyDays = 3
 
 var (
-	ErrUnknown     = shared.NotFound("automatizacion_no_encontrada", "Esa automatización no existe.")
-	ErrComingSoon  = shared.Rule("automatizacion_proximamente", "Esta automatización llega pronto; todavía no se puede encender.")
-	ErrNotEditable = shared.Rule("texto_no_editable", "El texto de esta automatización no se edita.")
-	ErrText        = shared.Validation("texto_invalido", "El texto no puede estar vacío ni pasar de 1.000 letras.").WithField("texto")
+	ErrUnknown        = shared.NotFound("automatizacion_no_encontrada", "Esa automatización no existe.")
+	ErrComingSoon     = shared.Rule("automatizacion_proximamente", "Esta automatización llega pronto; todavía no se puede encender.")
+	ErrScheduleNeeded = shared.Rule("horario_requerido", "Antes de encender el agente carga el horario del taller: con él le dice al cliente cuándo lo atienden.").WithField("horario")
+	ErrNotEditable    = shared.Rule("texto_no_editable", "El texto de esta automatización no se edita.")
+	ErrText           = shared.Validation("texto_invalido", "El texto no puede estar vacío ni pasar de 1.000 letras.").WithField("texto")
 )
 
 func Find(code string) (Definition, error) {

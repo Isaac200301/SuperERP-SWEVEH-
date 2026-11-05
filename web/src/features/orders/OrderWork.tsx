@@ -345,6 +345,8 @@ function CatalogItem({ label, detalle, precio, pidePrecio, pideCantidad, busy, o
 }) {
   const [cant, setCant] = useState('1');
   const [valor, setValor] = useState('');
+  // HU-06: si cotiza quien administra los servicios, el precio que escribe queda en la lista y no se vuelve a pedir.
+  const guardaEnLista = usePermission('service:manage');
   const n = pesos(cant) ?? 0;
   const v = pesos(valor);
   let falta: string | undefined;
@@ -356,7 +358,10 @@ function CatalogItem({ label, detalle, precio, pidePrecio, pideCantidad, busy, o
         {label} {detalle ? <span className="text-ink-2">{detalle}</span> : null}
         <span className="ml-2 font-mono">{precio == null ? 'sin precio de lista' : formatoCOP(precio)}</span>
       </span>
-      {pidePrecio ? <Field label={`Precio de ${label}`} inputMode="numeric" value={valor} onChange={(e) => setValor(e.target.value)} className="w-32" /> : null}
+      {pidePrecio ? (
+        <Field label={`Precio de ${label}`} inputMode="numeric" value={valor} onChange={(e) => setValor(e.target.value)} className="w-32"
+          hint={guardaEnLista ? 'Queda en tu lista de servicios.' : undefined} />
+      ) : null}
       {pideCantidad ? <Field label={`Cantidad de ${label}`} inputMode="numeric" value={cant} onChange={(e) => setCant(e.target.value)} className="w-20" /> : null}
       <Button variant="secondary" busy={busy} missing={falta} onClick={() => onAdd({ cantidad: n, ...(pidePrecio && v !== undefined ? { precioUnitario: v } : {}) })}>
         Agregar
