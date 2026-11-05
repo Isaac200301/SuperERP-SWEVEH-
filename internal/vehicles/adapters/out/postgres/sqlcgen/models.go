@@ -34,6 +34,7 @@ type AssistantBorrador struct {
 	CreatedAt         time.Time
 	ResueltoEn        *time.Time
 	ResueltoPor       *uuid.UUID
+	NotaDeVoz         bool
 }
 
 type AssistantLlamadaIum struct {
