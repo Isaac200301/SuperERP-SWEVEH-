@@ -23,6 +23,7 @@ import (
 
 	"sweveh/internal/messaging/app"
 	"sweveh/internal/messaging/domain"
+	"sweveh/internal/shared"
 )
 
 // Prefix marca el número del taller conectado por WAHA: "waha:<sesión>". El enrutador manda sus mensajes aquí.
@@ -54,6 +55,10 @@ type netError struct{ err error }
 func (e netError) Error() string   { return "waha: " + e.err.Error() }
 func (e netError) Unwrap() error   { return e.err }
 func (e netError) Retryable() bool { return true }
+
+// SessionFor es el nombre de la sesión de WAHA de un taller: una por taller, con su propio número vinculado.
+// El número que manda el código de entrada es otro (WAHA_SESSION, el de la plataforma).
+func SessionFor(tallerID shared.ID) string { return "t-" + tallerID.String() }
 
 // Session saca la sesión de WAHA del número del taller ("waha:default" → "default").
 func Session(pnid string) string { return strings.TrimPrefix(pnid, Prefix) }

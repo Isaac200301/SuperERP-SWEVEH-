@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"sweveh/internal/platform/config"
+	"sweveh/internal/shared"
 	"sweveh/internal/wire"
 )
 
@@ -26,6 +27,8 @@ type fakeWAHA struct {
 	sent   []map[string]any
 	status string
 	n      int
+	// sessions son las sesiones por las que preguntó el api, en orden (una por taller, ADR-0035).
+	sessions []string
 }
 
 func (f *fakeWAHA) handler(t *testing.T) http.HandlerFunc {
@@ -36,19 +39,20 @@ func (f *fakeWAHA) handler(t *testing.T) http.HandlerFunc {
 		}
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		switch r.URL.Path {
-		case "/api/sendText":
+		switch {
+		case r.URL.Path == "/api/sendText":
 			var b map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&b)
 			f.sent = append(f.sent, b)
 			f.n++
 			_, _ = fmt.Fprintf(w, `{"id":"true_%s_OUT%d"}`, b["chatId"], f.n)
-		case "/api/sessions/default":
-			_, _ = fmt.Fprintf(w, `{"name":"default","status":%q}`, f.status)
-		case "/api/files/default/nota.oga": // nota de voz que WAHA guardó (HU-60)
+		case strings.HasPrefix(r.URL.Path, "/api/sessions/"): // estado de cualquier sesión (una por taller, ADR-0035)
+			f.sessions = append(f.sessions, strings.TrimPrefix(r.URL.Path, "/api/sessions/"))
+			_, _ = fmt.Fprintf(w, `{"name":%q,"status":%q}`, strings.TrimPrefix(r.URL.Path, "/api/sessions/"), f.status)
+		case strings.HasPrefix(r.URL.Path, "/api/files/"): // nota de voz que WAHA guardó (HU-60)
 			w.Header().Set("Content-Type", "audio/ogg")
 			_, _ = io.WriteString(w, "OggS-nota-de-voz")
-		case "/api/default/auth/qr":
+		case strings.HasSuffix(r.URL.Path, "/auth/qr"):
 			_, _ = io.WriteString(w, `{"mimetype":"image/png","data":"`+base64.StdEncoding.EncodeToString([]byte("png"))+`"}`)
 		default:
 			_, _ = io.WriteString(w, `{}`)
@@ -56,12 +60,13 @@ func (f *fakeWAHA) handler(t *testing.T) http.HandlerFunc {
 	}
 }
 
-func (f *fakeWAHA) texts(chat string) []string {
+// texts son los textos enviados a ese chat por esa sesión.
+func (f *fakeWAHA) texts(session, chat string) []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var out []string
 	for _, b := range f.sent {
-		if b["chatId"] == chat && b["session"] == "default" {
+		if b["chatId"] == chat && b["session"] == session {
 			out = append(out, b["text"].(string))
 		}
 	}
@@ -79,10 +84,11 @@ func TestWAHA_DemoNumber(t *testing.T) {
 		WAHA: config.WAHA{URL: waha.URL, APIKey: "clave-waha", WebhookSecret: "secreto-hook", Session: "default"}}}
 	e := newEnvWith(t, cfg)
 	owner := e.register("3105550600", "Pablo Rodríguez")
+	sess := "t-" + tallerOf(t, owner).String() // ADR-0035: cada taller vincula su propia sesión de WAHA
 
 	// Mi taller: estado de la sesión con el QR para escanear, y el taller pasa a usar el número de WAHA.
 	st := owner.must(http.StatusOK, owner.do("GET", "/api/v1/whatsapp/waha", nil)).body
-	if st["configurado"] != true || st["estado"] != "SCAN_QR_CODE" || !strings.HasPrefix(st["qr"].(string), "data:image/png;base64,") {
+	if st["configurado"] != true || st["estado"] != "SCAN_QR_CODE" || st["sesion"] != sess || !strings.HasPrefix(st["qr"].(string), "data:image/png;base64,") {
 		t.Fatalf("estado: %v", st)
 	}
 	owner.must(http.StatusOK, owner.do("POST", "/api/v1/whatsapp/waha/start", nil))
@@ -102,9 +108,9 @@ func TestWAHA_DemoNumber(t *testing.T) {
 		t.Helper()
 		e.clk.Advance(time.Minute) // WhatsApp manda la hora en segundos: un minuto entre mensajes, como en el simulador
 		n++
-		body := fmt.Sprintf(`{"event":"message","session":"default","engine":"GOWS","payload":{"id":"false_%s_IN%d",
+		body := fmt.Sprintf(`{"event":"message","session":%q,"engine":"GOWS","payload":{"id":"false_%s_IN%d",
 			"timestamp":%d,"from":%q,"fromMe":false,"body":%q,"hasMedia":false,"_data":{"notifyName":"Laura Gómez"}}}`,
-			chat, n, e.clk.Now().Unix(), chat, text)
+			sess, chat, n, e.clk.Now().Unix(), chat, text)
 		if s := postWAHA(t, e, []byte(body), "secreto-hook"); s != http.StatusOK {
 			t.Fatalf("webhook: %d", s)
 		}
@@ -112,12 +118,12 @@ func TestWAHA_DemoNumber(t *testing.T) {
 	}
 
 	write("Hola, ¿a cómo el cambio de aceite?")
-	got := f.texts(chat)
+	got := f.texts(sess, chat)
 	if len(got) != 1 || !strings.Contains(got[0], "aceptas el tratamiento de tus datos") || !strings.Contains(got[0], "Responde con el número:\n1. ") {
 		t.Fatalf("autorización por WAHA: %q", got)
 	}
 	write("1")
-	got = f.texts(chat)
+	got = f.texts(sess, chat)
 	if len(got) != 2 || !strings.Contains(got[1], "Ya quedó registrada tu autorización") {
 		t.Fatalf("tras responder 1: %q", got)
 	}
@@ -144,7 +150,7 @@ func TestWAHA_DemoNumber(t *testing.T) {
 	}
 
 	// Entregas: message.ack con el id que devolvió WAHA marca el mensaje como leído.
-	ack := fmt.Sprintf(`{"event":"message.ack","session":"default","payload":{"id":"true_%s_OUT2","from":%q,"fromMe":true,"ack":3}}`, chat, chat)
+	ack := fmt.Sprintf(`{"event":"message.ack","session":%q,"payload":{"id":"true_%s_OUT2","from":%q,"fromMe":true,"ack":3}}`, sess, chat, chat)
 	if s := postWAHA(t, e, []byte(ack), "secreto-hook"); s != http.StatusOK {
 		t.Fatalf("ack: %d", s)
 	}
@@ -167,7 +173,7 @@ func TestWAHA_DemoNumber(t *testing.T) {
 	owner.must(http.StatusOK, owner.do("POST", q+"/lines", map[string]any{"tipo": "servicio", "descripcion": "Cambio de aceite", "cantidad": 1, "precioUnitario": 45000}))
 	owner.must(http.StatusOK, owner.do("POST", q+"/send", nil))
 	w.pump()
-	got = f.texts(chat)
+	got = f.texts(sess, chat)
 	if !strings.Contains(got[len(got)-1], "¿La apruebas?") || !strings.Contains(got[len(got)-1], "Responde con el número:") {
 		t.Fatalf("cotización por WAHA: %q", got[len(got)-1])
 	}
@@ -194,4 +200,64 @@ func postWAHA(t *testing.T, e *env, body []byte, secret string) int {
 	}
 	_ = res.Body.Close()
 	return res.StatusCode
+}
+
+// ADR-0035: cada taller vincula su propio número de WAHA, con su sesión (una por taller). Un mensaje que entra por la
+// sesión de un taller se queda en ese taller; el de otra sesión (o el número de la plataforma, que manda los códigos
+// de entrada) no llega a ninguno.
+func TestWAHA_SessionPerWorkshop(t *testing.T) {
+	f := &fakeWAHA{status: "WORKING"}
+	srv := httptest.NewServer(f.handler(t))
+	t.Cleanup(srv.Close)
+	cfg := config.API{Env: config.EnvLocal, WhatsApp: config.WhatsApp{Provider: "local",
+		WAHA: config.WAHA{URL: srv.URL, APIKey: "clave-waha", WebhookSecret: "secreto-hook", Session: "default"}}}
+	e := newEnvWith(t, cfg)
+	a := e.register("3105550910", "Taller A")
+	b := e.register("3105550911", "Taller B")
+	sessA, sessB := "t-"+tallerOf(t, a).String(), "t-"+tallerOf(t, b).String()
+	w := e.whatsapp(t, a, wire.Channel(cfg.WhatsApp))
+
+	for name, c := range map[string]*client{sessA: a, sessB: b} {
+		if st := c.must(http.StatusOK, c.do("GET", "/api/v1/whatsapp/waha", nil)).body; st["sesion"] != name {
+			t.Fatalf("la sesión de cada taller es la suya: %v quería %s", st["sesion"], name)
+		}
+		c.must(http.StatusOK, c.do("PUT", "/api/v1/whatsapp/channel", map[string]any{"proveedor": "waha"}))
+	}
+
+	n := 0
+	inbound := func(session, from string) {
+		t.Helper()
+		e.clk.Advance(time.Minute)
+		n++
+		body := fmt.Sprintf(`{"event":"message","session":%q,"engine":"GOWS","payload":{"id":"false_%s_IN%d","timestamp":%d,"from":%q,`+
+			`"fromMe":false,"body":"Hola","hasMedia":false,"_data":{"notifyName":"Cliente"}}}`, session, from, n, e.clk.Now().Unix(), from)
+		if s := postWAHA(t, e, []byte(body), "secreto-hook"); s != http.StatusOK {
+			t.Fatalf("webhook: %d", s)
+		}
+		w.pump()
+	}
+	chats := func(c *client) int {
+		return len(c.must(http.StatusOK, c.do("GET", "/api/v1/conversations", nil)).body["conversaciones"].([]any))
+	}
+
+	inbound(sessA, "573001234910@c.us")
+	if chats(a) != 1 || chats(b) != 0 {
+		t.Fatalf("el mensaje por la sesión de A: A tiene %d y B tiene %d", chats(a), chats(b))
+	}
+	inbound(sessB, "573001234911@c.us")
+	if chats(a) != 1 || chats(b) != 1 {
+		t.Fatalf("el mensaje por la sesión de B: A tiene %d y B tiene %d", chats(a), chats(b))
+	}
+	inbound("default", "573001234912@c.us") // el número de la plataforma no es de ningún taller
+	inbound("t-"+shared.NewID().String(), "573001234913@c.us")
+	if chats(a) != 1 || chats(b) != 1 {
+		t.Fatalf("una sesión desconocida no crea conversaciones: A %d, B %d", chats(a), chats(b))
+	}
+	// Cada taller responde por su propia sesión.
+	if got := f.texts(sessA, "573001234910@c.us"); len(got) == 0 {
+		t.Fatalf("A no respondió por su sesión: %v", f.sent)
+	}
+	if got := f.texts(sessB, "573001234910@c.us"); len(got) != 0 {
+		t.Fatalf("B respondió a un cliente de A: %v", got)
+	}
 }

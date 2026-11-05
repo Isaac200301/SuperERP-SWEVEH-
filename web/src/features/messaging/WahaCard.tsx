@@ -53,7 +53,8 @@ export function WahaCard() {
     <section className={card} aria-labelledby="waha">
       <h2 id="waha" className="text-[17px] font-extrabold">WhatsApp de prueba</h2>
       <p className="text-ink-2">
-        Solo para la demo: es un WhatsApp no oficial. Usa un número de prueba, nunca el del taller, y no escribas datos de clientes reales.
+        Vincula aquí el celular de prueba de tu taller: los clientes que le escriban hablarán con tu asistente. Es un WhatsApp no
+        oficial, solo para la demo: no lo uses con clientes reales.
       </p>
       <p>
         Estado: <strong>{estados[estado] ?? estado}</strong>
