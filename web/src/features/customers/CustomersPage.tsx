@@ -1,12 +1,21 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { api, unwrap, type Schemas } from '../../shared/api/client';
+import { CsvImport } from '../../shared/import/CsvImport';
 import { Alert } from '../../shared/ui/Alert';
 import { Field } from '../../shared/ui/Field';
 import { Plate } from '../../shared/ui/Plate';
+import { usePermission } from '../auth/api';
 
 type Cliente = Schemas['Cliente'];
+
+// HU-92: encabezados como los entiende el servidor (vehicles/domain.importAliases). Obligatorias: nombre, celular, placa
+// y tipo. Sin cilindraje, turbo, energía o caja el vehículo queda con motor pendiente.
+export const plantillaClientes =
+  'Nombre;Celular;Placa;Tipo de vehículo;Marca;Línea;Modelo;Kilometraje;Cilindraje;Turbo;Energía;Caja\n' +
+  'Carlos Ruiz;3001234567;ABC123;Carro;Mazda;3;2015;85000;2000;No;Gasolina;Manual\n' +
+  'Carlos Ruiz;3001234567;GNO66F;Moto;Yamaha;NMAX;2022;;;;;\n';
 
 const autorizacion: Record<string, string> = {
   autorizada: 'Autorizó sus datos',
@@ -60,6 +69,8 @@ function Row({ c }: { c: Cliente }) {
 export function CustomersPage() {
   const [q, setQ] = useState('');
   const term = q.trim();
+  const qc = useQueryClient();
+  const puedeImportar = usePermission('import:run');
   const list = useQuery({
     queryKey: ['clientes', term],
     queryFn: async () => unwrap(await api.GET('/customers', { params: { query: term ? { q: term } : {} } })).clientes,
@@ -83,6 +94,12 @@ export function CustomersPage() {
           ))}
         </ul>
       </section>
+      {puedeImportar ? (
+        <CsvImport endpoint="/vehicles/import" title="Subir clientes y vehículos (CSV)" noun="vehículos"
+          help="Trae tus clientes desde Excel: guárdalo como CSV. Los clientes nuevos quedan con la autorización de datos pendiente."
+          template={plantillaClientes} templateName="plantilla-clientes-vehiculos.csv"
+          onImported={() => void qc.invalidateQueries({ queryKey: ['clientes'] })} />
+      ) : null}
     </>
   );
 }

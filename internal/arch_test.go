@@ -85,9 +85,9 @@ func TestDependencyRules(t *testing.T) {
 				if !isStdlib(imp) && imp != "github.com/google/uuid" {
 					t.Errorf("%s (shared) importa %s", p.ImportPath, imp)
 				}
-			// 2. domain: solo biblioteca estándar, shared y su propio domain.
+			// 2. domain: solo biblioteca estándar, shared (y sus subpaquetes, como csvx) y su propio domain.
 			case layer == "domain":
-				if !isStdlib(imp) && imp != mod+"internal/shared" && (im != m || ilayer != "domain") {
+				if !isStdlib(imp) && imp != mod+"internal/shared" && !strings.HasPrefix(imp, mod+"internal/shared/") && (im != m || ilayer != "domain") {
 					t.Errorf("%s (domain) importa %s", p.ImportPath, imp)
 				}
 			// 3. app y ports: nada de adaptadores, HTTP ni drivers de base de datos.

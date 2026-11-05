@@ -158,6 +158,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/vehicles/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Importar clientes y vehículos desde CSV (HU-92). Sin confirmar=1 es solo la vista previa; con errores no se importa nada. Los clientes nuevos quedan con autorización pendiente. Permiso import:run */
+        post: operations["importVehicles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/vehicles/by-plate/{placa}": {
         parameters: {
             query?: never;
@@ -1890,6 +1907,8 @@ export interface components {
                     avisos: string[];
                     conError: number;
                     importadas: number;
+                    /** @description Solo en la importación de clientes y vehículos (HU-92) */
+                    clientesNuevos?: number;
                     filas: {
                         fila: number;
                         referencia: string;
@@ -2327,6 +2346,32 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    importVehicles: {
+        parameters: {
+            query?: {
+                confirmar?: "0" | "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description CSV con nombre, celular, placa y tipo de vehículo (carro o moto); marca, línea, modelo, kilometraje, cilindraje y turbo son opcionales
+                     */
+                    archivo: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Importacion"];
+            400: components["responses"]["Problem"];
+            422: components["responses"]["Importacion"];
         };
     };
     getVehicleByPlate: {

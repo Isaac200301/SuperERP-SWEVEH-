@@ -1,16 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api, ApiError, unwrap, type Schemas } from '../../shared/api/client';
+import { api, unwrap, type Schemas } from '../../shared/api/client';
 
 export type Repuesto = Schemas['Repuesto'];
 export type Categoria = Schemas['Categoria'];
-export type Importacion = {
-  filas: { fila: number; referencia: string; nombre: string; estado: 'ok' | 'error'; errores: string[] }[];
-  conError: number;
-  importadas: number;
-  avisos: string[];
-};
-
 // Mismas claves que inventory/domain.Categories; coinciden con los sistemas del diagnóstico.
 export const categorias: Record<Categoria, string> = {
   motor: 'Motor', frenos: 'Frenos', suspension: 'Suspensión', direccion: 'Dirección', electrico: 'Eléctrico', transmision: 'Caja y transmisión',
@@ -90,33 +83,6 @@ export function usePartActions() {
       onSettled: done,
     }),
   };
-}
-
-/**
- * HU-37: sube el CSV. Sin confirmar es la vista previa. Con errores el servidor responde 422 con las mismas filas,
- * así que se devuelve el cuerpo en vez de lanzar el error.
- */
-export function useImport() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (v: { archivo: File; confirmar: boolean }): Promise<Importacion> => {
-      const r = await api.POST('/parts/import', {
-        params: { query: { confirmar: v.confirmar ? '1' : '0' } },
-        body: { archivo: '' },
-        bodySerializer: () => {
-          const fd = new FormData();
-          fd.append('archivo', v.archivo);
-          return fd;
-        },
-      });
-      if (r.data) return r.data as Importacion;
-      if (r.response.status === 422 && r.error && 'filas' in (r.error as object)) return r.error as unknown as Importacion;
-      throw new ApiError(r.response.status, r.error as never);
-    },
-    onSuccess: (res) => {
-      if (res.importadas > 0) void qc.invalidateQueries({ queryKey: key });
-    },
-  });
 }
 
 // Encabezados y valores como los muestra la pantalla; el servidor también acepta las claves internas (domain.columnAliases).

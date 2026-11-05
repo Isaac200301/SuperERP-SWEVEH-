@@ -82,6 +82,7 @@ func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger
 	m.CustDir = customers.NewDirectory(m.Customers)
 	m.Vehicles = vehiclesapp.NewService(tx, vehiclespg.NewRepository(), m.CustDir, m.Audit, m.Events, clk)
 	m.Vehicles.SetExtra(vehiclespg.Extra{})
+	m.Vehicles.SetCustomerRegistrar(m.CustDir) // importación de clientes y vehículos (HU-92)
 	m.VehDir = vehicles.NewDirectory(m.Vehicles)
 
 	vdir, cdir := directory.NewVehicles(m.VehDir), directory.NewCustomers(m.CustDir)

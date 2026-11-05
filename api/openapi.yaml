@@ -223,6 +223,26 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
 
+  /vehicles/import:
+    post:
+      operationId: importVehicles
+      summary: Importar clientes y vehículos desde CSV (HU-92). Sin confirmar=1 es solo la vista previa; con errores no se importa nada. Los clientes nuevos quedan con autorización pendiente. Permiso import:run
+      parameters:
+        - { name: confirmar, in: query, schema: { type: string, enum: ['0', '1'] } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [archivo]
+              properties:
+                archivo: { type: string, format: binary, description: 'CSV con nombre, celular, placa y tipo de vehículo (carro o moto); marca, línea, modelo, kilometraje, cilindraje y turbo son opcionales' }
+      responses:
+        '200': { $ref: '#/components/responses/Importacion' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Importacion' }
+
   /vehicles/by-plate/{placa}:
     get:
       operationId: getVehicleByPlate
@@ -1840,6 +1860,7 @@ components:
               avisos: { type: array, items: { type: string }, description: 'Lo que no impide importar, p. ej. columnas que no se reconocen' }
               conError: { type: integer }
               importadas: { type: integer }
+              clientesNuevos: { type: integer, description: 'Solo en la importación de clientes y vehículos (HU-92)' }
               filas:
                 type: array
                 items:

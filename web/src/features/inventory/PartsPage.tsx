@@ -1,12 +1,14 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
+import { CsvImport } from '../../shared/import/CsvImport';
 import { formatoCOP, formatoFechaHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { Field } from '../../shared/ui/Field';
 import { usePermission } from '../auth/api';
-import { categorias, fotoRepuesto, motivos, plantillaCSV, useImport, useMovements, usePartActions, useParts, type Categoria, type Filtros, type Importacion, type Repuesto } from './api';
+import { categorias, fotoRepuesto, motivos, plantillaCSV, useMovements, usePartActions, useParts, type Categoria, type Filtros, type Repuesto } from './api';
 
 const card = 'flex flex-col gap-3 rounded-card bg-white p-5';
 const select = 'min-h-[52px] rounded-btn border-[1.5px] border-line bg-white px-4 text-base';
@@ -214,78 +216,13 @@ function PartDetail({ p, onClose }: { p: Repuesto; onClose: () => void }) {
   );
 }
 
-function resumen(v: Importacion): string {
-  if (v.importadas > 0) return `Listo: se importaron ${v.importadas} repuestos.`;
-  if (v.conError) return `${v.conError} de ${v.filas.length} filas tienen errores. Corrígelas en el archivo y vuelve a subirlo.`;
-  return `Las ${v.filas.length} filas están bien.`;
-}
-
-/** HU-37: subir el CSV, revisar fila por fila y confirmar. Con una fila en error no se importa nada. */
-function ImportParts() {
-  const imp = useImport();
-  const [archivo, setArchivo] = useState<File | null>(null);
-  const [vista, setVista] = useState<Importacion | null>(null);
-  const plantilla = `data:text/csv;charset=utf-8,${encodeURIComponent(plantillaCSV)}`;
-  const revisar = (f: File) => {
-    setArchivo(f);
-    imp.mutate({ archivo: f, confirmar: false }, { onSuccess: setVista });
-  };
-  return (
-    <section className={card} aria-labelledby="importar">
-      <h2 id="importar" className="text-[17px] font-extrabold">Importar desde Excel (CSV)</h2>
-      <p className="text-sm text-ink-2">
-        Guarda tu Excel como CSV con las columnas de la{' '}
-        <a className="font-bold text-primary underline" href={plantilla} download="plantilla-repuestos.csv">
-          plantilla
-        </a>
-        . Primero ves cada fila revisada; nada se importa hasta que confirmes y todas estén bien.
-      </p>
-      <label className="flex flex-col gap-1.5 text-[15px] font-extrabold">
-        Archivo CSV
-        <input type="file" accept=".csv,text/csv" onChange={(e) => e.target.files?.[0] && revisar(e.target.files[0])} />
-      </label>
-      {imp.isError ? <Alert>{imp.error.message}</Alert> : null}
-      {vista ? (
-        <>
-          <p role="status" className={vista.conError ? 'font-bold text-warn-ink' : 'font-bold text-ok'}>
-            {resumen(vista)}
-          </p>
-          {(vista.avisos ?? []).map((a) => (
-            <p key={a} className="text-sm font-semibold text-warn-ink">
-              {a}
-            </p>
-          ))}
-          <ul className="flex max-h-72 flex-col gap-1 overflow-auto text-sm">
-            {vista.filas.map((r) => (
-              <li key={r.fila} className={`flex flex-wrap gap-3 rounded-xl px-3 py-2 ${r.estado === 'error' ? 'bg-err-tint' : ''}`}>
-                <span className="w-14 text-ink-2">Fila {r.fila}</span>
-                <span className="font-mono">{r.referencia}</span>
-                <span className="flex-1">{r.nombre}</span>
-                {r.errores.length ? <span className="font-bold text-err-ink">{r.errores.join(' · ')}</span> : <span className="text-ok">ok</span>}
-              </li>
-            ))}
-          </ul>
-          {archivo && vista.importadas === 0 ? (
-            <Button
-              busy={imp.isPending}
-              missing={vista.conError ? 'Corrige las filas con error antes de importar.' : undefined}
-              onClick={() => imp.mutate({ archivo, confirmar: true }, { onSuccess: setVista })}
-            >
-              Importar {vista.filas.length} repuestos
-            </Button>
-          ) : null}
-        </>
-      ) : null}
-    </section>
-  );
-}
-
 /** Bloque 2: inventario completo (HU-32, HU-34 a HU-37). */
 export function PartsPage() {
   const [params] = useSearchParams();
   const [filtros, setFiltros] = useState<Filtros>({ q: '', categoria: '', bajo: params.get('bajo') === '1', inactivos: false });
   const [abierto, setAbierto] = useState<string | null>(null);
   const puedeImportar = usePermission('import:run');
+  const qc = useQueryClient();
   const list = useParts(filtros);
   const repuestos = list.data ?? [];
   const sel = repuestos.find((p) => p.id === abierto) ?? null;
@@ -350,7 +287,10 @@ export function PartsPage() {
       </section>
       {sel ? <PartDetail key={`${sel.id}-${sel.version}`} p={sel} onClose={() => setAbierto(null)} /> : null}
       <NewPart />
-      {puedeImportar ? <ImportParts /> : null}
+      {puedeImportar ? (
+        <CsvImport endpoint="/parts/import" title="Importar desde Excel (CSV)" help="Guarda tu Excel como CSV." template={plantillaCSV}
+          templateName="plantilla-repuestos.csv" noun="repuestos" onImported={() => void qc.invalidateQueries({ queryKey: ['repuestos'] })} />
+      ) : null}
     </>
   );
 }

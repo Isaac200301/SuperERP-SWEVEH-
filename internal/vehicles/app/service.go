@@ -22,6 +22,7 @@ type Service struct {
 	events    ports.EventPublisher
 	clock     ports.Clock
 	extra     Extra
+	registrar CustomerRegistrar // importación de clientes y vehículos (HU-92)
 }
 
 func NewService(uow ports.UnitOfWork, repo ports.VehicleRepository, cc ports.CustomerChecker,
