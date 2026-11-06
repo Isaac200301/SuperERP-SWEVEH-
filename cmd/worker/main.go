@@ -10,13 +10,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"sweveh/internal/outbox"
 	"sweveh/internal/platform/clock"
 	"sweveh/internal/platform/config"
 	"sweveh/internal/platform/db"
 	"sweveh/internal/platform/logging"
 	"sweveh/internal/platform/storage"
-	"sweveh/internal/server"
 	"sweveh/internal/wire"
 )
 
@@ -49,14 +47,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	m := server.Build(db.NewTxManager(pool), store, clk, log)
-	s := wire.Build(m, cfg.WhatsApp, cfg.AI)
-	d := outbox.NewDispatcher(pool, clk, log, cfg.BatchSize)
-	wire.Register(d, s)
-
-	log.Info("worker despachando outbox y webhooks", "cada", cfg.PollInterval.String())
-	go wire.Loops(ctx, pool, s, log)
-	d.Run(ctx, cfg.PollInterval)
-	log.Info("worker detenido")
+	wire.StartWorker(ctx, pool, store, clk, log, wire.WorkerConfig{WhatsApp: cfg.WhatsApp, AI: cfg.AI, Poll: cfg.PollInterval,
+		Batch: cfg.BatchSize})
 	return nil
 }

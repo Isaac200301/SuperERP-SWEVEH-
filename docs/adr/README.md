@@ -38,5 +38,6 @@ Los **ADR-01 a ADR-21** nacen en `docs/06-arquitectura.md`, sección 14.1 (1-nov
 | [ADR-0033](0033-notas-de-voz-con-groq.md) | Notas de voz (HU-60): se descargan del canal, se transcriben con Groq (Whisper, solo demo) y siguen el flujo del texto; el audio se escucha en el panel | Pablo / Propuesta | Propuesto |
 | [ADR-0034](0034-codigo-de-entrada-por-whatsapp.md) | Código de entrada por el WhatsApp de prueba (WAHA), solo demo: `OTP_SENDER=waha` permite arrancar en staging | Equipo / Propuesta | Propuesto |
 | [ADR-0035](0035-sesion-de-waha-por-taller.md) | Una sesión de WAHA por taller (`t-<id>`), cada una con su número; el número de la plataforma (`WAHA_SESSION`) solo manda los códigos de entrada | Pablo / Propuesta | Propuesto |
+| [ADR-0036](0036-worker-dentro-del-api.md) | Worker dentro del api para la demo (`RUN_WORKER=true`), con su propio rol de base; en producción van separados | Pablo / Propuesta | Propuesto |
 
 Cuando una propuesta se acepta o se cambia: actualizar la columna Estado, crear el ADR en este directorio si el cambio es nuevo y reflejarlo en `docs/06-arquitectura.md`.

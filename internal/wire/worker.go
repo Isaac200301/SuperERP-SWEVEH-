@@ -9,8 +9,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"sweveh/internal/outbox"
+	"sweveh/internal/platform/clock"
+	"sweveh/internal/platform/config"
 	"sweveh/internal/platform/db"
 	"sweveh/internal/platform/reqctx"
+	"sweveh/internal/platform/storage"
+	"sweveh/internal/server"
 	"sweveh/internal/shared"
 )
 
@@ -101,4 +105,25 @@ func daily(ctx context.Context, pool *pgxpool.Pool, tx *db.TxManager, s *Service
 		return err
 	}
 	return s.Automations.Daily(ctx, ids, reqctx.WithTenant)
+}
+
+// WorkerConfig es lo que necesita el worker para arrancar, sea el proceso worker o el api con RUN_WORKER (ADR-0036).
+type WorkerConfig struct {
+	WhatsApp config.WhatsApp
+	AI       config.AI
+	Poll     time.Duration
+	Batch    int32
+}
+
+// StartWorker arma los servicios del motor sobre el pool del worker (rol sweveh_worker) y despacha el outbox, los
+// webhooks y las tareas diarias hasta que ctx se cancela. Lo usan cmd/worker y, con RUN_WORKER=true, cmd/api.
+func StartWorker(ctx context.Context, pool *pgxpool.Pool, st storage.Store, clk clock.Clock, log *slog.Logger, c WorkerConfig) {
+	m := server.Build(db.NewTxManager(pool), st, clk, log)
+	s := Build(m, c.WhatsApp, c.AI)
+	d := outbox.NewDispatcher(pool, clk, log, c.Batch)
+	Register(d, s)
+	log.Info("worker despachando outbox y webhooks", "cada", c.Poll.String())
+	go Loops(ctx, pool, s, log)
+	d.Run(ctx, c.Poll)
+	log.Info("worker detenido")
 }

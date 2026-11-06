@@ -42,6 +42,12 @@ type API struct {
 	WhatsApp         WhatsApp
 	AI               AI
 	Platform         Platform
+	// RunWorker: el api corre también el worker (outbox, webhooks y tareas diarias) en el mismo proceso, para la demo
+	// en un solo servicio gratis (ADR-0036). En producción van separados. Usa su propio rol de base (WorkerDatabaseURL).
+	RunWorker         bool
+	WorkerDatabaseURL string
+	PollInterval      time.Duration
+	BatchSize         int32
 }
 
 // Platform es lo del administrador del ERP (HU-74, ADR-0030): quiénes son y con qué números se compara el consumo.
@@ -164,22 +170,26 @@ func LoadAI() (AI, error) {
 func LoadAPI() (API, error) {
 	var errs []error
 	c := API{
-		Env:              Env(get("APP_ENV", "local")),
-		HTTPAddr:         get("HTTP_ADDR", ":8080"),
-		DatabaseURL:      os.Getenv("DATABASE_URL"),
-		JWTPrivateKeyPEM: os.Getenv("JWT_PRIVATE_KEY_PEM"),
-		JWTKeyID:         get("JWT_KID", "local-1"),
-		OTPPepper:        os.Getenv("OTP_PEPPER"),
-		OTPSender:        get("OTP_SENDER", "consola"),
-		AllowedOrigins:   splitList(get("APP_ORIGINS", "http://localhost:5173,http://localhost:8080")),
-		TrustProxy:       getBool("TRUST_PROXY", false, &errs),
-		WebDir:           os.Getenv("WEB_DIR"),
-		LogLevel:         get("LOG_LEVEL", "info"),
-		DBMaxConns:       int32(getInt("DB_MAX_CONNS", 10, &errs)),
-		DBSimpleProtocol: getBool("DB_SIMPLE_PROTOCOL", false, &errs),
-		DBMaxLifetime:    getDuration("DB_MAX_CONN_LIFETIME", 30*time.Minute, &errs),
-		LoginPerMinute:   float64(getInt("LOGIN_RATE_PER_MINUTE", 10, &errs)),
-		StorageDir:       get("STORAGE_DIR", ".data/fotos"),
+		Env:               Env(get("APP_ENV", "local")),
+		HTTPAddr:          get("HTTP_ADDR", ":8080"),
+		DatabaseURL:       os.Getenv("DATABASE_URL"),
+		JWTPrivateKeyPEM:  os.Getenv("JWT_PRIVATE_KEY_PEM"),
+		JWTKeyID:          get("JWT_KID", "local-1"),
+		OTPPepper:         os.Getenv("OTP_PEPPER"),
+		OTPSender:         get("OTP_SENDER", "consola"),
+		AllowedOrigins:    splitList(get("APP_ORIGINS", "http://localhost:5173,http://localhost:8080")),
+		TrustProxy:        getBool("TRUST_PROXY", false, &errs),
+		RunWorker:         getBool("RUN_WORKER", false, &errs),
+		WorkerDatabaseURL: os.Getenv("WORKER_DATABASE_URL"),
+		PollInterval:      getDuration("OUTBOX_POLL_INTERVAL", time.Second, &errs),
+		BatchSize:         int32(getInt("OUTBOX_BATCH_SIZE", 50, &errs)),
+		WebDir:            os.Getenv("WEB_DIR"),
+		LogLevel:          get("LOG_LEVEL", "info"),
+		DBMaxConns:        int32(getInt("DB_MAX_CONNS", 10, &errs)),
+		DBSimpleProtocol:  getBool("DB_SIMPLE_PROTOCOL", false, &errs),
+		DBMaxLifetime:     getDuration("DB_MAX_CONN_LIFETIME", 30*time.Minute, &errs),
+		LoginPerMinute:    float64(getInt("LOGIN_RATE_PER_MINUTE", 10, &errs)),
+		StorageDir:        get("STORAGE_DIR", ".data/fotos"),
 	}
 	c.WhatsApp, c.AI = engine(c.Env, &errs)
 	c.Platform = Platform{IncludedMessages: getInt("PLAN_MENSAJES_INCLUIDOS", 1000, &errs), COPPerUSD: getInt("TRM_COP_POR_USD", 4000, &errs)}
@@ -199,6 +209,9 @@ func LoadAPI() (API, error) {
 	}
 	if c.DatabaseURL == "" {
 		errs = append(errs, errors.New("DATABASE_URL es obligatoria (rol sweveh_api, sin BYPASSRLS)"))
+	}
+	if c.RunWorker && c.WorkerDatabaseURL == "" {
+		errs = append(errs, errors.New("RUN_WORKER=true necesita WORKER_DATABASE_URL (rol sweveh_worker)"))
 	}
 	if c.Env != EnvLocal {
 		if c.JWTPrivateKeyPEM == "" {

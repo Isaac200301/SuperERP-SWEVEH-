@@ -21,6 +21,8 @@ El cómputo de staging y producción corre en **Google Cloud Run**, región `sou
 
 Credenciales de despliegue por **federación OIDC** desde GitHub Actions (sin claves de larga vida), como ya proponía `docs/06` §12.6 para Cloud Run.
 
+> **Nota 2026-11-05 (ADR-0036):** para la demo en Render, el api puede correr el worker en el mismo proceso (`RUN_WORKER=true`) y así usar un solo servicio gratis. En producción siguen separados como dice este ADR.
+
 ## Alternativas descartadas
 | Alternativa | Por qué no |
 |---|---|
