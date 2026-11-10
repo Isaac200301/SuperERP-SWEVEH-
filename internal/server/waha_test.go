@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha512"
 	"encoding/base64"
@@ -29,6 +30,8 @@ type fakeWAHA struct {
 	n      int
 	// sessions son las sesiones por las que preguntó el api, en orden (una por taller, ADR-0035).
 	sessions []string
+	// lids es el número detrás de cada chat "…@lid" que WAHA conoce (sin "@lid" → "57…@c.us").
+	lids map[string]string
 }
 
 func (f *fakeWAHA) handler(t *testing.T) http.HandlerFunc {
@@ -52,6 +55,13 @@ func (f *fakeWAHA) handler(t *testing.T) http.HandlerFunc {
 		case strings.HasPrefix(r.URL.Path, "/api/files/"): // nota de voz que WAHA guardó (HU-60)
 			w.Header().Set("Content-Type", "audio/ogg")
 			_, _ = io.WriteString(w, "OggS-nota-de-voz")
+		case strings.Contains(r.URL.Path, "/lids/"): // número detrás de un chat que lo oculta
+			lid := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
+			pn, _ := json.Marshal(f.lids[lid])
+			if f.lids[lid] == "" {
+				pn = []byte("null")
+			}
+			_, _ = fmt.Fprintf(w, `{"lid":"%s@lid","pn":%s}`, lid, pn)
 		case strings.HasSuffix(r.URL.Path, "/auth/qr"):
 			_, _ = io.WriteString(w, `{"mimetype":"image/png","data":"`+base64.StdEncoding.EncodeToString([]byte("png"))+`"}`)
 		default:
@@ -259,5 +269,70 @@ func TestWAHA_SessionPerWorkshop(t *testing.T) {
 	}
 	if got := f.texts(sessB, "573001234910@c.us"); len(got) != 0 {
 		t.Fatalf("B respondió a un cliente de A: %v", got)
+	}
+}
+
+// WhatsApp oculta el número de algunos chats y WAHA los entrega como "…@lid". Antes el agente fallaba con
+// celular_invalido y el evento se reintentaba para siempre sin responder. Ahora el número se traduce con WAHA y el
+// cliente sigue el flujo normal (autorización y agente); si WAHA no lo conoce, o el número no es colombiano, la
+// conversación pasa a una persona y no queda nada reintentándose.
+func TestWAHA_LidChats(t *testing.T) {
+	f := &fakeWAHA{status: "WORKING", lids: map[string]string{"7001": "573001234701@c.us"}}
+	srv := httptest.NewServer(f.handler(t))
+	t.Cleanup(srv.Close)
+	cfg := config.API{Env: config.EnvLocal, WhatsApp: config.WhatsApp{Provider: "local",
+		WAHA: config.WAHA{URL: srv.URL, APIKey: "clave-waha", WebhookSecret: "secreto-hook", Session: "default"}}}
+	e := newEnvWith(t, cfg)
+	owner := e.register("3105550700", "Pablo Rodríguez")
+	sess := "t-" + tallerOf(t, owner).String()
+	owner.must(http.StatusOK, owner.do("PUT", "/api/v1/whatsapp/channel", map[string]any{"proveedor": "waha"}))
+	w := e.whatsapp(t, owner, wire.Channel(cfg.WhatsApp))
+
+	n := 0
+	write := func(from, text string) {
+		t.Helper()
+		e.clk.Advance(time.Minute)
+		n++
+		body := fmt.Sprintf(`{"event":"message","session":%q,"engine":"GOWS","payload":{"id":"false_%s_IN%d","timestamp":%d,"from":%q,`+
+			`"fromMe":false,"body":%q,"hasMedia":false,"_data":{"notifyName":"Laura Gómez"}}}`, sess, from, n, e.clk.Now().Unix(), from, text)
+		if s := postWAHA(t, e, []byte(body), "secreto-hook"); s != http.StatusOK {
+			t.Fatalf("webhook: %d", s)
+		}
+		w.pump()
+	}
+
+	// Con número: la autorización sale al celular real y, al aceptar, el mensaje pasa al agente.
+	write("7001@lid", "Hola, ¿a cómo el cambio de aceite?")
+	got := f.texts(sess, "573001234701@c.us")
+	if len(got) != 1 || !strings.Contains(got[0], "aceptas el tratamiento de tus datos") {
+		t.Fatalf("autorización al chat con lid: %q (todo: %v)", got, f.sent)
+	}
+	write("7001@lid", "1")
+	if c := owner.must(http.StatusOK, owner.do("GET", "/api/v1/customers/by-phone/3001234701", nil)).body; c["autorizacionEstado"] != "autorizada" {
+		t.Fatalf("cliente: %v", c)
+	}
+	if ds := w.drafts(); len(ds) != 1 || !strings.Contains(ds[0]["mensajeCliente"].(string), "cambio de aceite") {
+		t.Fatalf("el mensaje no llegó al agente: %v", ds)
+	}
+
+	// Sin número (WAHA no lo conoce) y número de otro país: a una persona, sin enviar nada.
+	for _, from := range []string{"7002@lid", "14155550123@c.us"} {
+		write(from, "Hola")
+		chat := from
+		if strings.HasSuffix(from, "@c.us") {
+			chat = "+" + strings.TrimSuffix(from, "@c.us")
+		}
+		conv, _ := w.conversation(chat)
+		if conv == nil || conv["modo"] != "humano" || conv["pideHumano"] != true {
+			t.Fatalf("%s pasa a una persona: %v", from, conv)
+		}
+		if got := f.texts(sess, from); len(got) != 0 {
+			t.Fatalf("%s no recibe nada sin autorización: %q", from, got)
+		}
+	}
+	var stuck int
+	if err := e.db.Worker.QueryRow(context.Background(),
+		"SELECT count(*) FROM outbox.evento WHERE procesado_en IS NULL AND ultimo_error IS NOT NULL").Scan(&stuck); err != nil || stuck != 0 {
+		t.Fatalf("eventos reintentándose: %d %v", stuck, err)
 	}
 }

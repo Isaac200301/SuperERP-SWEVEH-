@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"sweveh/internal/messaging/app"
@@ -33,6 +34,7 @@ const Prefix = "waha:"
 type Client struct {
 	base, key string
 	http      *http.Client
+	lids      sync.Map // "<sesión>|<lid>" → "+57…": WhatsApp no cambia el número detrás de un lid
 }
 
 // New crea el cliente. base es p. ej. "http://localhost:3000" (WAHA_URL).
@@ -40,7 +42,40 @@ func New(base, key string, timeout time.Duration) *Client {
 	return &Client{base: strings.TrimRight(base, "/"), key: key, http: &http.Client{Timeout: timeout}}
 }
 
-var _ app.Channel = (*Client)(nil)
+var (
+	_ app.Channel       = (*Client)(nil)
+	_ app.PhoneResolver = (*Client)(nil)
+)
+
+// ResolvePhone traduce un chat "…@lid" (WhatsApp oculta el número) al celular: GET /api/{sesión}/lids/{lid}
+// responde {"lid": "…@lid", "pn": "57…@c.us"} o pn null si la sesión no conoce el número
+// (https://waha.devlike.pro/docs/how-to/contacts/, consultada el 2026-11-10). Sin número, el id queda igual.
+func (c *Client) ResolvePhone(ctx context.Context, pnid, from string) (string, error) {
+	if !strings.HasSuffix(from, "@lid") {
+		return from, nil
+	}
+	key := Session(pnid) + "|" + from
+	if v, ok := c.lids.Load(key); ok {
+		return v.(string), nil
+	}
+	var out struct {
+		PN *string `json:"pn"`
+	}
+	// WAHA acepta el lid sin "@lid" (o con la @ escapada); url.PathEscape no escapa la @.
+	path := "/api/" + url.PathEscape(Session(pnid)) + "/lids/" + url.PathEscape(strings.TrimSuffix(from, "@lid"))
+	if err := c.do(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return from, err
+	}
+	if out.PN == nil {
+		return from, nil
+	}
+	n, ok := strings.CutSuffix(*out.PN, "@c.us")
+	if !ok || n == "" {
+		return from, nil
+	}
+	c.lids.Store(key, "+"+n)
+	return "+" + n, nil
+}
 
 // APIError es una respuesta no exitosa de WAHA: solo el código HTTP, sin eco del cuerpo (puede traer el número).
 type APIError struct{ Status int }

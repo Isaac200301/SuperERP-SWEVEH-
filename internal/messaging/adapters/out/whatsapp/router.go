@@ -49,6 +49,14 @@ func (r Router) SendImage(ctx context.Context, pnid, to string, img app.Image) (
 	return r.pick(pnid).SendImage(ctx, pnid, to, img)
 }
 
+// ResolvePhone traduce un chat que oculta el número con el canal que lo sabe hacer (WAHA); los demás lo dejan igual.
+func (r Router) ResolvePhone(ctx context.Context, pnid, from string) (string, error) {
+	if p, ok := r.pick(pnid).(app.PhoneResolver); ok {
+		return p.ResolvePhone(ctx, pnid, from)
+	}
+	return from, nil
+}
+
 // FetchMedia descarga el archivo con el canal del número; el simulador no tiene archivos (HU-60).
 func (r Router) FetchMedia(ctx context.Context, pnid, ref string) (app.Media, error) {
 	if f, ok := r.pick(pnid).(app.MediaFetcher); ok {

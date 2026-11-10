@@ -22,5 +22,8 @@ La documentación de WAHA, consultada el 2026-11-04, dice que **los botones no f
 - La demo funciona con un celular real sin cuenta de Meta. Pasar a Meta después es configuración y `PUT` del canal; el código del flujo es el mismo.
 - **Riesgo de bloqueo:** WhatsApp puede bloquear números que usan clientes no oficiales, y limita a quien escribe a muchos contactos nuevos ("Reachout Timelock"). Por eso se usa un **número de prueba**, nunca el del taller, y nunca con datos reales (AQ-10).
 - Sin plantillas ni ventana oficial de 24 h en WAHA. Se mantiene la regla de la ventana (HU-47) para que la demo se comporte como producción.
-- Pendiente para la prueba real: si WhatsApp entrega el remitente como `@lid` (id que oculta el número), hoy se responde al mismo chat pero el cliente queda sin celular legible. Si pasa, se resuelve el teléfono con la API de WAHA.
+- **Chats `@lid` (pasó en la prueba real, 2026-11-10).** WhatsApp entregó remitentes como `…@lid`, un id que oculta el número. El agente fallaba con `celular_invalido` antes de enviar la autorización, y el outbox reintentaba esos eventos sin fin (más de 600 intentos en los logs de Render) sin responder nada. Se corrigió así:
+  - **Traducción del id:** al guardar el mensaje, `messaging/app.storeInbound` traduce el `@lid` al celular con el puerto opcional `PhoneResolver`. WAHA lo resuelve con `GET /api/{sesión}/lids/{lid}`, con memoria por sesión (https://waha.devlike.pro/docs/how-to/contacts/, consultada el 2026-11-10).
+  - **Si no se puede traducir:** si WAHA no conoce el número (`pn: null`) o el chat no tiene un celular colombiano, el agente no procesa el mensaje. La conversación pasa a una persona (modo `humano`, `pide_humano`) y no queda nada reintentándose (Q-34).
+  - Prueba: `TestWAHA_LidChats`.
 - El id de los mensajes que devuelve `sendText` no está documentado. El adaptador acepta texto u objeto con `_serialized`, y se confirma con el número real que coincide con el de `message.ack`.

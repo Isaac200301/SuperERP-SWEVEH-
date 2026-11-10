@@ -208,6 +208,13 @@ func (s *Service) storeInbound(ctx context.Context, in Inbound) error {
 	if tallerID == shared.NilID {
 		return nil // número desconocido: se descarta (no es de ningún taller)
 	}
+	// WhatsApp oculta el número de algunos chats ("…@lid"): se traduce al celular antes de la transacción (es una
+	// llamada al proveedor). Si no se puede, el mensaje se guarda igual con el id del chat y lo atiende una persona.
+	if r, ok := s.channel.(PhoneResolver); ok {
+		if phone, err := r.ResolvePhone(ctx, in.PhoneNumberID, in.From); err == nil {
+			in.From = phone
+		}
+	}
 	return s.tx.DoWithSettings(ctx, map[string]string{"app.taller_id": tallerID.String()}, func(ctx context.Context) error {
 		conv, err := s.repo.Conversation(ctx, tallerID, in.From)
 		if err != nil {

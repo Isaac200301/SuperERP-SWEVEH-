@@ -229,6 +229,12 @@ func (s *Service) HandleInbound(ctx context.Context, tallerID, msgID shared.ID) 
 	if err != nil {
 		return err
 	}
+	// Un chat sin celular colombiano (WhatsApp ocultó el número, "…@lid", o es de otro país) no puede ser cliente
+	// (RF-04) ni dar la autorización (RF-22): no pasa por la IA y lo atiende una persona (Q-09). Antes quedaba
+	// reintentándose para siempre sin respuesta.
+	if _, err := shared.ParseColombianMobile(in.Phone); err != nil {
+		return s.taller.SetMode(ctx, tallerID, in.ConversationID, "humano", true)
+	}
 	c, err := s.taller.CustomerByPhone(ctx, tallerID, in.Phone)
 	if err != nil {
 		return err
