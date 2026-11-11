@@ -37,8 +37,12 @@ export function celularValido(raw: string): boolean {
   return /^3[0-9]{9}$/.test(soloCelular(raw));
 }
 
-/** 3001234567 → 300 123 4567 */
+/**
+ * 3001234567 → 300 123 4567. Un chat "…@lid" es uno en que WhatsApp ocultó el número y WAHA no lo pudo traducir
+ * (ADR-0027): se dice eso en vez de mostrar el id interno.
+ */
 export function formatoCelular(raw: string): string {
+  if (raw.endsWith('@lid')) return 'Número oculto por WhatsApp';
   const d = soloCelular(raw);
   if (d.length !== 10) return raw;
   return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;

@@ -2222,6 +2222,7 @@ components:
         ventanaAbiertaHasta: { type: string, format: date-time, nullable: true }
         ultimoMensaje: { type: string }
         ultimoEn: { type: string, format: date-time }
+        nombre: { type: string, description: 'Nombre que WhatsApp mandó con el último mensaje del cliente; sirve cuando el chat oculta el número ("…@lid")' }
 
     Mensaje:
       type: object

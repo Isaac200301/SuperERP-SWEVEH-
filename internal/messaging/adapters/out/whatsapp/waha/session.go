@@ -36,11 +36,22 @@ func (c *Client) StartSession(ctx context.Context, session string) error {
 	}
 	switch st.Status {
 	case "NOT_FOUND":
-		return c.do(ctx, http.MethodPost, "/api/sessions", map[string]any{"name": session, "start": true}, nil)
-	case "STOPPED", "FAILED":
+		return c.create(ctx, session)
+	case "STOPPED":
 		return c.do(ctx, http.MethodPost, "/api/sessions/"+url.PathEscape(session)+"/start", nil, nil)
+	case "FAILED":
+		// WhatsApp cerró la sesión ("device removed", 401) y sus credenciales ya no sirven: arrancarla de nuevo vuelve
+		// a FAILED sin QR. Se borra y se crea limpia para que WAHA genere un QR nuevo (DELETE /api/sessions/{session}).
+		if err := c.do(ctx, http.MethodDelete, "/api/sessions/"+url.PathEscape(session), nil, nil); err != nil {
+			return err
+		}
+		return c.create(ctx, session)
 	}
 	return nil // ya arrancando, esperando QR o funcionando
+}
+
+func (c *Client) create(ctx context.Context, session string) error {
+	return c.do(ctx, http.MethodPost, "/api/sessions", map[string]any{"name": session, "start": true}, nil)
 }
 
 // QR devuelve la imagen PNG del código para vincular el número (GET /api/{session}/auth/qr). El QR cambia cada

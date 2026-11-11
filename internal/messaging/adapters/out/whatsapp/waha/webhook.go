@@ -79,7 +79,11 @@ func (Parser) Parse(body []byte) ([]app.Inbound, []app.Status, error) {
 	}
 	switch e.Event {
 	case "message":
-		if p.FromMe {
+		if p.FromMe || strings.HasPrefix(p.ID, "true_") {
+			// Lo que envía el propio número no es del cliente. El id de WAHA empieza por "true_" cuando el mensaje es
+			// propio ("{fromMe}_{chat}_{id}"): se mira también por si el motor manda fromMe en false al reflejar en un
+			// chat "@lid" un mensaje enviado al "@c.us" (Inferencia: el 2026-11-11 el menú de autorización volvió como
+			// mensaje del cliente; falta el cuerpo del evento para confirmarlo).
 			return nil, nil, nil
 		}
 		in := app.Inbound{PhoneNumberID: pnid, From: phone(p.From), WAMID: p.ID, Kind: "texto", Text: p.Body,

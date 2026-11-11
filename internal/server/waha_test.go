@@ -330,6 +330,49 @@ func TestWAHA_LidChats(t *testing.T) {
 			t.Fatalf("%s no recibe nada sin autorización: %q", from, got)
 		}
 	}
+	// WAHA aprende después el número de 7002: la lista lo vuelve a pedir (no más de una vez cada 5 min) y la
+	// conversación queda con el celular, con el nombre que mandó WhatsApp. El siguiente mensaje cae en la misma.
+	f.mu.Lock()
+	f.lids["7002"] = "573001234702@c.us"
+	f.mu.Unlock()
+	if conv, _ := w.conversation("3001234702"); conv != nil {
+		t.Fatal("antes de 5 minutos no se vuelve a preguntar")
+	}
+	e.clk.Advance(6 * time.Minute)
+	owner.must(http.StatusOK, owner.do("POST", "/api/v1/auth/refresh", nil)) // el token de acceso dura 10 minutos
+	conv, _ := w.conversation("3001234702")
+	if conv == nil {
+		t.Fatalf("la conversación no tomó el número: %v", owner.must(http.StatusOK, owner.do("GET", "/api/v1/conversations", nil)).body)
+	}
+	chats := func() (n int, nombre any) {
+		for _, c := range owner.must(http.StatusOK, owner.do("GET", "/api/v1/conversations", nil)).body["conversaciones"].([]any) {
+			if m := c.(map[string]any); m["celular"] == "3001234702" || m["celular"] == "7002@lid" {
+				n, nombre = n+1, m["nombre"]
+			}
+		}
+		return n, nombre
+	}
+	if n, nombre := chats(); n != 1 || nombre != "Laura Gómez" {
+		t.Fatalf("conversaciones de 7002: %d, nombre de WhatsApp: %v", n, nombre)
+	}
+	write("7002@lid", "¿Sigues ahí?")
+	if n, _ := chats(); n != 1 {
+		t.Fatalf("el mensaje nuevo abrió otra conversación: %d", n)
+	}
+
+	// Si el mismo celular ya tiene su propia conversación, la del lid no se toca (celular único por taller): la
+	// lista responde igual, sin error.
+	write("7003@lid", "Hola")
+	write("573001234703@c.us", "Hola otra vez")
+	f.mu.Lock()
+	f.lids["7003"] = "573001234703@c.us"
+	f.mu.Unlock()
+	e.clk.Advance(6 * time.Minute)
+	owner.must(http.StatusOK, owner.do("POST", "/api/v1/auth/refresh", nil))
+	if conv, _ := w.conversation("3001234703"); conv == nil {
+		t.Fatal("la conversación con el número sigue en la lista")
+	}
+
 	var stuck int
 	if err := e.db.Worker.QueryRow(context.Background(),
 		"SELECT count(*) FROM outbox.evento WHERE procesado_en IS NULL AND ultimo_error IS NOT NULL").Scan(&stuck); err != nil || stuck != 0 {

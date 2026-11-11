@@ -6,6 +6,7 @@ import { Brand } from '../../shared/ui/Logo';
 import { IconLogout } from '../../shared/ui/icons';
 import { can, useLogout } from '../auth/api';
 import { usePendingCards } from '../inbox/usePendingCards';
+import { WhatsappDown } from '../messaging/WhatsappDown';
 import { sectionsFor } from './sections';
 
 /** soloYo: el taller dijo "solo yo" en el registro y no ve la gestión de usuarios (HU-83). */
@@ -64,6 +65,7 @@ export function PanelLayout({ session, soloYo = false }: { session: Sesion; solo
         </div>
       </aside>
       <main className="flex min-w-0 flex-1 flex-col gap-5">
+        <WhatsappDown enabled={can(session, 'workshop:manage')} />
         <Outlet />
       </main>
     </div>

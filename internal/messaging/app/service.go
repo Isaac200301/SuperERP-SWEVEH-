@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	"sweveh/internal/messaging/domain"
@@ -73,6 +74,8 @@ type Repository interface {
 	UpsertChannel(ctx context.Context, c ChannelInfo) error
 	Conversation(ctx context.Context, tallerID shared.ID, phone string) (Conversation, error) // crea si no existe
 	ConversationByID(ctx context.Context, tallerID, id shared.ID) (Conversation, error)
+	// SetConversationPhone cambia el "…@lid" por el celular; false si otra conversación ya tiene ese celular.
+	SetConversationPhone(ctx context.Context, tallerID, id shared.ID, phone string) (bool, error)
 	TouchInbound(ctx context.Context, tallerID, convID shared.ID, at time.Time, customerID *shared.ID) error
 	SetMode(ctx context.Context, tallerID, convID shared.ID, mode string, wantsHuman bool) error
 	InsertMessage(ctx context.Context, m Message) (bool, error) // false si el wamid ya existía
@@ -98,6 +101,7 @@ type ConversationSummary struct {
 	Conversation
 	LastBody string
 	LastAt   time.Time
+	Name     string // el nombre que WhatsApp mandó con el último mensaje del cliente; vacío si no mandó
 }
 
 type TxRunner interface {
@@ -119,7 +123,13 @@ type Service struct {
 	events  EventPublisher
 	clock   Clock
 	media   MediaSource
+	// hiddenTried: conversación "…@lid" → última vez que se le preguntó al proveedor por su celular. La lista se
+	// refresca cada 10 s: así se pregunta una vez cada hiddenRetry y no en cada carga.
+	hiddenTried sync.Map
 }
+
+// hiddenRetry es cada cuánto se vuelve a preguntar por el celular de un chat "…@lid" (WAHA lo aprende con el tiempo).
+const hiddenRetry = 5 * time.Minute
 
 func NewService(tx TxRunner, r Repository, ch Channel, p InboundParser, e EventPublisher, c Clock) *Service {
 	return &Service{tx: tx, repo: r, channel: ch, parser: p, events: e, clock: c}
@@ -465,7 +475,47 @@ func (s *Service) Conversations(ctx context.Context, tallerID shared.ID) ([]Conv
 		out, err = s.repo.Conversations(ctx, tallerID, 100)
 		return err
 	})
-	return out, err
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		out[i].Conversation = s.resolveHidden(ctx, tallerID, out[i].Conversation)
+	}
+	return out, nil
+}
+
+// resolveHidden vuelve a pedir el celular de una conversación guardada con el chat "…@lid": al llegar el mensaje
+// WAHA a veces todavía no sabe el número y lo aprende después (contactos sincronizados, envíos). Si ya lo sabe, la
+// conversación queda con el celular (así el próximo mensaje cae en ella y el agente encuentra al cliente); si otra
+// conversación ya tiene ese celular, solo se muestra. Cualquier falla deja la conversación como estaba: es visual.
+// La llamada al proveedor va fuera de la transacción.
+func (s *Service) resolveHidden(ctx context.Context, tallerID shared.ID, c Conversation) Conversation {
+	r, ok := s.channel.(PhoneResolver)
+	if !ok || !strings.HasSuffix(c.Phone, "@lid") {
+		return c
+	}
+	now := s.clock.Now()
+	if at, ok := s.hiddenTried.Load(c.ID); ok && now.Sub(at.(time.Time)) < hiddenRetry {
+		return c
+	}
+	s.hiddenTried.Store(c.ID, now)
+	ch, found, err := s.Channel(ctx, tallerID)
+	if err != nil || !found {
+		return c
+	}
+	phone, err := r.ResolvePhone(ctx, ch.PhoneNumberID, c.Phone)
+	if err != nil || strings.HasSuffix(phone, "@lid") {
+		return c
+	}
+	if err := s.tx.Do(ctx, func(ctx context.Context) error {
+		_, err := s.repo.SetConversationPhone(ctx, tallerID, c.ID, phone)
+		return err
+	}); err != nil {
+		return c
+	}
+	s.hiddenTried.Delete(c.ID)
+	c.Phone = phone
+	return c
 }
 
 func (s *Service) Messages(ctx context.Context, tallerID, convID shared.ID) (Conversation, []Message, error) {
@@ -481,7 +531,10 @@ func (s *Service) Messages(ctx context.Context, tallerID, convID shared.ID) (Con
 		out, err = s.repo.Messages(ctx, tallerID, convID, 200)
 		return err
 	})
-	return c, out, err
+	if err != nil {
+		return c, out, err
+	}
+	return s.resolveHidden(ctx, tallerID, c), out, nil
 }
 
 // ByOrder es la conversación de WhatsApp dentro de la orden (HU-24).
