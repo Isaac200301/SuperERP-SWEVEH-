@@ -163,7 +163,18 @@ Mockups en `docs/mockups/movil/` (390 × 844). Canvas: https://claude.ai/artifac
   - "Pregúntale al asistente" en Taller es HU-78 (T7).
   - "Reasignar / cancelar" en el menú de la orden: hoy no hay pantalla para cancelar (HU-26 está en el API).
   - El nombre del mecánico en las tarjetas: la orden solo trae `mecanicoId`.
-- **Prueba:** `web/e2e/movil.spec.ts` (Pixel 7) recorre Hoy → Nueva orden → orden en pestañas → Órdenes → Más y verifica que ninguna pantalla se desborde de lado (CA-11).
+- **Automatizaciones:** encabezado con encendidas, envíos de la semana y borradores por revisar; filtro Todas / Encendidas / Apagadas. El texto del aviso va plegado en "Editar texto del aviso".
+- **Piso** (mecánico y quien abra `/panel/piso`):
+  - "Lo siguiente" arriba, con la próxima orden por recibir.
+  - Cada tarjeta trae su próximo paso, de 52 px (DR-04). Recibir lleva a la recepción. La aprobación es del cliente y la entrega se hace en la orden, así que no van en la tarjeta.
+  - Sin costos (RF-21).
+- **Recibir** (`/panel/piso/recibir/:id`): la recepción de la orden a pantalla completa con "Pasar a Recibido" fijo abajo. Sin id abre la próxima por recibir. Desde la hoja "Nueva orden", "Crear y recibir ahora" lleva aquí.
+- **Prueba:** `web/e2e/movil.spec.ts` (Pixel 7) recorre:
+  - Hoy → Nueva orden → orden en pestañas → Órdenes;
+  - Por revisar → Taller (Números e Inventario) → Clientes;
+  - Automatizaciones → Piso → Recibir.
+
+  En cada pantalla verifica que no se desborde de lado (CA-11).
 
 ---
 

@@ -28,6 +28,7 @@ const TeamPage = page(() => import('../features/team/TeamPage'), 'TeamPage');
 const WorkshopPage = page(() => import('../features/workshop/WorkshopPage'), 'WorkshopPage');
 const OnboardingPage = page(() => import('../features/workshop/OnboardingPage'), 'OnboardingPage');
 const MorePage = page(() => import('../features/panel/MorePage'), 'MorePage');
+const ReceivePage = page(() => import('../features/orders/FloorMobile'), 'ReceivePage');
 
 function Lazy({ Page }: { Page: LazyExoticComponent<ComponentType> }) {
   return (
@@ -57,6 +58,9 @@ export const router = createBrowserRouter([
       { path: 'ordenes/nueva', element: <Lazy Page={NewOrderPage} /> },
       { path: 'ordenes/:id', element: <Lazy Page={OrderDetailPage} /> },
       { path: 'piso', element: <Lazy Page={FloorPage} /> },
+      // Recibir desde el piso (mockup PisoChecklist): la próxima por recibir o una orden.
+      { path: 'piso/recibir', element: <Lazy Page={ReceivePage} /> },
+      { path: 'piso/recibir/:id', element: <Lazy Page={ReceivePage} /> },
       { path: 'clientes', element: <Lazy Page={CustomersPage} /> },
       { path: 'por-revisar', element: <Lazy Page={InboxPage} /> },
       { path: 'conversaciones', element: <Lazy Page={ConversationsPage} /> },

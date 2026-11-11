@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useState } from 'react';
+import { Link } from 'react-router';
 
 import { api, unwrap, type EstadoOrden, type Orden } from '../../shared/api/client';
 import { estados, flujoFor } from '../../shared/i18n/es-CO';
@@ -115,12 +115,7 @@ function Historial({ orden }: { orden: Orden }) {
 
 /** La orden en el celular (mockup Orden): encabezado compacto, pestañas y la acción principal fija abajo. */
 export function OrderDetailMobile({ orden: o }: { orden: Orden }) {
-  const [params] = useSearchParams();
   const [tab, setTab] = useState<Pestana>('estado');
-  const recibir = params.get('recibir') === '1';
-  useEffect(() => {
-    if (recibir) document.getElementById('recepcion')?.scrollIntoView({ block: 'start' });
-  }, [recibir]);
   const cotizable = !['por_recibir', 'recibido', 'cancelada'].includes(o.estado);
   const conAcciones = o.estado !== 'entregado' && o.estado !== 'cancelada';
   return (

@@ -10,8 +10,11 @@ import { Tabs } from '../../shared/ui/Tabs';
 import { useIsMobile } from '../../shared/ui/useIsMobile';
 import { mechanic, mockApi, orden, owner, renderPage } from '../../test/api';
 import { mockMobile } from '../../test/mobile';
+import { AutomationsPage } from '../automations/AutomationsPage';
 import { CustomersPage } from '../customers/CustomersPage';
 import { InboxPage } from '../inbox/InboxPage';
+import { FloorPage } from '../orders/FloorPage';
+import { ReceivePage } from '../orders/FloorMobile';
 import { NewOrderSheet } from '../orders/NewOrderSheet';
 import { OrderDetailPage } from '../orders/OrderDetailPage';
 import { OrdersPage } from '../orders/OrdersPage';
@@ -47,9 +50,9 @@ describe('TabBar (mockups móviles)', () => {
     expect(labels()).toEqual(['Órdenes', 'Revisar', 'Más']);
   });
 
-  it('el mecánico solo ve sus órdenes y Yo, sin crear órdenes (HU-81)', () => {
+  it('el mecánico solo ve sus órdenes, Recibir y Yo, sin crear órdenes (HU-81)', () => {
     renderPage(<TabBar session={as(mechanic)} pending={0} />);
-    expect(labels()).toEqual(['Órdenes', 'Yo']);
+    expect(labels()).toEqual(['Órdenes', 'Recibir', 'Yo']);
     expect(screen.getByRole('link', { name: 'Órdenes' })).toHaveAttribute('href', '/panel/piso');
     expect(screen.queryByRole('button', { name: 'Nueva orden' })).not.toBeInTheDocument();
   });
@@ -148,7 +151,7 @@ describe('Hoja Nueva orden (HU-16)', () => {
     renderPage(
       <Routes>
         <Route path="/" element={<NewOrderSheet open onClose={() => undefined} />} />
-        <Route path="/panel/ordenes/:id" element={<p>orden abierta</p>} />
+        <Route path="/panel/piso/recibir/:id" element={<p>recepción</p>} />
       </Routes>,
     );
     await userEvent.type(screen.getByLabelText('Placa'), 'klm482');
@@ -157,7 +160,7 @@ describe('Hoja Nueva orden (HU-16)', () => {
     expect(screen.getByText('Falta lo que dice el cliente.')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('¿Qué dice el cliente?'), 'Chilla al frenar');
     await userEvent.click(screen.getByRole('button', { name: 'Crear y recibir ahora' }));
-    expect(await screen.findByText('orden abierta')).toBeInTheDocument();
+    expect(await screen.findByText('recepción')).toBeInTheDocument();
     expect(calls.find((c) => c.method === 'POST' && c.path === '/orders')?.body).toMatchObject({
       vehiculoId: 'v1',
       sintoma: 'Chilla al frenar',
@@ -255,5 +258,65 @@ describe('Clientes en el celular', () => {
     const ficha = screen.getByRole('dialog', { name: 'Laura Gómez' });
     expect(ficha).toHaveTextContent('Autorizó sus datos');
     expect(await screen.findByText('KLM482')).toBeInTheDocument();
+  });
+});
+
+describe('Piso en el celular (HU-23, HU-81)', () => {
+  it('pone arriba lo siguiente por recibir y cada orden trae su próximo paso', async () => {
+    mockMobile();
+    const calls = mockApi({
+      'GET /me': mechanic,
+      'GET /orders/mine': {
+        ordenes: [
+          orden({ id: 'o1', placa: 'KLM482', estado: 'por_recibir' }),
+          orden({ id: 'o2', placa: 'HTR315', estado: 'en_diagnostico' }),
+          orden({ id: 'o3', placa: 'GBW118', estado: 'esperando_aprobacion' }),
+        ],
+      },
+      'GET /workshop/settings': { usarControlCalidad: false, usarEsperandoRepuesto: false },
+      'POST /orders/{id}/transition': orden({ id: 'o2', estado: 'esperando_aprobacion' }),
+    });
+    renderPage(<FloorPage />);
+    expect(await screen.findByText('LO SIGUIENTE')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Recibir vehículo' })).toHaveAttribute('href', '/panel/piso/recibir/o1');
+    expect(screen.getByText('Espera la aprobación del cliente')).toBeInTheDocument();
+    expect(screen.queryByText(/\$/)).not.toBeInTheDocument(); // RF-21: sin costos
+    await userEvent.click(screen.getByRole('button', { name: 'Pasar a Esperando aprobación' }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'POST')?.path).toBe('/orders/o2/transition'));
+    expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ estado: 'esperando_aprobacion', version: 3 });
+  });
+
+  it('Recibir sin vehículos pendientes lo dice', async () => {
+    mockMobile();
+    mockApi({ 'GET /orders/mine': { ordenes: [orden({ estado: 'en_reparacion' })] } });
+    renderPage(
+      <Routes>
+        <Route path="/panel/piso/recibir" element={<ReceivePage />} />
+      </Routes>,
+      '/panel/piso/recibir',
+    );
+    expect(await screen.findByText('No tienes vehículos por recibir.')).toBeInTheDocument();
+  });
+});
+
+describe('Automatizaciones en el celular (HU-40, HU-41)', () => {
+  it('muestra las cifras de la semana y filtra encendidas y apagadas', async () => {
+    mockMobile();
+    const au = (codigo: string, nombre: string, activa: boolean, ejecucionesSemana: number) => ({
+      codigo, nombre, disparador: 'Cuando…', activa, proximamente: false, enviaMensaje: false, editable: false, texto: '', datos: [],
+      ejecucionesSemana, costo: '1 mensaje',
+    });
+    mockApi({
+      'GET /me': dueno,
+      'GET /automations': { automatizaciones: [au('AU-01', 'Vehículo recibido', true, 30), au('AU-07', 'Sin recoger', false, 7)] },
+      'GET /automations/runs': { ejecuciones: [] },
+      'GET /inbox/stats': { pendientes: 4, enviados: 0, editados: 0, porcentajeEditados: 0 },
+    });
+    renderPage(<AutomationsPage />);
+    expect(await screen.findByText('37')).toBeInTheDocument();
+    expect(await screen.findByText('4')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: /Apagadas/ }));
+    expect(screen.getByText('Sin recoger')).toBeInTheDocument();
+    expect(screen.queryByText('Vehículo recibido')).not.toBeInTheDocument();
   });
 });

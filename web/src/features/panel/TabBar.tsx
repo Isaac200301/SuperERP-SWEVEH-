@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 import { NavLink } from 'react-router';
 
 import type { Sesion } from '../../shared/api/client';
-import { IconGrid, IconHome, IconInbox, IconOrders, IconPlus, IconUser } from '../../shared/ui/icons';
+import { IconCamera, IconGrid, IconHome, IconInbox, IconOrders, IconPlus, IconUser } from '../../shared/ui/icons';
 import { can } from '../auth/api';
 
 export const nuevaOrdenEvento = 'sweveh:nueva-orden';
@@ -13,20 +13,21 @@ export function abrirNuevaOrden() {
 }
 
 type TabDef =
-  | { kind: 'link'; to: string; label: string; icon: ComponentType<{ size?: number }>; badge?: boolean }
+  | { kind: 'link'; to: string; label: string; icon: ComponentType<{ size?: number }>; badge?: boolean; end?: boolean }
   | { kind: 'new'; label: string };
 
 /**
  * Pestañas de la barra inferior según lo que el rol puede hacer (mockups móviles v1, docs/10 §4.7):
  * - dueño: Hoy · Órdenes · + Nueva · Revisar · Taller
  * - recepción (sin números): Órdenes · + Nueva · Revisar · Más
- * - mecánico (Piso): Órdenes · Yo
+ * - mecánico (Piso): Órdenes · Recibir · Yo
  * Ocultar no protege: el servidor responde 403 igual (R-05).
  */
 export function tabsFor(session: Sesion): TabDef[] {
   if (!can(session, 'order:create')) {
     return [
-      { kind: 'link', to: '/panel/piso', label: 'Órdenes', icon: IconOrders },
+      { kind: 'link', to: '/panel/piso', label: 'Órdenes', icon: IconOrders, end: true },
+      { kind: 'link', to: '/panel/piso/recibir', label: 'Recibir', icon: IconCamera },
       { kind: 'link', to: '/panel/mas', label: 'Yo', icon: IconUser },
     ];
   }
@@ -58,7 +59,7 @@ export function TabBar({ session, pending }: { session: Sesion; pending: number 
             {t.label}
           </button>
         ) : (
-          <NavLink key={t.to} to={t.to} className={({ isActive }) => `${tab} ${isActive ? 'text-ink' : 'text-ink-2'}`}>
+          <NavLink key={t.to} to={t.to} end={t.end ?? false} className={({ isActive }) => `${tab} ${isActive ? 'text-ink' : 'text-ink-2'}`}>
             {({ isActive }) => (
               <>
                 <i className={`relative grid h-[30px] w-[52px] place-items-center rounded-full not-italic ${isActive ? 'bg-nav' : ''}`}>

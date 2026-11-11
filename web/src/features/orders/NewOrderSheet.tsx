@@ -60,7 +60,7 @@ export function NewOrderSheet({ open, onClose }: { open: boolean; onClose: () =>
       {
         onSuccess: (o) => {
           close();
-          navigate(`/panel/ordenes/${o.id}${recibir ? '?recibir=1' : ''}`);
+          navigate(recibir ? `/panel/piso/recibir/${o.id}` : `/panel/ordenes/${o.id}`);
         },
       },
     );

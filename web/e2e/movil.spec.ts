@@ -94,4 +94,24 @@ test('el dueño maneja el taller desde el celular', async ({ page }) => {
   await expect(ficha.getByText(placa)).toBeVisible();
   await sinDesborde(page);
   await shot(page, 'movil-08-cliente');
+  await page.keyboard.press('Escape');
+
+  // Automatizaciones: cifras de la semana y filtro.
+  await barra.getByRole('link', { name: 'Taller' }).click();
+  await page.getByRole('link', { name: 'Automatizaciones' }).click();
+  await expect(page.getByText('envíos esta semana')).toBeVisible();
+  await sinDesborde(page);
+  await shot(page, 'movil-09-automatizaciones');
+
+  // Piso: la orden por recibir va arriba y se recibe a pantalla completa.
+  await page.getByRole('link', { name: 'Volver a Taller' }).click();
+  await page.getByRole('link', { name: 'Piso' }).click();
+  await expect(page.getByText('LO SIGUIENTE')).toBeVisible();
+  await sinDesborde(page);
+  await shot(page, 'movil-10-piso');
+  await page.getByRole('link', { name: 'Recibir vehículo' }).click();
+  await expect(page.getByRole('heading', { name: 'Recibir' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Mover la orden' })).toContainText('Pasar a Recibido');
+  await sinDesborde(page);
+  await shot(page, 'movil-11-recibir');
 });
