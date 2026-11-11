@@ -1,12 +1,13 @@
 /** Logo provisional: la W de WEVEH con el punto ámbar (docs/10 §2.3 y §8). */
-export function Logo({ size = 36 }: { size?: number }) {
+/** light: sobre fondo verde (encabezado del celular) el cuadro va blanco y la W verde. */
+export function Logo({ size = 36, light = false }: { size?: number; light?: boolean }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-      <rect width="64" height="64" rx="15" fill="var(--color-primary)" />
+      <rect width="64" height="64" rx="15" fill={light ? '#FFFFFF' : 'var(--color-primary)'} />
       <path
         d="M17.5 27 L24.75 46 L32 33 L39.25 46 L46.5 27"
         fill="none"
-        stroke="#FFFFFF"
+        stroke={light ? 'var(--color-primary)' : '#FFFFFF'}
         strokeWidth="6"
         strokeLinecap="round"
         strokeLinejoin="round"

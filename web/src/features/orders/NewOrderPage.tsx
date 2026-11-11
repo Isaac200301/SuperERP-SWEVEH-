@@ -30,7 +30,8 @@ export function NewOrderPage() {
   const [params] = useSearchParams();
   const primera = params.get('primera') === '1';
 
-  const [placa, setPlaca] = useState('');
+  // La hoja "Nueva orden" del celular manda aquí la placa de un vehículo nuevo.
+  const [placa, setPlaca] = useState(params.get('placa') ?? '');
   const [confirmarEspecial, setConfirmarEspecial] = useState(false);
   const [tipoEspecial, setTipoEspecial] = useState<'carro' | 'moto' | ''>('');
   const [celular, setCelular] = useState('');

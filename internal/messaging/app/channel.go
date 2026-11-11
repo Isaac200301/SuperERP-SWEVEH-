@@ -72,3 +72,9 @@ var ErrNoMedia = errors.New("messaging: el mensaje no tiene un archivo que se pu
 type MediaFetcher interface {
 	FetchMedia(ctx context.Context, phoneNumberID, ref string) (Media, error)
 }
+
+// PhoneResolver traduce el id de un chat que oculta el número (WhatsApp "…@lid") al celular en E.164. Es opcional:
+// solo WAHA lo necesita. Si el proveedor no conoce el número, devuelve el id tal cual (sin error).
+type PhoneResolver interface {
+	ResolvePhone(ctx context.Context, phoneNumberID, from string) (string, error)
+}

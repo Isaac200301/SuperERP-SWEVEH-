@@ -118,6 +118,40 @@ func TestSend_Errors(t *testing.T) {
 	}
 }
 
+// WhatsApp oculta el número de algunos chats ("…@lid"): WAHA lo traduce con GET /api/{sesión}/lids/{lid}.
+func TestResolvePhone(t *testing.T) {
+	ctx := context.Background()
+	c, calls := fake(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/t-1/lids/9999":
+			_, _ = io.WriteString(w, `{"lid":"9999@lid","pn":"573001234567@c.us"}`)
+		case "/api/t-1/lids/8888":
+			_, _ = io.WriteString(w, `{"lid":"8888@lid","pn":null}`)
+		default:
+			w.WriteHeader(http.StatusBadGateway)
+		}
+	})
+	if got, err := c.ResolvePhone(ctx, "waha:t-1", "9999@lid"); err != nil || got != "+573001234567" {
+		t.Fatalf("con número: %q %v", got, err)
+	}
+	if got, _ := c.ResolvePhone(ctx, "waha:t-1", "9999@lid"); got != "+573001234567" || len(*calls) != 1 {
+		t.Fatalf("la segunda vez sale de la memoria: %q, %d llamadas", got, len(*calls))
+	}
+	if (*calls)[0].method != http.MethodGet || (*calls)[0].key != "clave-waha" {
+		t.Fatalf("llamada: %+v", (*calls)[0])
+	}
+	if got, err := c.ResolvePhone(ctx, "waha:t-1", "8888@lid"); err != nil || got != "8888@lid" {
+		t.Fatalf("sin número queda el chat: %q %v", got, err)
+	}
+	if got, err := c.ResolvePhone(ctx, "waha:t-2", "9999@lid"); !app.IsRetryable(err) || got != "9999@lid" {
+		t.Fatalf("WAHA caído: %q %v", got, err)
+	}
+	n := len(*calls)
+	if got, err := c.ResolvePhone(ctx, "waha:t-1", "+573001234567"); err != nil || got != "+573001234567" || len(*calls) != n {
+		t.Fatalf("un celular no se consulta: %q %v", got, err)
+	}
+}
+
 func TestSend_Timeout(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		select {

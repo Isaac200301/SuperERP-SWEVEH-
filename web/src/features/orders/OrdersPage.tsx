@@ -5,9 +5,16 @@ import { Alert } from '../../shared/ui/Alert';
 import { IconPlus } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
 import { StatePill } from '../../shared/ui/StatePill';
+import { useIsMobile } from '../../shared/ui/useIsMobile';
+import { OrdersMobile } from './OrdersMobile';
 import { useRecentOrders } from './api';
 
 export function OrdersPage() {
+  if (useIsMobile()) return <OrdersMobile />;
+  return <OrdersPageDesktop />;
+}
+
+function OrdersPageDesktop() {
   const q = useRecentOrders();
   return (
     <>

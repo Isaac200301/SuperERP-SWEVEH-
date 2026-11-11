@@ -5,10 +5,17 @@ import { Alert } from '../../shared/ui/Alert';
 import { IconClock } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
 import { StatePill } from '../../shared/ui/StatePill';
+import { useIsMobile } from '../../shared/ui/useIsMobile';
+import { FloorMobile } from './FloorMobile';
 import { useMyOrders } from './work';
 
 /** HU-23: la lista del piso, pensada para el celular del mecánico (tarjetas grandes, un toque). */
 export function FloorPage() {
+  if (useIsMobile()) return <FloorMobile />;
+  return <FloorDesktop />;
+}
+
+function FloorDesktop() {
   const q = useMyOrders();
   return (
     <>
