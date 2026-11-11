@@ -12,20 +12,33 @@ const conv = (over: object) => ({ id: 'c1', celular: '3001234567', modo: 'agente
 const enUnaHora = new Date(Date.now() + 3_600_000).toISOString();
 
 describe('ConversationsPage (HU-59)', () => {
-  it('pone primero a quien pidió una persona', async () => {
+  it('pone primero a quien escribió de último y marca a quien pidió una persona', async () => {
     mockApi({
       'GET /conversations': {
         conversaciones: [
-          conv({ id: 'c1', celular: '3001111111', ultimoMensaje: 'gracias', ultimoEn: '2026-11-04T16:00:00Z' }),
           conv({ id: 'c2', celular: '3002222222', modo: 'humano', pideHumano: true, ultimoMensaje: 'quiero hablar con alguien', ultimoEn: '2026-11-04T15:00:00Z' }),
+          conv({ id: 'c1', celular: '3001111111', ultimoMensaje: 'gracias', ultimoEn: '2026-11-04T16:00:00Z', nombre: 'Laura Gómez' }),
+          conv({ id: 'c3', celular: '3003333333', ultimoMensaje: 'hola', ultimoEn: '2026-11-04T14:00:00Z' }),
         ],
       },
     });
     renderPage(<ConversationsPage />);
     const links = await screen.findAllByRole('link');
-    expect(links[0]).toHaveAttribute('href', '/panel/conversaciones/c2');
-    expect(links[0]).toHaveTextContent('Pidió una persona');
-    expect(links[1]).toHaveTextContent('gracias');
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/panel/conversaciones/c1', '/panel/conversaciones/c2', '/panel/conversaciones/c3']);
+    expect(links[0]).toHaveTextContent('300 111 1111');
+    expect(links[0]).toHaveTextContent('Laura Gómez');
+    expect(links[1]).toHaveTextContent('Pidió una persona');
+  });
+
+  it('si WhatsApp ocultó el número, muestra el nombre y no el id interno', async () => {
+    mockApi({
+      'GET /conversations': { conversaciones: [conv({ id: 'c4', celular: '123456789012345@lid', nombre: 'Belén', ultimoEn: '2026-11-04T16:00:00Z' })] },
+    });
+    renderPage(<ConversationsPage />);
+    const [link] = await screen.findAllByRole('link');
+    expect(link).toHaveTextContent('Belén');
+    expect(link).toHaveTextContent('Número oculto por WhatsApp');
+    expect(link).not.toHaveTextContent('@lid');
   });
 });
 

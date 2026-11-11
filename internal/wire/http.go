@@ -105,6 +105,7 @@ type convDTO struct {
 	VentanaHasta *time.Time `json:"ventanaAbiertaHasta"`
 	Ultimo       string     `json:"ultimoMensaje,omitempty"`
 	UltimoEn     *time.Time `json:"ultimoEn,omitempty"`
+	Nombre       string     `json:"nombre,omitempty"`
 }
 
 func convOut(c messagingapp.Conversation) convDTO {
@@ -128,7 +129,7 @@ func (h *handler) conversations(r *http.Request, p reqctx.Principal) (int, any, 
 	for _, c := range list {
 		d := convOut(c.Conversation)
 		at := c.LastAt
-		d.Ultimo, d.UltimoEn = c.LastBody, &at
+		d.Ultimo, d.UltimoEn, d.Nombre = c.LastBody, &at, c.Name
 		out = append(out, d)
 	}
 	return http.StatusOK, map[string]any{"conversaciones": out}, err

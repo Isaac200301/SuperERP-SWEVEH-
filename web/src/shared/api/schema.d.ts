@@ -1580,6 +1580,8 @@ export interface components {
             ultimoMensaje?: string;
             /** Format: date-time */
             ultimoEn?: string;
+            /** @description Nombre que WhatsApp mandó con el último mensaje del cliente; sirve cuando el chat oculta el número ("…@lid") */
+            nombre?: string;
         };
         Mensaje: {
             /** Format: uuid */

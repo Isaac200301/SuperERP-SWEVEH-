@@ -61,6 +61,18 @@ export function WahaCard() {
         {estado === 'WORKING' && s.data.numero ? ` · ${numero(s.data.numero)}` : null}
       </p>
 
+      {estado === 'FAILED' ? (
+        <Alert kind="warn" title="WhatsApp cerró la sesión">
+          Los mensajes no están saliendo. Pulsa «Conectar número de prueba» para generar un código QR nuevo y vuelve a
+          vincularlo. Antes, en el celular, quita el dispositivo viejo de Dispositivos vinculados.
+        </Alert>
+      ) : null}
+      {estado === 'SIN_CONEXION' ? (
+        <Alert kind="warn" title="WAHA no responde">
+          El servidor de WhatsApp de prueba está apagado o reiniciando. Si está en un plan gratis, puede tardar en despertar:
+          espera un minuto y recarga.
+        </Alert>
+      ) : null}
       {['NOT_FOUND', 'STOPPED', 'FAILED'].includes(estado) ? (
         <Button variant="secondary" busy={arrancar.isPending} onClick={() => arrancar.mutate()}>
           Conectar número de prueba

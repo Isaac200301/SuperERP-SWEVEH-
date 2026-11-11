@@ -105,6 +105,14 @@ func (Repository) Conversation(ctx context.Context, tallerID shared.ID, phone st
 	return r.conv(), err
 }
 
+// SetConversationPhone cambia el chat "…@lid" de la conversación por el celular que WAHA ya conoce. Si el taller
+// ya tiene otra conversación con ese celular no cambia nada (conversacion_celular_unica) y responde false.
+func (Repository) SetConversationPhone(ctx context.Context, tallerID, id shared.ID, phone string) (bool, error) {
+	n, err := db.Exec(ctx, `UPDATE messaging.conversacion c SET celular = $3 WHERE c.taller_id = $1 AND c.id = $2
+		AND NOT EXISTS (SELECT 1 FROM messaging.conversacion o WHERE o.taller_id = $1 AND o.celular = $3)`, tallerID, id, phone)
+	return n == 1, err
+}
+
 func (Repository) ConversationByID(ctx context.Context, tallerID, id shared.ID) (app.Conversation, error) {
 	r, err := db.One[convRow](ctx, errConv, `SELECT `+convCols+` FROM messaging.conversacion WHERE taller_id = $1 AND id = $2`, tallerID, id)
 	return r.conv(), err
@@ -201,9 +209,14 @@ func (Repository) Conversations(ctx context.Context, tallerID shared.ID, limit i
 		convRow
 		Ultimo  *string   `db:"ultimo_cuerpo"`
 		UltimoA time.Time `db:"ultimo_en"`
+		Nombre  *string   `db:"nombre"`
 	}
+	// nombre: el que WhatsApp mandó con el último mensaje del cliente (WAHA "notifyName"/"pushName"); sirve cuando
+	// el chat oculta el número.
 	rows, err := db.Many[row](ctx, `SELECT c.id, c.taller_id, c.cliente_id, c.celular, c.ultimo_entrante_en, c.modo, c.pide_humano,
-		m.cuerpo AS ultimo_cuerpo, m.created_at AS ultimo_en
+		m.cuerpo AS ultimo_cuerpo, m.created_at AS ultimo_en,
+		(SELECT NULLIF(e.payload->>'nombre', '') FROM messaging.mensaje e WHERE e.taller_id = c.taller_id AND e.conversacion_id = c.id
+			AND e.direccion = 'entrante' AND NULLIF(e.payload->>'nombre', '') IS NOT NULL ORDER BY e.created_at DESC LIMIT 1) AS nombre
 		FROM messaging.conversacion c
 		JOIN LATERAL (SELECT cuerpo, created_at FROM messaging.mensaje WHERE taller_id = c.taller_id AND conversacion_id = c.id
 			ORDER BY created_at DESC LIMIT 1) m ON true
@@ -213,6 +226,9 @@ func (Repository) Conversations(ctx context.Context, tallerID shared.ID, limit i
 		s := app.ConversationSummary{Conversation: r.conv(), LastAt: r.UltimoA}
 		if r.Ultimo != nil {
 			s.LastBody = *r.Ultimo
+		}
+		if r.Nombre != nil {
+			s.Name = *r.Nombre
 		}
 		out = append(out, s)
 	}

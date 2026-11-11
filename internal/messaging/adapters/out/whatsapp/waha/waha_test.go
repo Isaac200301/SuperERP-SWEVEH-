@@ -195,8 +195,19 @@ func TestSession(t *testing.T) {
 	if err := c.StartSession(ctx, "default"); err != nil || (*calls)[len(*calls)-1].path != "/api/sessions/default/start" {
 		t.Fatalf("arrancar: %v %+v", err, (*calls)[len(*calls)-1])
 	}
-	status = "WORKING"
+	// WhatsApp cerró la sesión: se borra y se crea de nuevo para que haya QR.
+	status = "FAILED"
 	n := len(*calls)
+	if err := c.StartSession(ctx, "default"); err != nil {
+		t.Fatal(err)
+	}
+	del, crear := (*calls)[n+1], (*calls)[n+2]
+	if len(*calls) != n+3 || del.method != http.MethodDelete || del.path != "/api/sessions/default" ||
+		crear.method != http.MethodPost || crear.path != "/api/sessions" || crear.body["name"] != "default" {
+		t.Fatalf("sesión cerrada: %+v", (*calls)[n:])
+	}
+	status = "WORKING"
+	n = len(*calls)
 	if err := c.StartSession(ctx, "default"); err != nil || len(*calls) != n+1 {
 		t.Fatal("si ya funciona no se vuelve a arrancar")
 	}
@@ -258,6 +269,7 @@ func TestParse(t *testing.T) {
 
 	for name, body := range map[string]string{
 		"mensaje propio": strings.Replace(msg, `"fromMe":false`, `"fromMe":true`, 1),
+		"propio por id":  strings.Replace(msg, `"id":"false_573001234567@c.us_AAAA"`, `"id":"true_99887766@lid_AAAA"`, 1),
 		"grupo":          strings.ReplaceAll(msg, "573001234567@c.us", "120363@g.us"),
 		"estado":         strings.ReplaceAll(msg, "573001234567@c.us", "status@broadcast"),
 		"otro evento":    strings.Replace(msg, `"event":"message"`, `"event":"message.reaction"`, 1),

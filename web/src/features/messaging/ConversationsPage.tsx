@@ -12,10 +12,16 @@ import { Thread } from './Thread';
 type Conversacion = Schemas['Conversacion'];
 const card = 'flex flex-col gap-3 rounded-card bg-white p-5';
 
-/** Primero las que esperan a una persona (HU-59), después las más recientes. */
+/** Primero quien escribió de último, como en WhatsApp. Las que esperan a una persona llevan su etiqueta (HU-59). */
 function orden(a: Conversacion, b: Conversacion): number {
-  if (a.pideHumano !== b.pideHumano) return a.pideHumano ? -1 : 1;
   return (b.ultimoEn ?? '').localeCompare(a.ultimoEn ?? '');
+}
+
+/** El número; si WhatsApp lo ocultó ("…@lid") y aún no se sabe, el nombre que mandó WhatsApp. */
+function quien(c: Conversacion): { titulo: string; detalle?: string | undefined } {
+  const numero = formatoCelular(c.celular);
+  if (c.celular.endsWith('@lid')) return c.nombre ? { titulo: c.nombre, detalle: numero } : { titulo: numero };
+  return { titulo: numero, detalle: c.nombre };
 }
 
 /** Conversaciones de WhatsApp del taller: de aquí el dueño atiende al cliente que pidió una persona. */
@@ -39,7 +45,10 @@ export function ConversationsPage() {
           <li key={c.id}>
             <Link to={`/panel/conversaciones/${c.id}`} className={`${card} hover:ring-2 hover:ring-primary`}>
               <span className="flex flex-wrap items-center justify-between gap-2">
-                <b className="font-mono">{formatoCelular(c.celular)}</b>
+                <span className="flex flex-col">
+                  <b className="font-mono">{quien(c).titulo}</b>
+                  {quien(c).detalle ? <span className="text-sm text-ink-2">{quien(c).detalle}</span> : null}
+                </span>
                 {c.pideHumano ? (
                   <span className="rounded-full bg-err-tint px-3 py-1 text-sm font-bold text-err-ink">Pidió una persona</span>
                 ) : c.modo === 'humano' ? (
