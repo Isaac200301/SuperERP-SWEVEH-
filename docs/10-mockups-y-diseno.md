@@ -154,6 +154,9 @@ Mockups en `docs/mockups/movil/` (390 × 844). Canvas: https://claude.ai/artifac
   - Acción principal de la orden fija abajo (DR-05), con las demás en "Más acciones".
   - La orden y la recepción ocupan toda la pantalla, sin barra.
 - **"Taller" / "Más" / "Yo"** (`/panel/mas`) lista las demás secciones del rol, con la misma lista del menú de escritorio (`features/panel/sections.ts`), y cerrar sesión.
+  - **Dueño:** encima de la lista, Números (KPI con "¿Qué significa?" y barras por estado que abren Órdenes filtrada con `?estado=`) e Inventario (existencia contra el mínimo con ícono y palabra, HU-36).
+- **Por revisar:** un borrador a la vez, en tres pasos (lo que escribió · de dónde sacó cada dato · respuesta editable), con Enviar fijo abajo. Mismo endpoint y misma lógica que en escritorio (`DraftCard`).
+- **Clientes:** tarjetas por cliente y la ficha en hoja inferior (autorización, vehículos con historial, Nueva orden, copia y borrado HU-87). No lleva los chips Carros/Motos del mockup: `GET /customers` no trae los vehículos.
 - **No se tomó del mockup** (manda la HU o la decisión del equipo):
   - "Accesorios que deja" en la recepción de moto: Pablo los quitó el 3-nov; van como nota con foto.
   - La pestaña "Asistente" del Piso es HU-77 (T7).

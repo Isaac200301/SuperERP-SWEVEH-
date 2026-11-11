@@ -9,8 +9,12 @@ import { formatoFechaHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { Field } from '../../shared/ui/Field';
+import { BottomSheet } from '../../shared/ui/BottomSheet';
+import { IconCheck, IconSearch, IconWarn } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
+import { useIsMobile } from '../../shared/ui/useIsMobile';
 import { usePermission } from '../auth/api';
+import { abrirNuevaOrden } from '../panel/TabBar';
 
 type Cliente = Schemas['Cliente'];
 
@@ -215,8 +219,117 @@ function Duplicates() {
   );
 }
 
+/** Iniciales para el avatar de la ficha. */
+function iniciales(nombre: string): string {
+  return nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('');
+}
+
+/** Clientes en el celular (mockup Clientes): tarjetas y la ficha en una hoja inferior (HU-12, HU-13, HU-85). */
+function CustomersMobile() {
+  const [q, setQ] = useState('');
+  const [sel, setSel] = useState<Cliente | null>(null);
+  const term = q.trim();
+  const qc = useQueryClient();
+  const puedeImportar = usePermission('import:run');
+  const puedeUnir = usePermission('customer:merge');
+  const puedeDatos = usePermission('data_request:manage');
+  const puedeOrden = usePermission('order:create');
+  const list = useQuery({
+    queryKey: ['clientes', term],
+    queryFn: async () => unwrap(await api.GET('/customers', { params: { query: term ? { q: term } : {} } })).clientes,
+  });
+  return (
+    <>
+      <header className="-mx-4 -mt-4 flex flex-col gap-3.5 rounded-b-[28px] bg-white px-[18px] pt-5 pb-4">
+        <div>
+          <h1 className="text-[24px] font-extrabold tracking-[-.02em]">Clientes y vehículos</h1>
+          <p className="text-[13px] text-ink-2">{list.data ? `${list.data.length} ${list.data.length === 1 ? 'cliente' : 'clientes'}` : ' '}</p>
+        </div>
+        <label className="flex min-h-[50px] items-center gap-2.5 rounded-2xl bg-surface px-3.5 text-ink-2">
+          <IconSearch size={20} />
+          <input
+            type="search"
+            aria-label="Buscar por nombre o celular"
+            placeholder="Nombre o celular"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none"
+          />
+        </label>
+      </header>
+      {list.isPending ? <p role="status" className="text-ink-2">Cargando clientes…</p> : null}
+      {list.isError ? <Alert>{list.error.message}</Alert> : null}
+      {list.data && list.data.length === 0 ? (
+        <p className="rounded-[22px] bg-white p-4 text-sm text-ink-2">
+          {term ? 'Ningún cliente coincide con la búsqueda.' : 'Todavía no hay clientes. Se crean al abrir una orden.'}
+        </p>
+      ) : null}
+      <ul className="flex flex-col gap-2">
+        {(list.data ?? []).map((c) => (
+          <li key={c.id}>
+            <button type="button" onClick={() => setSel(c)} className="flex min-h-[64px] w-full items-center gap-3 rounded-[18px] bg-white px-3.5 py-2.5 text-left">
+              <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-primary-tint text-sm font-extrabold text-primary">{iniciales(c.nombre)}</span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <b className="truncate">{c.nombre}</b>
+                <span className="font-mono text-[13px] text-ink-2">{c.celular}</span>
+              </span>
+              <span className={`text-right text-xs font-bold ${c.autorizacionEstado === 'autorizada' ? 'text-ok-ink' : 'text-warn-ink'}`}>
+                {autorizacion[c.autorizacionEstado] ?? c.autorizacionEstado}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {puedeUnir ? <Duplicates /> : null}
+      {puedeImportar ? (
+        <CsvImport endpoint="/vehicles/import" title="Subir clientes y vehículos (CSV)" noun="vehículos"
+          help="Trae tus clientes desde Excel: guárdalo como CSV. Los clientes nuevos quedan con la autorización de datos pendiente."
+          template={plantillaClientes} templateName="plantilla-clientes-vehiculos.csv"
+          onImported={() => void qc.invalidateQueries({ queryKey: ['clientes'] })} />
+      ) : null}
+      <BottomSheet open={sel !== null} onClose={() => setSel(null)} title={sel?.nombre ?? ''} eyebrow="FICHA DEL CLIENTE">
+        {sel ? (
+          <>
+            <p className="-mt-2 font-mono text-ink-2">{sel.celular}</p>
+            <span
+              className={`inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-[13px] font-bold ${
+                sel.autorizacionEstado === 'autorizada' ? 'bg-ok-tint text-ok-ink' : 'bg-warn-tint text-warn-ink'
+              }`}
+            >
+              {sel.autorizacionEstado === 'autorizada' ? <IconCheck size={14} /> : <IconWarn size={14} />}
+              {autorizacion[sel.autorizacionEstado] ?? sel.autorizacionEstado}
+            </span>
+            <Vehicles id={sel.id} />
+            {puedeOrden ? (
+              <Button
+                onClick={() => {
+                  setSel(null);
+                  abrirNuevaOrden();
+                }}
+              >
+                Nueva orden
+              </Button>
+            ) : null}
+            {puedeDatos ? <DataRequest c={sel} /> : null}
+          </>
+        ) : null}
+      </BottomSheet>
+    </>
+  );
+}
+
 /** HU-82: clientes y vehículos del taller, para el dueño y la recepción (customer:read_all). */
 export function CustomersPage() {
+  if (useIsMobile()) return <CustomersMobile />;
+  return <CustomersDesktop />;
+}
+
+function CustomersDesktop() {
   const [q, setQ] = useState('');
   const term = q.trim();
   const qc = useQueryClient();

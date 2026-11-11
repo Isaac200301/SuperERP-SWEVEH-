@@ -69,10 +69,29 @@ test('el dueño maneja el taller desde el celular', async ({ page }) => {
   await shot(page, 'movil-05-hoja-nueva-orden');
   await page.keyboard.press('Escape');
 
-  // Taller / Más: las demás secciones y cerrar sesión.
+  // Por revisar: vacío en un taller nuevo, con el interruptor del asistente.
+  await barra.getByRole('link', { name: 'Revisar' }).click();
+  await expect(page.getByRole('heading', { name: 'Por revisar' })).toBeVisible();
+  await sinDesborde(page);
+  await shot(page, 'movil-06-por-revisar');
+
+  // Taller: números e inventario del dueño, y las demás secciones.
   await barra.getByRole('link', { name: 'Taller' }).click();
+  await expect(page.getByRole('tab', { name: 'Números' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('link', { name: /^Por recibir: 1$/ })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Mi taller' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible();
   await sinDesborde(page);
-  await shot(page, 'movil-06-mas');
+  await shot(page, 'movil-07-taller');
+  await page.getByRole('tab', { name: 'Inventario' }).click();
+  await expect(page.getByRole('link', { name: 'Registrar entrada de mercancía' })).toBeVisible();
+  await sinDesborde(page);
+
+  // Clientes: la ficha en una hoja inferior.
+  await page.getByRole('link', { name: 'Clientes' }).click();
+  await page.getByRole('button', { name: /Laura Cliente/ }).click();
+  const ficha = page.getByRole('dialog', { name: 'Laura Cliente' });
+  await expect(ficha.getByText(placa)).toBeVisible();
+  await sinDesborde(page);
+  await shot(page, 'movil-08-cliente');
 });

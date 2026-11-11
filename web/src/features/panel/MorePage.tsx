@@ -8,6 +8,7 @@ import { Logo } from '../../shared/ui/Logo';
 import { useIsMobile } from '../../shared/ui/useIsMobile';
 import { can, useLogout, useSession } from '../auth/api';
 import { sectionsFor } from './sections';
+import { TallerOverview } from './TallerOverview';
 
 /** Lo que ya está en la barra inferior no se repite en la lista. */
 const enLaBarra = ['/panel/tablero', '/panel/ordenes', '/panel/por-revisar'];
@@ -37,6 +38,7 @@ export function MorePage() {
           </p>
         </div>
       </header>
+      {can(session, 'kpi:read') ? <TallerOverview /> : null}
       <nav aria-label="Más secciones" className="flex flex-col gap-2">
         {lista.map((s) => (
           <Link key={s.to} to={s.to} className="flex min-h-[56px] items-center gap-3 rounded-[18px] bg-white px-3.5 text-[15px] font-bold text-ink">

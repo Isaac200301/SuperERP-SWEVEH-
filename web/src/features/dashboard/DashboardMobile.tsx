@@ -4,8 +4,6 @@ import { Link } from 'react-router';
 
 import { api, unwrap, type Schemas } from '../../shared/api/client';
 import { Alert } from '../../shared/ui/Alert';
-import { BottomSheet } from '../../shared/ui/BottomSheet';
-import { Button } from '../../shared/ui/Button';
 import { Chips } from '../../shared/ui/Chips';
 import {
   IconBolt,
@@ -24,9 +22,9 @@ import { usePendingCards } from '../inbox/usePendingCards';
 import { useRecentOrders } from '../orders/api';
 import { OrderCard } from '../orders/OrdersMobile';
 import { SearchBox } from '../panel/SearchBox';
+import { KpiCards } from './KpiCards';
 
 type Pendiente = Schemas['Pendiente'];
-type Kpi = Schemas['Kpi'];
 
 /** A dónde lleva cada pendiente (las mismas acciones del tablero de escritorio, HU-76). */
 export function pendingAction(p: Pendiente): { to: string; label: string } | null {
@@ -43,7 +41,6 @@ const tonos = {
   info: { tile: 'bg-primary-tint text-primary', tag: 'Para ti', icon: IconInbox },
 } as const;
 const sinSonido = () => undefined;
-const kpiFondos = ['bg-kpi-peach', 'bg-kpi-lilac', 'bg-kpi-aqua'];
 
 /** "Buen día" / "Buenas tardes" / "Buenas noches" y la fecha, con la hora de Colombia (R-16). */
 function saludo(now = new Date()): { hola: string; fecha: string } {
@@ -76,7 +73,6 @@ function QuickLink({ to, label, icon: Icon, tone, badge }: { to: string; label: 
 export function DashboardMobile() {
   const session = useSession().data;
   const [seg, setSeg] = useState<'todo' | 'clientes' | 'taller'>('todo');
-  const [kpi, setKpi] = useState<Kpi | null>(null);
   const kpis = useQuery({ queryKey: ['tablero', ''], queryFn: async () => unwrap(await api.GET('/dashboard', { params: { query: {} } })), refetchInterval: 60_000 });
   const hoy = useQuery({ queryKey: ['hoy'], queryFn: async () => unwrap(await api.GET('/today')).pendientes, refetchInterval: 60_000 });
   const ordenes = useRecentOrders();
@@ -183,17 +179,7 @@ export function DashboardMobile() {
             </Link>
           </div>
           {kpis.data.ejemplo ? <p className="text-xs text-ink-2">Incluye órdenes de ejemplo.</p> : null}
-          <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-            {kpis.data.kpis.map((k, i) => (
-              <div key={k.codigo} className={`flex w-[150px] flex-none flex-col gap-1 rounded-[20px] p-3.5 ${kpiFondos[i % kpiFondos.length]}`}>
-                <span className={`font-mono font-bold break-words ${k.texto.length > 9 ? 'text-[17px]' : 'text-[22px]'}`}>{k.texto}</span>
-                <span className="text-[13px] font-bold text-[#33443F]">{k.titulo}</span>
-                <button type="button" onClick={() => setKpi(k)} className="mt-1 min-h-[32px] self-start rounded-full bg-white/75 px-2.5 text-xs font-bold text-primary">
-                  ¿Qué significa?
-                </button>
-              </div>
-            ))}
-          </div>
+          <KpiCards kpis={kpis.data.kpis} layout="scroll" />
         </section>
       ) : null}
 
@@ -213,18 +199,6 @@ export function DashboardMobile() {
         {ordenes.isSuccess && abiertas.length === 0 ? <p className="rounded-[22px] bg-white p-4 text-sm text-ink-2">No hay órdenes abiertas.</p> : null}
       </section>
 
-      <BottomSheet open={kpi !== null} onClose={() => setKpi(null)} title={kpi?.titulo ?? ''} eyebrow="¿QUÉ SIGNIFICA?">
-        {kpi ? (
-          <>
-            <div className="flex flex-col gap-0.5 rounded-[20px] bg-kpi-aqua p-3.5">
-              <span className="font-mono text-[30px] font-bold">{kpi.texto}</span>
-              <span className="text-sm">{kpi.detalle}</span>
-            </div>
-            <p className="text-[15px] leading-normal">{kpi.queSignifica}</p>
-            <Button onClick={() => setKpi(null)}>Entendido</Button>
-          </>
-        ) : null}
-      </BottomSheet>
     </>
   );
 }

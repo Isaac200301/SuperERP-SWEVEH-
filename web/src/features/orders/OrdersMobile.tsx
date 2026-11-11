@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 
 import type { EstadoOrden, Orden } from '../../shared/api/client';
 import { estados } from '../../shared/i18n/es-CO';
@@ -59,10 +59,12 @@ const cerradas: EstadoOrden[] = ['entregado', 'cancelada'];
 /** Órdenes en el celular (mockup Ordenes): buscador, chips por estado con su conteo y tarjetas (HU-20, HU-68). */
 export function OrdersMobile() {
   const q = useRecentOrders();
-  const [filtro, setFiltro] = useState<'abiertas' | EstadoOrden | 'todas'>('abiertas');
+  // Desde las barras de Taller llega ?estado=… para abrir ya filtrado.
+  const [params] = useSearchParams();
+  const [filtro, setFiltro] = useState<'abiertas' | EstadoOrden | 'todas'>((params.get('estado') as EstadoOrden | null) ?? 'abiertas');
   const todas = q.data?.ordenes ?? [];
   const abiertas = todas.filter((o) => !cerradas.includes(o.estado));
-  const presentes = [...new Set(todas.map((o) => o.estado))];
+  const presentes = [...new Set([...todas.map((o) => o.estado), ...(filtro !== 'abiertas' && filtro !== 'todas' ? [filtro] : [])])];
   const lista = filtro === 'todas' ? todas : filtro === 'abiertas' ? abiertas : todas.filter((o) => o.estado === filtro);
   const espera = abiertas.filter((o) => o.estado === 'esperando_aprobacion').length;
   return (

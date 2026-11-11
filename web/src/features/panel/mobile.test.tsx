@@ -10,6 +10,8 @@ import { Tabs } from '../../shared/ui/Tabs';
 import { useIsMobile } from '../../shared/ui/useIsMobile';
 import { mechanic, mockApi, orden, owner, renderPage } from '../../test/api';
 import { mockMobile } from '../../test/mobile';
+import { CustomersPage } from '../customers/CustomersPage';
+import { InboxPage } from '../inbox/InboxPage';
 import { NewOrderSheet } from '../orders/NewOrderSheet';
 import { OrderDetailPage } from '../orders/OrderDetailPage';
 import { OrdersPage } from '../orders/OrdersPage';
@@ -187,5 +189,71 @@ describe('Más (celular)', () => {
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Órdenes' })).not.toBeInTheDocument());
     expect(screen.queryByRole('link', { name: 'Mi taller' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
+  });
+});
+
+describe('Por revisar en el celular (HU-62, HU-64)', () => {
+  const borrador = (id: string, celular: string, mensaje: string) => ({
+    id, conversacionId: `cv-${id}`, celular, mensajeCliente: mensaje, intencion: 'cotizar', propuesto: `Hola, ${mensaje}`,
+    fuentes: [{ campo: 'precio', valor: '$40.000', origen: 'lista de precios' }], estado: 'pendiente', origen: 'plantilla',
+    creadoEn: '2026-11-10T15:00:00Z',
+  });
+
+  it('muestra un borrador a la vez, con sus fuentes, y Enviar usa el mismo endpoint', async () => {
+    mockMobile();
+    const calls = mockApi({
+      'GET /me': dueno,
+      'GET /inbox': { borradores: [borrador('d1', '+573001112233', 'chilla al frenar'), borrador('d2', '+573004445566', 'cambio de aceite')] },
+      'GET /inbox/stats': { pendientes: 2, enviados: 0, editados: 0, porcentajeEditados: 0 },
+      'GET /services/proposals': { propuestas: [] },
+      'GET /assistant/settings': { autoEnvio: false },
+      'POST /inbox/{id}': {},
+    });
+    renderPage(<InboxPage />);
+    expect(await screen.findByText('chilla al frenar')).toBeInTheDocument();
+    expect(screen.queryByText('cambio de aceite')).not.toBeInTheDocument();
+    expect(screen.getByText('lista de precios')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: /300 444 5566/ }));
+    expect(await screen.findByText('cambio de aceite')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar' }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'POST')?.path).toBe('/inbox/d2'));
+    expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ decision: 'enviar' });
+  });
+});
+
+describe('Taller del dueño en el celular', () => {
+  it('muestra los números con "¿Qué significa?" y las barras llevan a las órdenes filtradas', async () => {
+    mockMobile();
+    mockApi({
+      'GET /me': dueno,
+      'GET /workshop': { tamano: 'pequeno' },
+      'GET /workshop/settings': { usarControlCalidad: false, usarEsperandoRepuesto: false },
+      'GET /dashboard': {
+        ejemplo: false,
+        kpis: [{ codigo: 'abiertas', titulo: 'Órdenes abiertas', valor: 7, texto: '7', detalle: '', queSignifica: 'Son los vehículos que no se han entregado.', ejemplo: false }],
+        porEstado: { esperando_aprobacion: 1, en_reparacion: 2 },
+      },
+    });
+    renderPage(<MorePage />);
+    await userEvent.click(await screen.findByRole('button', { name: '¿Qué significa?' }));
+    expect(screen.getByRole('dialog', { name: 'Órdenes abiertas' })).toHaveTextContent('Son los vehículos que no se han entregado.');
+    await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
+    expect(screen.getByRole('link', { name: 'En reparación: 2' })).toHaveAttribute('href', '/panel/ordenes?estado=en_reparacion');
+  });
+});
+
+describe('Clientes en el celular', () => {
+  it('abre la ficha del cliente con su autorización y vehículos en una hoja', async () => {
+    mockMobile();
+    mockApi({
+      'GET /me': dueno,
+      'GET /customers': { clientes: [{ id: 'c1', nombre: 'Laura Gómez', celular: '3001234567', correo: null, autorizacionEstado: 'autorizada', creadoEn: '2026-11-01T00:00:00Z' }] },
+      'GET /customers/{id}/vehicles': { vehiculos: [{ id: 'v1', placa: 'KLM482', tipo: 'carro', marca: 'Chevrolet', linea: 'Spark', motorPendiente: false }] },
+    });
+    renderPage(<CustomersPage />);
+    await userEvent.click(await screen.findByRole('button', { name: /Laura Gómez/ }));
+    const ficha = screen.getByRole('dialog', { name: 'Laura Gómez' });
+    expect(ficha).toHaveTextContent('Autorizó sus datos');
+    expect(await screen.findByText('KLM482')).toBeInTheDocument();
   });
 });
