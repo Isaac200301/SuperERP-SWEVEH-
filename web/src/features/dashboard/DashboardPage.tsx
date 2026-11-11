@@ -7,11 +7,18 @@ import { estados, flujoFor } from '../../shared/i18n/es-CO';
 import { useSettings } from '../workshop/SettingsForm';
 import { Alert } from '../../shared/ui/Alert';
 import { Segmented } from '../../shared/ui/Segmented';
+import { useIsMobile } from '../../shared/ui/useIsMobile';
+import { DashboardMobile } from './DashboardMobile';
 
 const tonos = { err: 'bg-err-tint text-err-ink', warn: 'bg-warn-tint text-warn-ink', info: 'bg-primary-tint' } as const;
 
 /** HU-68…73 y HU-76: los 6 números del taller, cada uno con "qué significa" (HU-75), y lo pendiente de hoy. */
 export function DashboardPage() {
+  if (useIsMobile()) return <DashboardMobile />;
+  return <DashboardPageDesktop />;
+}
+
+function DashboardPageDesktop() {
   const [tipo, setTipo] = useState<'' | 'carro' | 'moto'>('');
   const kpis = useQuery({
     queryKey: ['tablero', tipo],

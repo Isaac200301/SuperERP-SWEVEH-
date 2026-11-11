@@ -8,11 +8,13 @@ import { Alert } from '../../shared/ui/Alert';
 import { IconBack, IconCheck, IconWarn } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
 import { StatePill } from '../../shared/ui/StatePill';
+import { useIsMobile } from '../../shared/ui/useIsMobile';
 import { useSession } from '../auth/api';
 import { Thread } from '../messaging/Thread';
 import { useSettings } from '../workshop/SettingsForm';
 import { useOrder } from './api';
 import { DiagnosisPanel } from './DiagnosisPanel';
+import { OrderDetailMobile } from './OrderDetailMobile';
 import { OrderActions, QuotePanel, ReceptionPanel } from './OrderWork';
 
 /** Stepper de los 7 estados con la hora de cada paso (docs/10 §4.3). */
@@ -106,6 +108,7 @@ export function OrderDetailPage() {
   const { id = '' } = useParams();
   const [params] = useSearchParams();
   const q = useOrder(id);
+  const mobile = useIsMobile();
   if (q.isPending) return <p role="status">Cargando la orden…</p>;
   if (q.isError) {
     return (
@@ -118,6 +121,7 @@ export function OrderDetailPage() {
     );
   }
   const o = q.data;
+  if (mobile) return <OrderDetailMobile orden={o} />;
   return (
     <>
       <header className="flex flex-col gap-1">

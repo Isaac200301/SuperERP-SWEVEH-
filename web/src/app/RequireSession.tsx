@@ -3,9 +3,11 @@ import { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router';
 
 import { can, sessionKey, useSession } from '../features/auth/api';
+import { MobileShell } from '../features/panel/MobileShell';
 import { PanelLayout } from '../features/panel/PanelLayout';
 import { api, unwrap, type Sesion } from '../shared/api/client';
 import { Alert } from '../shared/ui/Alert';
+import { useIsMobile } from '../shared/ui/useIsMobile';
 
 /** Protege el panel: sin sesión manda a /entrar y conserva la ruta para volver. */
 export function RequireSession() {
@@ -42,10 +44,13 @@ export function RequireSession() {
 /** Un taller sin arranque va primero a /panel/arranque (pasos 2 y 3 del registro, HU-03 a HU-05). */
 function Panel({ session }: { session: Sesion }) {
   const loc = useLocation();
+  const mobile = useIsMobile();
   const dueno = can(session, 'workshop:manage');
   const t = useQuery({ queryKey: ['taller'], queryFn: async () => unwrap(await api.GET('/workshop')), enabled: dueno });
   if (dueno && t.data && !t.data.onboardingCompleto && loc.pathname !== '/panel/arranque') {
     return <Navigate to="/panel/arranque" replace />;
   }
+  // En el celular, barra inferior y pantallas de los mockups móviles; en escritorio, el panel de siempre.
+  if (mobile) return <MobileShell session={session} />;
   return <PanelLayout session={session} soloYo={t.data?.tamano === 'solo'} />;
 }

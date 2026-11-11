@@ -138,6 +138,30 @@ Tres pasos con barra de progreso y un **cronómetro visible** (promesa de < 5 mi
 ### 4.6 Admin del ERP (tema oscuro)
 Mensajes enviados por categoría, costo de IA del mes, costo por conversación y % de salidas descartadas. Debajo: medidor por taller (servicio usado de 1.000 gratis), últimas llamadas a la IA con proveedor, tokens, latencia y resultado (HU-99), número de WhatsApp (HU-101), y Reiniciar demo / Agregar la moto (HU-97/98). **Proveedor y modelo de IA están `[por definir]`.**
 
+### 4.7 Celular (mockups móviles v1, 2026-11-10)
+Mockups en `docs/mockups/movil/` (390 × 844). Canvas: https://claude.ai/artifact/KdDbBumybZZvt7Rixtcb7V
+- **Responsive, no otra app.** Por debajo de 768 px (`useIsMobile`, `shared/ui/useIsMobile.ts`) el panel usa `MobileShell` con barra inferior; por encima, el panel de escritorio sin cambios. Se elige con JS para que solo una navegación exista en el DOM.
+- **Barra inferior por rol** (`features/panel/TabBar.tsx`):
+  - **Dueño:** Hoy · Órdenes · + Nueva · Revisar · Taller.
+  - **Recepción** (sin `kpi:read`): Órdenes · + Nueva · Revisar · Más.
+  - **Mecánico:** Órdenes (Piso) · Yo.
+
+  El activo va en lima con `aria-current` (DR-02, DR-14), y Revisar lleva el contador de HU-66.
+- **Patrones:**
+  - `BottomSheet`: "Nueva orden" y "¿Qué significa?".
+  - `Tabs`: la orden en Estado / Cotización / WhatsApp / Historial.
+  - `Chips`: filtros con conteo y desplazamiento horizontal.
+  - Acción principal de la orden fija abajo (DR-05), con las demás en "Más acciones".
+  - La orden y la recepción ocupan toda la pantalla, sin barra.
+- **"Taller" / "Más" / "Yo"** (`/panel/mas`) lista las demás secciones del rol, con la misma lista del menú de escritorio (`features/panel/sections.ts`), y cerrar sesión.
+- **No se tomó del mockup** (manda la HU o la decisión del equipo):
+  - "Accesorios que deja" en la recepción de moto: Pablo los quitó el 3-nov; van como nota con foto.
+  - La pestaña "Asistente" del Piso es HU-77 (T7).
+  - "Pregúntale al asistente" en Taller es HU-78 (T7).
+  - "Reasignar / cancelar" en el menú de la orden: hoy no hay pantalla para cancelar (HU-26 está en el API).
+  - El nombre del mecánico en las tarjetas: la orden solo trae `mecanicoId`.
+- **Prueba:** `web/e2e/movil.spec.ts` (Pixel 7) recorre Hoy → Nueva orden → orden en pestañas → Órdenes → Más y verifica que ninguna pantalla se desborde de lado (CA-11).
+
 ---
 
 ## 5. Inventario de mockups

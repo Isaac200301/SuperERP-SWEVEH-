@@ -5,7 +5,9 @@ import { estados, flujoFor } from '../../shared/i18n/es-CO';
 import { formatoCOP, formatoFechaHora, formatoHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
+import { BottomSheet } from '../../shared/ui/BottomSheet';
 import { Field } from '../../shared/ui/Field';
+import { IconMore } from '../../shared/ui/icons';
 import {
   photoUrl,
   useAddEvidence,
@@ -56,9 +58,13 @@ function errorText(e: unknown): string | undefined {
 const card = 'flex flex-col gap-3 rounded-card bg-white p-5';
 const select = 'min-h-[52px] rounded-btn border-[1.5px] border-line bg-white px-4 text-base';
 
-/** HU-20 y HU-25: avanzar o devolverse un paso, con las puertas que pide cada estado. */
-export function OrderActions({ orden }: { orden: Orden }) {
+/**
+ * HU-20 y HU-25: avanzar o devolverse un paso, con las puertas que pide cada estado.
+ * bar: en el celular la acción principal va fija abajo (DR-05) y las demás en "Más acciones".
+ */
+export function OrderActions({ orden, bar = false }: { orden: Orden; bar?: boolean }) {
   const mover = useTransition(orden.id);
+  const [mas, setMas] = useState(false);
   const puedeAnular = usePermission('order:override_approval');
   const [motivo, setMotivo] = useState('');
   const [recogido, setRecogido] = useState('');
@@ -82,11 +88,8 @@ export function OrderActions({ orden }: { orden: Orden }) {
   if (entrega && !recogido.trim()) faltaEntrega = 'Escribe quién recoge.';
   else if (entrega && !revisado) faltaEntrega = 'Confirma que revisaste lo que dejó.';
 
-  return (
-    <section className={card} aria-labelledby="acciones">
-      <h2 id="acciones" className="text-[17px] font-extrabold">
-        Mover la orden
-      </h2>
+  const campos = (
+    <>
       {sinAprobacion && puedeAnular ? (
         <Field
           label="Motivo si el cliente aprobó por fuera (solo el dueño)"
@@ -105,44 +108,99 @@ export function OrderActions({ orden }: { orden: Orden }) {
         </>
       ) : null}
       {mover.isError ? <Alert>{errorText(mover.error)}</Alert> : null}
-      <div className="flex flex-wrap gap-3">
-        {siguiente ? (
-          <Button
-            busy={mover.isPending}
-            missing={faltaEntrega}
-            onClick={() =>
-              mover.mutate({
-                estado: siguiente,
-                version: orden.version,
-                ...(motivo ? { motivo } : {}),
-                ...(entrega ? { recogidoPor: recogido.trim(), accesoriosConfirmados: revisado } : {}),
-              })
-            }
-          >
-            Pasar a {estados[siguiente]}
-          </Button>
-        ) : null}
-        {anterior ? (
-          <Button variant="ghost" disabled={mover.isPending} onClick={() => mover.mutate({ estado: anterior, version: orden.version })}>
-            Devolver a {estados[anterior]}
-          </Button>
-        ) : null}
+    </>
+  );
+  const avanzar = siguiente ? (
+    <Button
+      busy={mover.isPending}
+      missing={faltaEntrega}
+      className={bar ? 'w-full' : ''}
+      onClick={() =>
+        mover.mutate({
+          estado: siguiente,
+          version: orden.version,
+          ...(motivo ? { motivo } : {}),
+          ...(entrega ? { recogidoPor: recogido.trim(), accesoriosConfirmados: revisado } : {}),
+        })
+      }
+    >
+      Pasar a {estados[siguiente]}
+    </Button>
+  ) : null;
+  const devolver = anterior ? (
+    <Button
+      variant="ghost"
+      disabled={mover.isPending}
+      onClick={() => mover.mutate({ estado: anterior, version: orden.version }, { onSuccess: () => setMas(false) })}
+    >
+      Devolver a {estados[anterior]}
+    </Button>
+  ) : null;
+  const esperar = puedeEsperar ? (
+    <div className={`flex flex-wrap items-end gap-3 ${bar ? '' : 'border-t border-line pt-3'}`}>
+      <div className="min-w-[220px] flex-1">
+        <Field label="¿Qué repuesto falta?" value={falta} onChange={(e) => setFalta(e.target.value)} placeholder="Kit de embrague, llega el jueves" />
       </div>
-      {puedeEsperar ? (
-        <div className="flex flex-wrap items-end gap-3 border-t border-line pt-3">
-          <div className="min-w-[220px] flex-1">
-            <Field label="¿Qué repuesto falta?" value={falta} onChange={(e) => setFalta(e.target.value)} placeholder="Kit de embrague, llega el jueves" />
-          </div>
-          <Button
-            variant="secondary"
-            busy={mover.isPending}
-            missing={falta.trim() ? undefined : 'Escribe qué repuesto falta.'}
-            onClick={() => mover.mutate({ estado: 'esperando_repuesto', version: orden.version, motivo: falta.trim() }, { onSuccess: () => setFalta('') })}
-          >
-            Poner en Esperando repuesto
-          </Button>
+      <Button
+        variant="secondary"
+        busy={mover.isPending}
+        missing={falta.trim() ? undefined : 'Escribe qué repuesto falta.'}
+        onClick={() =>
+          mover.mutate(
+            { estado: 'esperando_repuesto', version: orden.version, motivo: falta.trim() },
+            {
+              onSuccess: () => {
+                setFalta('');
+                setMas(false);
+              },
+            },
+          )
+        }
+      >
+        Poner en Esperando repuesto
+      </Button>
+    </div>
+  ) : null;
+
+  if (bar) {
+    return (
+      <section
+        aria-label="Mover la orden"
+        className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2.5 border-t border-[#E3EAE8] bg-white px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]"
+      >
+        {campos}
+        <div className="flex items-start gap-2.5">
+          {devolver || esperar ? (
+            <button
+              type="button"
+              aria-label="Más acciones"
+              onClick={() => setMas(true)}
+              className="grid h-[52px] w-[52px] flex-none place-items-center rounded-btn bg-surface text-ink"
+            >
+              <IconMore size={22} />
+            </button>
+          ) : null}
+          <div className="flex-1">{avanzar}</div>
         </div>
-      ) : null}
+        <BottomSheet open={mas} onClose={() => setMas(false)} title="Más acciones">
+          {devolver}
+          {esperar}
+        </BottomSheet>
+      </section>
+    );
+  }
+
+  return (
+    <section className={card} aria-labelledby="acciones">
+      <h2 id="acciones" className="text-[17px] font-extrabold">
+        Mover la orden
+      </h2>
+      {campos}
+      <div className="flex flex-wrap gap-3">
+        {avanzar}
+        {devolver}
+      </div>
+      {esperar}
     </section>
   );
 }

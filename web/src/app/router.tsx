@@ -27,6 +27,7 @@ const PartsPage = page(() => import('../features/inventory/PartsPage'), 'PartsPa
 const TeamPage = page(() => import('../features/team/TeamPage'), 'TeamPage');
 const WorkshopPage = page(() => import('../features/workshop/WorkshopPage'), 'WorkshopPage');
 const OnboardingPage = page(() => import('../features/workshop/OnboardingPage'), 'OnboardingPage');
+const MorePage = page(() => import('../features/panel/MorePage'), 'MorePage');
 
 function Lazy({ Page }: { Page: LazyExoticComponent<ComponentType> }) {
   return (
@@ -70,6 +71,8 @@ export const router = createBrowserRouter([
       { path: 'whatsapp-prueba', element: <Lazy Page={SimulatorPage} /> },
       { path: 'arranque', element: <Lazy Page={OnboardingPage} /> },
       { path: 'plataforma', element: <Lazy Page={PlatformPage} /> },
+      // Celular: "Taller" / "Más" / "Yo" de la barra inferior (mockups móviles v1).
+      { path: 'mas', element: <Lazy Page={MorePage} /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
