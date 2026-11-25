@@ -777,6 +777,34 @@ paths:
         '409': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
 
+  /orders/{id}/quote/client-view:
+    get:
+      operationId: getQuoteClientView
+      summary: 'Lo que ve el cliente de la cotización vigente, para mostrarla en pantalla (V-10, ADR-0043, HU-109). Solo lo del cliente: sin costos internos, gastos ni notas internas; el detalle de las partidas solo si "Mostrar detalle al cliente" está encendido. Permiso quote:read'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VistaCliente' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /orders/{id}/quote.pdf:
+    get:
+      operationId: getQuotePdf
+      summary: 'La cotización vigente en PDF tamaño carta, con lo mismo que ve el cliente (V-10, HU-109). Sin caché. Permiso quote:read'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: PDF
+          headers:
+            Content-Disposition: { schema: { type: string }, description: 'attachment; filename="cotizacion-OS-0044.pdf"' }
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /orders/{id}/quote/lines/{lineId}/detail:
     put:
       operationId: setPartidaDetail
@@ -899,6 +927,7 @@ paths:
                 decision: { type: string, enum: [aprobar, rechazar, dudas] }
                 canal: { type: string, enum: [telefono, mostrador] }
                 itemsAprobados: { type: array, items: { type: string, format: uuid } }
+                motivo: { type: string, maxLength: 200, description: 'Opcional, al no aprobar (V-10); queda en la bitácora' }
       responses:
         '200': { $ref: '#/components/responses/Cotizacion' }
         '400': { $ref: '#/components/responses/Problem' }
@@ -2612,6 +2641,72 @@ components:
         cotizado: { type: integer, format: int64 }
         gastado: { type: integer, format: int64 }
         quedan: { type: integer, format: int64 }
+
+    VistaCliente:
+      type: object
+      required: [documento, autorizacion]
+      properties:
+        documento: { $ref: '#/components/schemas/DocumentoCliente' }
+        autorizacion: { $ref: '#/components/schemas/AutorizacionMostrador' }
+
+    DocumentoCliente:
+      type: object
+      required: [taller, orden, placa, vehiculo, cliente, cotizacion]
+      properties:
+        taller: { type: string }
+        orden: { type: string, description: 'Código de la orden, por ejemplo OS-0044' }
+        placa: { type: string }
+        vehiculo: { type: string }
+        cliente: { type: string }
+        cotizacion: { $ref: '#/components/schemas/CotizacionCliente' }
+
+    CotizacionCliente:
+      type: object
+      required: [numero, estado, lineas, subtotal, descuento, ivaPct, iva, preciosConIva, total, enviadaEn, venceEn, vencida]
+      properties:
+        numero: { type: integer }
+        estado: { type: string, enum: [borrador, enviada, aprobada, rechazada, dudas] }
+        lineas: { type: array, items: { $ref: '#/components/schemas/LineaCliente' } }
+        subtotal: { type: integer, format: int64, description: 'COP sin decimales, antes de descuentos' }
+        descuento: { type: integer, format: int64 }
+        ivaPct: { type: integer }
+        iva: { type: integer, format: int64 }
+        preciosConIva: { type: boolean }
+        total: { type: integer, format: int64 }
+        enviadaEn: { type: string, format: date-time, nullable: true }
+        venceEn: { type: string, format: date-time, nullable: true }
+        vencida: { type: boolean }
+
+    LineaCliente:
+      type: object
+      required: [tipo, descripcion, cantidad, precioUnitario, subtotal, descuentoPct, descuento, aprobada]
+      properties:
+        tipo: { type: string, enum: [servicio, repuesto, partida] }
+        descripcion: { type: string }
+        cantidad: { type: integer }
+        precioUnitario: { type: integer, format: int64 }
+        subtotal: { type: integer, format: int64 }
+        descuentoPct: { type: integer }
+        descuento: { type: integer, format: int64 }
+        aprobada: { type: boolean, nullable: true, description: 'Respuesta ítem por ítem (HU-30); null si aún no hay' }
+        detalle:
+          type: array
+          description: 'Solo en partidas y solo si el taller encendió "Mostrar detalle al cliente"; sin valores de referencia'
+          items:
+            type: object
+            required: [descripcion, cantidad]
+            properties:
+              descripcion: { type: string }
+              cantidad: { type: integer }
+
+    AutorizacionMostrador:
+      type: object
+      description: 'Para quien atiende, no para el cliente: si el cliente ya autorizó sus datos y el texto que debe aceptar antes de aprobar en el mostrador (HU-86)'
+      required: [clienteId, estado, texto]
+      properties:
+        clienteId: { type: string, format: uuid }
+        estado: { type: string, enum: [pendiente, autorizada, rechazada, revocada] }
+        texto: { type: string }
 
     DetallePartida:
       type: object

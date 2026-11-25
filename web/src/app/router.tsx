@@ -31,6 +31,7 @@ const OnboardingPage = page(() => import('../features/workshop/OnboardingPage'),
 const MorePage = page(() => import('../features/panel/MorePage'), 'MorePage');
 const ChangePinPage = page(() => import('../features/auth/ChangePinPage'), 'ChangePinPage');
 const AssistantPage = page(() => import('../features/assistant/AssistantPage'), 'AssistantPage');
+const ClientQuotePage = page(() => import('../features/orders/ClientQuotePage'), 'ClientQuotePage');
 const ReceivePage = page(() => import('../features/orders/FloorMobile'), 'ReceivePage');
 
 /** Pantalla de una función que se puede apagar (V-01, V-02). */
@@ -61,6 +62,12 @@ export const router = createBrowserRouter([
   { path: '/registro', element: <Lazy Page={RegisterPage} /> },
   { path: '/entrar', element: <Lazy Page={LoginPage} /> },
   { path: '/politica-de-datos', element: <Lazy Page={PolicyPage} /> },
+  // V-10 (ADR-0043): la cotización a pantalla completa para el cliente; va fuera del panel para que no tenga menú.
+  {
+    path: '/panel/ordenes/:id/cliente',
+    element: <RequireSession bare />,
+    children: [{ index: true, element: <Lazy Page={ClientQuotePage} /> }],
+  },
   {
     path: '/panel',
     element: <RequireSession />,

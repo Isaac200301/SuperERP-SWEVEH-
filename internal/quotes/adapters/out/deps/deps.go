@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"sweveh/internal/catalog"
+	"sweveh/internal/customers"
 	"sweveh/internal/inventory"
 	"sweveh/internal/orders"
 	"sweveh/internal/quotes/app"
@@ -12,6 +13,28 @@ import (
 	"sweveh/internal/shared"
 	"sweveh/internal/tenancy"
 )
+
+// Directory lee el taller, la orden con su vehículo y el cliente para la vista del cliente (V-10).
+type Directory struct {
+	Workshops tenancy.Workshops
+	Orders    orders.Orders
+	Customers customers.Directory
+}
+
+func (d Directory) WorkshopName(ctx context.Context, tallerID shared.ID) (string, error) {
+	w, err := d.Workshops.Get(ctx, tallerID)
+	return w.Name, err
+}
+
+func (d Directory) Order(ctx context.Context, tallerID, orderID shared.ID) (app.OrderCard, error) {
+	i, err := d.Orders.Info(ctx, tallerID, orderID)
+	return app.OrderCard{Code: i.Code, Plate: i.Plate, Vehicle: i.Vehicle, CustomerID: i.CustomerID}, err
+}
+
+func (d Directory) Customer(ctx context.Context, tallerID, id shared.ID) (app.CustomerCard, error) {
+	c, err := d.Customers.Get(ctx, tallerID, id)
+	return app.CustomerCard{Name: c.Name, Consent: c.Consent}, err
+}
 
 // Rules lee los parámetros de cotización del taller desde la fachada de tenancy.
 type Rules struct{ A *tenancy.Admin }

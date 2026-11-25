@@ -6,11 +6,13 @@ import { ordersKey } from './api';
 export type Checklist = Schemas['Checklist'];
 export type Evidencia = Schemas['Evidencia'];
 export type Cotizacion = Schemas['Cotizacion'];
+export type VistaCliente = Schemas['VistaCliente'];
 
 const keys = {
   checklist: (id: string) => [...ordersKey, id, 'checklist'] as const,
   evidence: (id: string) => [...ordersKey, id, 'evidencias'] as const,
   quote: (id: string) => [...ordersKey, id, 'cotizacion'] as const,
+  clientView: (id: string) => [...ordersKey, id, 'vista-cliente'] as const,
 };
 
 /** Tras cualquier cambio la orden (estado, versión, historial) se vuelve a leer. */
@@ -113,6 +115,32 @@ export function useQuote(id: string, enabled = true) {
   });
 }
 
+/** V-10 (ADR-0043): lo que ve el cliente de la cotización vigente, más si ya autorizó sus datos (HU-86). */
+export function useClientView(id: string) {
+  return useQuery({
+    queryKey: keys.clientView(id),
+    queryFn: async (): Promise<VistaCliente> => unwrap(await api.GET('/orders/{id}/quote/client-view', { params: { path: { id } } })),
+  });
+}
+
+/** HU-86: la autorización de datos que el cliente da (o no) en el mostrador, con la prueba que guarda el servidor. */
+export function useCounterConsent(orderId: string) {
+  const invalidate = useInvalidateOrder(orderId);
+  return useMutation({
+    mutationFn: async (v: { clienteId: string; acepta: boolean }) =>
+      unwrap(await api.POST('/customers/{id}/consent', { params: { path: { id: v.clienteId } }, body: { acepta: v.acepta } })),
+    onSettled: invalidate,
+  });
+}
+
+/** El PDF de la cotización vigente, tal como se le comparte al cliente (V-10). */
+export async function fetchQuotePdf(id: string): Promise<{ blob: Blob; nombre: string }> {
+  const r = await api.GET('/orders/{id}/quote.pdf', { params: { path: { id } }, parseAs: 'blob' });
+  const blob = unwrap(r) as Blob;
+  const nombre = /filename="([^"]+)"/.exec(r.response.headers.get('Content-Disposition') ?? '')?.[1] ?? 'cotizacion.pdf';
+  return { blob, nombre };
+}
+
 export type LineInput = { tipo: 'servicio' | 'repuesto' | 'partida'; refId?: string; descripcion?: string; cantidad: number; precioUnitario?: number; horas?: number };
 
 export function useQuoteActions(id: string) {
@@ -132,7 +160,7 @@ export function useQuoteActions(id: string) {
     onSettled: invalidate,
   });
   const respond = useMutation({
-    mutationFn: async (body: { decision: 'aprobar' | 'rechazar' | 'dudas'; canal: 'telefono' | 'mostrador' }) =>
+    mutationFn: async (body: { decision: 'aprobar' | 'rechazar' | 'dudas'; canal: 'telefono' | 'mostrador'; motivo?: string }) =>
       unwrap(await api.POST('/orders/{id}/quote/response', { params: { path: { id } }, body })),
     onSettled: invalidate,
   });

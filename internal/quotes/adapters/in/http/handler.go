@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -26,6 +27,15 @@ type Handler struct {
 	svc   *app.Quotes
 	guard *authn.Guard
 	log   *slog.Logger
+	// consentText es el texto de autorización de datos que la pantalla del cliente muestra en el mostrador (HU-86);
+	// lo pone la raíz de composición para que sea el mismo que se guarda como prueba.
+	consentText string
+}
+
+// WithConsentText fija el texto de autorización que la pantalla del cliente le muestra a quien aprueba en el mostrador.
+func (h *Handler) WithConsentText(t string) *Handler {
+	h.consentText = t
+	return h
 }
 
 func NewHandler(s *app.Quotes, g *authn.Guard, log *slog.Logger) *Handler {
@@ -34,6 +44,9 @@ func NewHandler(s *app.Quotes, g *authn.Guard, log *slog.Logger) *Handler {
 
 func (h *Handler) Routes(r chi.Router) {
 	r.With(h.guard.Require("quote:read")).Get("/orders/{id}/quote", httpx.JSON(h.log, h.get))
+	// V-10 (ADR-0043): lo que ve el cliente, en pantalla y en PDF.
+	r.With(h.guard.Require("quote:read")).Get("/orders/{id}/quote/client-view", httpx.JSON(h.log, h.clientView))
+	r.With(h.guard.Require("quote:read")).Get("/orders/{id}/quote.pdf", h.pdf)
 	r.With(h.guard.Require("quote:edit")).Post("/orders/{id}/quote/lines", httpx.JSON(h.log, h.add))
 	r.With(h.guard.Require("quote:edit")).Delete("/orders/{id}/quote/lines/{lineId}", httpx.JSON(h.log, h.remove))
 	r.With(h.guard.Require("quote:edit")).Patch("/orders/{id}/quote/lines/{lineId}", httpx.JSON(h.log, h.update))
@@ -292,7 +305,10 @@ type respondReq struct {
 	Decision string   `json:"decision"`
 	Canal    string   `json:"canal"`
 	Items    []string `json:"itemsAprobados"`
+	Motivo   string   `json:"motivo"` // opcional, al no aprobar (V-10)
 }
+
+var errReason = shared.Validation("motivo_invalido", "El motivo puede tener hasta 200 letras.").WithField("motivo")
 
 // respond registra una respuesta tomada por teléfono o en mostrador (HU-29); el botón de WhatsApp entra por el webhook.
 func (h *Handler) respond(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -307,6 +323,13 @@ func (h *Handler) respond(r *http.Request, p reqctx.Principal) (int, any, error)
 	if q.Canal != "telefono" && q.Canal != "mostrador" {
 		return 0, nil, shared.Validation("canal_invalido", "Indica si la respuesta llegó por teléfono o en el mostrador.").WithField("canal")
 	}
+	reason := strings.Join(strings.Fields(q.Motivo), " ")
+	if len([]rune(reason)) > 200 {
+		return 0, nil, errReason
+	}
+	if q.Decision != "rechazar" { // el motivo es de "No aprobó"
+		reason = ""
+	}
 	items := map[shared.ID]bool{}
 	for _, s := range q.Items {
 		if lid, err := shared.ParseID(s); err == nil {
@@ -314,6 +337,6 @@ func (h *Handler) respond(r *http.Request, p reqctx.Principal) (int, any, error)
 		}
 	}
 	out, err := h.svc.Respond(r.Context(), app.RespondCmd{TallerID: p.TallerID, OrderID: id, Actor: p.Actor(),
-		Response: domain.Response{Decision: q.Decision, Items: items, Channel: q.Canal}})
+		Response: domain.Response{Decision: q.Decision, Items: items, Channel: q.Canal}, Reason: reason})
 	return http.StatusOK, toDTO(&out), err
 }

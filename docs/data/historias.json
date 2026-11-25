@@ -5003,7 +5003,7 @@
    "au": [],
    "esc": [],
    "ca": [],
-   "notas": "Entrega del 27-nov (V-07, ADR-0040). La vista del cliente y el PDF llegan en R7. Por revisar con Isaac.",
+   "notas": "Entrega del 27-nov (V-07, ADR-0040). La vista del cliente y el PDF son HU-109 (R7, ADR-0043). Por revisar con Isaac.",
    "refs": [],
    "canc": "",
    "ac": [
@@ -5091,6 +5091,76 @@
      "dado": "lo gastado",
      "cuando": "el cliente ve la cotización o el PDF",
      "entonces": "no aparece nada de los gastos"
+    }
+   ]
+  },
+  {
+   "id": "HU-109",
+   "epic": "E04",
+   "roles": [
+    "DU",
+    "RE",
+    "ME"
+   ],
+   "surf": [
+    "P",
+    "F"
+   ],
+   "titulo": "Mostrar la cotización en pantalla y compartirla en PDF",
+   "como": "persona del taller que atiende al cliente en el mostrador o por teléfono",
+   "quiero": "mostrarle la cotización en la pantalla del celular o la tablet y compartirle un PDF",
+   "para": "que la apruebe sin depender de WhatsApp ni de papel",
+   "prio": "M",
+   "antes": "",
+   "src": "pablo-2026-11-24",
+   "moto": true,
+   "veh": "",
+   "dep": [
+    "HU-27",
+    "HU-105"
+   ],
+   "rf": [],
+   "au": [],
+   "esc": [],
+   "ca": [],
+   "notas": "Entrega del 27-nov (V-10, ADR-0043). Usa HU-29 y HU-86. Enlace público y logo del taller quedan para después. Por revisar con Isaac.",
+   "refs": [],
+   "canc": "",
+   "ac": [
+    {
+     "dado": "una cotización con ítems",
+     "cuando": "toco \"Mostrar al cliente\"",
+     "entonces": "se abre a pantalla completa, sin menú y con letra grande: taller, vehículo, partidas, líneas, descuento, IVA, total y vigencia; nada de costos internos, gastos ni notas"
+    },
+    {
+     "dado": "una partida con detalle interno y \"Mostrar detalle al cliente\" apagado",
+     "cuando": "el cliente ve la pantalla o el PDF",
+     "entonces": "ve la partida sin su detalle; encendido, ve el detalle sin valores de referencia"
+    },
+    {
+     "dado": "una cotización enviada",
+     "cuando": "toco \"El cliente aprobó\"",
+     "entonces": "queda aprobada por el mostrador, la orden pasa a En reparación y se descuenta lo que corresponda; si el cliente no ha autorizado sus datos se le pide en la misma pantalla (HU-86) y, si no autoriza, la aprobación igual se registra"
+    },
+    {
+     "dado": "una cotización enviada",
+     "cuando": "toco \"No aprobó\" con un motivo opcional",
+     "entonces": "queda rechazada y el motivo queda en la bitácora"
+    },
+    {
+     "dado": "una cotización",
+     "cuando": "toco \"Compartir PDF\"",
+     "entonces": "se abre el menú de compartir del sistema con el PDF carta, o se descarga si el aparato no lo permite; sin integración con WhatsApp"
+    },
+    {
+     "dado": "el PDF",
+     "cuando": "lo abro",
+     "entonces": "está en español, con pesos sin decimales y fecha en hora de Colombia, con taller, vehículo, partidas, total, vigencia y espacio para la firma; nada de lo gastado"
+    },
+    {
+     "dado": "la pantalla del cliente",
+     "cuando": "toco \"Volver\" sin sostener",
+     "entonces": "no sale: avisa que hay que mantenerlo presionado"
     }
    ]
   }

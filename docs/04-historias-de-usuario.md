@@ -1647,7 +1647,7 @@ _Módulo del MVP: Preparativos. Que la demo corra dos veces seguidas sin tocar c
 - **Dado** partidas y líneas detalladas en la misma cotización, **cuando** aplico descuento e IVA, **entonces** el total los suma igual que hoy.
 - **Dado** una cotización enviada, **cuando** intento cambiar el detalle o la opción, **entonces** no se permite.
 
-**Notas:** ADR-0040. La vista del cliente y el PDF llegan en R7 (HU-109).
+**Notas:** ADR-0040. La vista del cliente y el PDF son HU-109 (R7, ADR-0043).
 
 **Trazabilidad:** Depende de: HU-27 · ADR-0040
 
@@ -1668,6 +1668,26 @@ _Módulo del MVP: Preparativos. Que la demo corra dos veces seguidas sin tocar c
 **Notas:** ADR-0040. La frase y la foto de la factura leídas por el asistente llegan en R8 (HU-107).
 
 **Trazabilidad:** Depende de: HU-27, HU-105 · ADR-0040
+
+### HU-109 · Mostrar la cotización en pantalla y compartirla en PDF
+
+**Épica:** E04 · **Roles:** Dueño del taller, Recepción, Mecánico · **Superficies:** Panel, Piso · **Prioridad:** Must · **Origen:** Pablo (24-nov-2026, entrega del viernes, V-10), por revisar con Isaac · **Aplica a motos:** sí
+
+**Como** persona del taller que atiende al cliente en el mostrador o por teléfono, **quiero** mostrarle la cotización en la pantalla del celular o la tablet y compartirle un PDF, **para** que la apruebe sin depender de WhatsApp ni de papel.
+
+**Criterios de aceptación**
+
+- **Dado** una cotización con ítems, **cuando** toco "Mostrar al cliente", **entonces** se abre a pantalla completa, sin el menú del panel y con letra grande: el taller, el vehículo, las partidas, las líneas, el descuento, el IVA, el total y la vigencia; nada de costos internos, gastos ni notas internas.
+- **Dado** una partida con detalle interno y "Mostrar detalle al cliente" apagado, **cuando** el cliente ve la pantalla o el PDF, **entonces** ve la partida sin su detalle; encendido, ve el detalle (sin valores de referencia).
+- **Dado** una cotización enviada, **cuando** toco "El cliente aprobó", **entonces** queda aprobada por el mostrador con su hora y mi usuario, la orden pasa a En reparación y se descuenta lo que corresponda; si el cliente aún no autoriza sus datos, antes se le pide en la misma pantalla (HU-86) y, si no autoriza, la aprobación igual se registra.
+- **Dado** una cotización enviada, **cuando** toco "No aprobó" (con un motivo opcional), **entonces** queda rechazada y el motivo queda en la bitácora.
+- **Dado** una cotización, **cuando** toco "Compartir PDF", **entonces** se abre el menú de compartir del sistema con el PDF tamaño carta (o se descarga si el aparato no lo permite), sin integración con WhatsApp.
+- **Dado** el PDF, **cuando** lo abro, **entonces** está en español, con pesos sin decimales y la fecha en hora de Colombia, y lleva el taller, el vehículo, las partidas, el total, la vigencia y un espacio para la firma; no lleva nada de lo gastado.
+- **Dado** la pantalla del cliente, **cuando** toco "Volver" sin sostener, **entonces** no sale del todo: solo avisa que hay que mantenerlo presionado.
+
+**Notas:** ADR-0043. El enlace público para el cliente y el logo del taller en el PDF quedan para después. La ficha del plan llamaba `/quote/decision` a la respuesta; se reutiliza `/quote/response` con `canal: "mostrador"` (HU-29).
+
+**Trazabilidad:** Depende de: HU-27, HU-105 · Usa: HU-29, HU-86 · ADR-0043
 
 ## Referencias citadas en las historias
 

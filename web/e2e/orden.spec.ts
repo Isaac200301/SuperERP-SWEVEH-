@@ -90,7 +90,39 @@ test('orden de punta a punta en un taller real', async ({ page }) => {
   await expect(page.getByText('IVA 19 %')).toBeVisible();
   await shot(page, '05-cotizacion');
   await page.getByRole('button', { name: 'Enviar cotización al cliente' }).click();
-  await page.getByRole('button', { name: 'Aprobó en el mostrador' }).click();
+
+  // 7b. V-10: la cotización en pantalla completa para el cliente; autoriza sus datos (HU-86) y aprueba en el mostrador.
+  const orderId = /ordenes\/([0-9a-f-]{36})/.exec(page.url())?.[1] ?? '';
+  await page.getByRole('link', { name: 'Mostrar al cliente' }).click();
+  await expect(page).toHaveURL(/\/cliente$/);
+  await expect(page.getByRole('navigation')).toHaveCount(0); // sin el menú del panel
+  await expect(page.getByText('Rectificar discos')).toBeVisible();
+  await shot(page, '05b-vista-cliente');
+  // CA-11: en un celular de 390 px la pantalla del cliente no se desborda de lado y los totales quedan antes de las acciones.
+  const grande = page.viewportSize();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByText(/^Total/)).toBeVisible();
+  const { ancho, vista } = await page.evaluate(() => ({ ancho: document.documentElement.scrollWidth, vista: window.innerWidth }));
+  expect(ancho, 'la pantalla del cliente no debe desplazarse de lado').toBeLessThanOrEqual(vista);
+  await shot(page, '05c-vista-cliente-celular');
+  if (grande) await page.setViewportSize(grande);
+  const pdf = await page.request.get(`/api/v1/orders/${orderId}/quote.pdf`);
+  expect(pdf.ok()).toBe(true);
+  expect(pdf.headers()['content-type']).toBe('application/pdf');
+  expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
+  await page.getByRole('button', { name: 'El cliente aprobó' }).click();
+  await page.getByRole('button', { name: 'El cliente autoriza y aprueba' }).click();
+  await expect(page.getByText('Aprobada. El trabajo puede empezar.')).toBeVisible();
+  // Para volver al panel hay que mantener presionado "Volver": un toque corto no sale.
+  const volver = page.getByRole('button', { name: 'Volver', exact: true });
+  await volver.click();
+  await expect(page.getByText('Mantén presionado «Volver» para salir.')).toBeVisible();
+  await volver.hover();
+  await page.mouse.down();
+  await page.waitForTimeout(900);
+  await page.mouse.up();
+  await expect(page).toHaveURL(new RegExp(`/panel/ordenes/${orderId}$`));
+  await expect(page.locator('header').getByText('En reparación')).toBeVisible();
   await expect(page.getByText(/Descontado 2 · Devuelto 0/)).toBeVisible();
 
   // 8. Devolver una unidad: se ve qué pasó.

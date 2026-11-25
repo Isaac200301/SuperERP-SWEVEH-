@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router';
 
 import { ApiError, type EstadoOrden, type Orden, type Schemas } from '../../shared/api/client';
 import { estados, flujoFor } from '../../shared/i18n/es-CO';
@@ -642,9 +643,17 @@ export function QuotePanel({ orden }: { orden: Orden }) {
 
   return (
     <section className={card} aria-labelledby="cotizacion">
-      <h2 id="cotizacion" className="text-[17px] font-extrabold">
-        Cotización #{cot.numero} · {cot.estado}
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="cotizacion" className="text-[17px] font-extrabold">
+          Cotización #{cot.numero} · {cot.estado}
+        </h2>
+        {/* V-10 (ADR-0043): la cotización en pantalla completa para mostrársela al cliente o compartirla en PDF. */}
+        {cot.lineas.length > 0 ? (
+          <Link to={`/panel/ordenes/${orden.id}/cliente`} className="inline-flex min-h-[44px] items-center rounded-btn border-[1.5px] border-primary px-4 text-sm font-extrabold text-primary hover:bg-primary-tint">
+            Mostrar al cliente
+          </Link>
+        ) : null}
+      </div>
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="text-ink-2">

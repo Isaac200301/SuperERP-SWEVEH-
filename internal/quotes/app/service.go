@@ -82,6 +82,8 @@ type Quotes struct {
 	events  EventPublisher
 	clock   Clock
 	rules   RulesReader
+	dir     Directory // vista del cliente (V-10)
+	pdf     Renderer
 }
 
 // RulesReader lee los parámetros de cotización del taller (fachada de tenancy) en la transacción en curso.
@@ -438,6 +440,8 @@ type RespondCmd struct {
 	TallerID, OrderID shared.ID
 	Actor             shared.Actor
 	Response          domain.Response
+	// Reason es el motivo opcional de "No aprobó" (V-10); queda en la bitácora, no en la cotización.
+	Reason string
 }
 
 // Respond registra la respuesta (HU-28, HU-29, HU-30). Al aprobar: la orden pasa a En reparación y se
@@ -506,9 +510,12 @@ func (s *Quotes) Respond(ctx context.Context, c RespondCmd) (domain.Quote, error
 			}
 		}
 		now := s.clock.Now()
+		after := map[string]any{"decision": c.Response.Decision, "canal": c.Response.Channel, "total": q.Total()}
+		if c.Reason != "" {
+			after["motivo"] = c.Reason
+		}
 		if err := s.audit.Record(ctx, audit.Entry{TallerID: c.TallerID, Actor: c.Actor, Action: "cotizacion.respuesta", Entity: "cotizacion",
-			EntityID: q.ID, After: map[string]any{"decision": c.Response.Decision, "canal": c.Response.Channel, "total": q.Total()},
-			OccurredAt: now}); err != nil {
+			EntityID: q.ID, After: after, OccurredAt: now}); err != nil {
 			return err
 		}
 		out = q

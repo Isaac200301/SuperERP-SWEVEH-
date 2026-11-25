@@ -521,6 +521,40 @@ export interface paths {
         patch: operations["setQuoteOptions"];
         trace?: never;
     };
+    "/orders/{id}/quote/client-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lo que ve el cliente de la cotización vigente, para mostrarla en pantalla (V-10, ADR-0043, HU-109). Solo lo del cliente: sin costos internos, gastos ni notas internas; el detalle de las partidas solo si "Mostrar detalle al cliente" está encendido. Permiso quote:read */
+        get: operations["getQuoteClientView"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{id}/quote.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La cotización vigente en PDF tamaño carta, con lo mismo que ve el cliente (V-10, HU-109). Sin caché. Permiso quote:read */
+        get: operations["getQuotePdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/orders/{id}/quote/lines/{lineId}/detail": {
         parameters: {
             query?: never;
@@ -1873,6 +1907,71 @@ export interface components {
             gastado: number;
             /** Format: int64 */
             quedan: number;
+        };
+        VistaCliente: {
+            documento: components["schemas"]["DocumentoCliente"];
+            autorizacion: components["schemas"]["AutorizacionMostrador"];
+        };
+        DocumentoCliente: {
+            taller: string;
+            /** @description Código de la orden, por ejemplo OS-0044 */
+            orden: string;
+            placa: string;
+            vehiculo: string;
+            cliente: string;
+            cotizacion: components["schemas"]["CotizacionCliente"];
+        };
+        CotizacionCliente: {
+            numero: number;
+            /** @enum {string} */
+            estado: "borrador" | "enviada" | "aprobada" | "rechazada" | "dudas";
+            lineas: components["schemas"]["LineaCliente"][];
+            /**
+             * Format: int64
+             * @description COP sin decimales, antes de descuentos
+             */
+            subtotal: number;
+            /** Format: int64 */
+            descuento: number;
+            ivaPct: number;
+            /** Format: int64 */
+            iva: number;
+            preciosConIva: boolean;
+            /** Format: int64 */
+            total: number;
+            /** Format: date-time */
+            enviadaEn: string | null;
+            /** Format: date-time */
+            venceEn: string | null;
+            vencida: boolean;
+        };
+        LineaCliente: {
+            /** @enum {string} */
+            tipo: "servicio" | "repuesto" | "partida";
+            descripcion: string;
+            cantidad: number;
+            /** Format: int64 */
+            precioUnitario: number;
+            /** Format: int64 */
+            subtotal: number;
+            descuentoPct: number;
+            /** Format: int64 */
+            descuento: number;
+            /** @description Respuesta ítem por ítem (HU-30); null si aún no hay */
+            aprobada: boolean | null;
+            /** @description Solo en partidas y solo si el taller encendió "Mostrar detalle al cliente"; sin valores de referencia */
+            detalle?: {
+                descripcion: string;
+                cantidad: number;
+            }[];
+        };
+        /** @description Para quien atiende, no para el cliente: si el cliente ya autorizó sus datos y el texto que debe aceptar antes de aprobar en el mostrador (HU-86) */
+        AutorizacionMostrador: {
+            /** Format: uuid */
+            clienteId: string;
+            /** @enum {string} */
+            estado: "pendiente" | "autorizada" | "rechazada" | "revocada";
+            texto: string;
         };
         DetallePartida: {
             descripcion: string;
@@ -3429,6 +3528,54 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    getQuoteClientView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VistaCliente"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    getQuotePdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description PDF */
+            200: {
+                headers: {
+                    /** @description attachment; filename="cotizacion-OS-0044.pdf" */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
     setPartidaDetail: {
         parameters: {
             query?: never;
@@ -3593,6 +3740,8 @@ export interface operations {
                     /** @enum {string} */
                     canal: "telefono" | "mostrador";
                     itemsAprobados?: string[];
+                    /** @description Opcional, al no aprobar (V-10); queda en la bitácora */
+                    motivo?: string;
                 };
             };
         };

@@ -251,7 +251,7 @@ Preferir la biblioteca estándar de Go; librerías con licencia permisiva (MIT, 
 | 1-nov-2026 | Arquitectura: monolito modular con capas hexagonales | `docs/06-arquitectura.md` |
 | 24-nov-2026 | Entrada con **celular + PIN** de 4 dígitos sin verificar el número, en vez de celular + OTP (Pablo, V-03; ADR-0037). El código sigue con `AUTH_MODE=otp` | HU-01, HU-104, `docs/06` §6 |
 | 24-nov-2026 | **Un solo panel** (V-05, ADR-0038): el mecánico ve precios y dinero; cambia RF-21 y HU-81 | `docs/03` errata 13, HU-81, `roles.go` |
-| 24-nov-2026 | Funciones nuevas pedidas por Pablo para la entrega del 27-nov: **HU-104** (PIN), **HU-105** (partidas, V-07, ADR-0040), **HU-106** (lo gastado contra lo cotizado, V-08, ADR-0040) y **HU-110** (inventario en otro programa, V-06, ADR-0039); HU-107 a HU-109 llegan con sus rebanadas. Isaac debe revisarlas | `docs/04`, `docs/data/historias.json` |
+| 24-nov-2026 | Funciones nuevas pedidas por Pablo para la entrega del 27-nov: **HU-104** (PIN), **HU-105** (partidas, V-07, ADR-0040), **HU-106** (lo gastado contra lo cotizado, V-08, ADR-0040) y **HU-110** (inventario en otro programa, V-06, ADR-0039); HU-109 (la cotización en pantalla y en PDF, V-10, ADR-0043) llega con R7; HU-107 y HU-108 llegan con sus rebanadas. Isaac debe revisarlas | `docs/04`, `docs/data/historias.json` |
 
 ## 12. Registro de cambios de este documento
 
@@ -259,3 +259,4 @@ Preferir la biblioteca estándar de Go; librerías con licencia permisiva (MIT, 
 |---|---|---|
 | 1-nov-2026 | Versión inicial | Isaac / Pablo |
 | 25-nov-2026 | §11: entrada con celular + PIN (V-03) y HU-104 nueva (R-12: alcance pedido por Pablo, rango 1) | Pablo |
+| 25-nov-2026 | §11: HU-109 (la cotización en pantalla y en PDF, V-10, ADR-0043) agregada con R7 (R-12: alcance pedido por Pablo, rango 1) | Pablo |

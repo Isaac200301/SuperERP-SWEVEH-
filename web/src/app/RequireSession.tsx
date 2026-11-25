@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router';
+import { Navigate, Outlet, useLocation } from 'react-router';
 
 import { can, sessionKey, useSession } from '../features/auth/api';
 import { MobileShell } from '../features/panel/MobileShell';
@@ -9,8 +9,11 @@ import { api, unwrap, type Sesion } from '../shared/api/client';
 import { Alert } from '../shared/ui/Alert';
 import { useIsMobile } from '../shared/ui/useIsMobile';
 
-/** Protege el panel: sin sesión manda a /entrar y conserva la ruta para volver. */
-export function RequireSession() {
+/**
+ * Protege el panel: sin sesión manda a /entrar y conserva la ruta para volver. Con `bare` no pone el menú del panel:
+ * es para las pantallas completas (la cotización que se le muestra al cliente, V-10).
+ */
+export function RequireSession({ bare = false }: { bare?: boolean }) {
   const q = useSession();
   const qc = useQueryClient();
   const loc = useLocation();
@@ -38,6 +41,7 @@ export function RequireSession() {
   if (q.data === null) {
     return <Navigate to={`/entrar?volver=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
   }
+  if (bare) return q.data.cambiarPin ? <Navigate to="/panel/cambiar-pin" replace /> : <Outlet />;
   return <Panel session={q.data} />;
 }
 

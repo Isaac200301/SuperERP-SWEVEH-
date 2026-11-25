@@ -120,7 +120,7 @@ func New(d Deps) *chi.Mux {
 			p, err := m.Admin.Parametros(ctx, id) // V-06: "Llevo el inventario en otro programa"
 			return p.ExternalInventory, err
 		}).Routes,
-		quoteshttp.NewHandler(m.Quotes, guard, d.Log).Routes,
+		quoteshttp.NewHandler(m.Quotes, guard, d.Log).WithConsentText(customershttp.ConsentText).Routes,
 		ordershttp.NewFindingsHandler(m.Findings, guard, d.Log).Routes,
 		ordershttp.NewExpensesHandler(m.Expenses, guard, d.Log).Routes, // V-08
 		search.NewHandler(tx, m.VehDir, m.CustDir, m.OrdersF, guard, d.Log).Routes,

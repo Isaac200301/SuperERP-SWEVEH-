@@ -30,6 +30,7 @@ import (
 	"sweveh/internal/platform/storage"
 	"sweveh/internal/quotes"
 	quotesdeps "sweveh/internal/quotes/adapters/out/deps"
+	quotespdf "sweveh/internal/quotes/adapters/out/pdf"
 	quotespg "sweveh/internal/quotes/adapters/out/postgres"
 	quotesapp "sweveh/internal/quotes/app"
 	"sweveh/internal/tenancy"
@@ -105,6 +106,7 @@ func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger
 		quotesdeps.Inventory{I: m.InvF}, m.Audit, m.Events, clk)
 	m.QuotesF = quotes.New(m.Quotes)
 	m.Quotes.SetRules(quotesdeps.Rules{A: m.Admin})
+	m.Quotes.SetDirectory(quotesdeps.Directory{Workshops: m.Workshops, Orders: m.OrdersF, Customers: m.CustDir}, quotespdf.Renderer{}) // V-10
 	m.Flow.SetQuoteReader(quotesdir.Reader{Q: m.QuotesF})
 	m.Expenses = ordersapp.NewExpenses(tx, flowRepo, orderspg.Expenses{}, quotesdir.Reader{Q: m.QuotesF}, m.Audit, clk)
 	return m
