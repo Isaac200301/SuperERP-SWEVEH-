@@ -3,7 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { registerWorkshop, shot } from './helpers';
 
 /**
- * El panel en el celular (mockups móviles v1): barra inferior, hoja "Nueva orden", orden en pestañas y "Más".
+ * El panel en el celular (mockups móviles v1; barra de la entrega del 27-nov): Hoy · Órdenes · Asistente · Taller,
+ * hoja "Nueva orden" desde Órdenes, orden en pestañas y "Más". Sin WhatsApp (V-01) a menos que E2E_WHATSAPP=true.
  * CA-11: ninguna pantalla se desborda de lado. Datos Ficticio. Deja capturas en SWEVEH_E2E_OUT.
  */
 const uniq = Date.now().toString().slice(-6);
@@ -22,12 +23,18 @@ test('el dueño maneja el taller desde el celular', async ({ page }) => {
   // Hoy, con la barra inferior del dueño.
   await barra.getByRole('link', { name: 'Hoy' }).click();
   await expect(page.getByRole('heading', { name: /Buen día|Buenas tardes|Buenas noches/ })).toBeVisible();
-  for (const tab of ['Hoy', 'Órdenes', 'Taller']) await expect(barra.getByRole('link', { name: tab })).toBeVisible();
+  for (const tab of ['Hoy', 'Órdenes', 'Asistente', 'Taller']) await expect(barra.getByRole('link', { name: tab })).toBeVisible();
   await sinDesborde(page);
   await shot(page, 'movil-01-hoy');
 
-  // Nueva orden desde la hoja: la placa no ha venido, así que va a la pantalla completa.
-  await barra.getByRole('button', { name: 'Nueva orden' }).click();
+  // Asistente: por ahora el chat vacío (R8).
+  await barra.getByRole('link', { name: 'Asistente' }).click();
+  await expect(page.getByRole('heading', { name: 'Asistente' })).toBeVisible();
+  await sinDesborde(page);
+
+  // Nueva orden desde Órdenes: la placa no ha venido, así que va a la pantalla completa.
+  await barra.getByRole('link', { name: 'Órdenes' }).click();
+  await page.getByRole('button', { name: 'Nueva orden' }).click();
   const hoja = page.getByRole('dialog', { name: 'Nueva orden' });
   await hoja.getByLabel('Placa').fill(placa);
   await hoja.getByRole('button', { name: 'Registrar vehículo nuevo' }).click();
@@ -48,7 +55,8 @@ test('el dueño maneja el taller desde el celular', async ({ page }) => {
   await expect(barra).toHaveCount(0);
   await sinDesborde(page);
   await shot(page, 'movil-02-orden-estado');
-  for (const [tab, name] of [['Cotización', 'cotizacion'], ['WhatsApp', 'whatsapp'], ['Historial', 'historial']] as const) {
+  await expect(page.getByRole('tab', { name: 'WhatsApp' })).toHaveCount(0); // V-01
+  for (const [tab, name] of [['Cotización', 'cotizacion'], ['Historial', 'historial']] as const) {
     await page.getByRole('tab', { name: tab }).click();
     await sinDesborde(page);
     await shot(page, `movil-03-orden-${name}`);
@@ -63,17 +71,14 @@ test('el dueño maneja el taller desde el celular', async ({ page }) => {
   await shot(page, 'movil-04-ordenes');
 
   // La misma placa en la hoja ya tiene orden abierta: no deja duplicarla.
-  await barra.getByRole('button', { name: 'Nueva orden' }).click();
+  await page.getByRole('button', { name: 'Nueva orden' }).click();
   await page.getByRole('dialog', { name: 'Nueva orden' }).getByLabel('Placa').fill(placa);
   await expect(page.getByText(/Ya tiene abierta la OS-/)).toBeVisible();
   await shot(page, 'movil-05-hoja-nueva-orden');
   await page.keyboard.press('Escape');
 
-  // Por revisar: vacío en un taller nuevo, con el interruptor del asistente.
-  await barra.getByRole('link', { name: 'Revisar' }).click();
-  await expect(page.getByRole('heading', { name: 'Por revisar' })).toBeVisible();
-  await sinDesborde(page);
-  await shot(page, 'movil-06-por-revisar');
+  // Por revisar es de WhatsApp (V-01): sin la bandera no está en la barra.
+  await expect(barra.getByRole('link', { name: 'Revisar' })).toHaveCount(0);
 
   // Taller: números e inventario del dueño, y las demás secciones.
   await barra.getByRole('link', { name: 'Taller' }).click();
@@ -96,15 +101,11 @@ test('el dueño maneja el taller desde el celular', async ({ page }) => {
   await shot(page, 'movil-08-cliente');
   await page.keyboard.press('Escape');
 
-  // Automatizaciones: cifras de la semana y filtro.
+  // Automatizaciones son de WhatsApp (V-01): no salen en Taller.
   await barra.getByRole('link', { name: 'Taller' }).click();
-  await page.getByRole('link', { name: 'Automatizaciones' }).click();
-  await expect(page.getByText('envíos esta semana')).toBeVisible();
-  await sinDesborde(page);
-  await shot(page, 'movil-09-automatizaciones');
+  await expect(page.getByRole('link', { name: 'Automatizaciones' })).toHaveCount(0);
 
   // Piso: la orden por recibir va arriba y se recibe a pantalla completa.
-  await page.getByRole('link', { name: 'Volver a Taller' }).click();
   await page.getByRole('link', { name: 'Piso' }).click();
   await expect(page.getByText('LO SIGUIENTE')).toBeVisible();
   await sinDesborde(page);

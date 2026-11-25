@@ -114,6 +114,7 @@ La cuenta de Meta y el número de prueba (plantillas propias y duración del tok
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (solo backend) | Storage privado y URLs firmadas | staging, prod |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | Exportación de trazas, métricas y logs | staging, prod |
 | `SONAR_TOKEN`, `SNYK_TOKEN` | Solo como secretos de GitHub Actions | CI |
+| `FEATURE_WHATSAPP`, `FEATURE_PLATFORM` | Banderas de la entrega del 27-nov (V-01, V-02; `false` por defecto): con `false` no se montan las rutas de WhatsApp (mensajería, automatizaciones, bandeja, asesor, lista por foto, simulador, webhooks) ni las de Plataforma, `/me` lo dice en `funciones` y el worker deja esos eventos `omitido: whatsapp_apagado` | local, staging, prod |
 
 `.env.example` con **valores ficticios** sí va al repositorio; `.env` real, no (en `.gitignore`).
 

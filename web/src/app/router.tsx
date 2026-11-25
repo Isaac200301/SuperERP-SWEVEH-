@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router';
 
+import { RequireFeature } from './RequireFeature';
 import { RequireSession } from './RequireSession';
 
 // División de código por ruta (skill sweveh-frontend-react §11): cada pantalla se baja al abrirla.
@@ -28,7 +29,17 @@ const TeamPage = page(() => import('../features/team/TeamPage'), 'TeamPage');
 const WorkshopPage = page(() => import('../features/workshop/WorkshopPage'), 'WorkshopPage');
 const OnboardingPage = page(() => import('../features/workshop/OnboardingPage'), 'OnboardingPage');
 const MorePage = page(() => import('../features/panel/MorePage'), 'MorePage');
+const AssistantPage = page(() => import('../features/assistant/AssistantPage'), 'AssistantPage');
 const ReceivePage = page(() => import('../features/orders/FloorMobile'), 'ReceivePage');
+
+/** Pantalla de una función que se puede apagar (V-01, V-02). */
+function Gated({ funcion, Page }: { funcion: 'whatsapp' | 'plataforma'; Page: LazyExoticComponent<ComponentType> }) {
+  return (
+    <RequireFeature funcion={funcion}>
+      <Lazy Page={Page} />
+    </RequireFeature>
+  );
+}
 
 function Lazy({ Page }: { Page: LazyExoticComponent<ComponentType> }) {
   return (
@@ -62,19 +73,21 @@ export const router = createBrowserRouter([
       { path: 'piso/recibir', element: <Lazy Page={ReceivePage} /> },
       { path: 'piso/recibir/:id', element: <Lazy Page={ReceivePage} /> },
       { path: 'clientes', element: <Lazy Page={CustomersPage} /> },
-      { path: 'por-revisar', element: <Lazy Page={InboxPage} /> },
-      { path: 'conversaciones', element: <Lazy Page={ConversationsPage} /> },
-      { path: 'conversaciones/:id', element: <Lazy Page={ConversationPage} /> },
-      { path: 'automatizaciones', element: <Lazy Page={AutomationsPage} /> },
+      { path: 'por-revisar', element: <Gated funcion="whatsapp" Page={InboxPage} /> },
+      { path: 'conversaciones', element: <Gated funcion="whatsapp" Page={ConversationsPage} /> },
+      { path: 'conversaciones/:id', element: <Gated funcion="whatsapp" Page={ConversationPage} /> },
+      { path: 'automatizaciones', element: <Gated funcion="whatsapp" Page={AutomationsPage} /> },
       { path: 'tablero', element: <Lazy Page={DashboardPage} /> },
       { path: 'servicios', element: <Lazy Page={ServicesPage} /> },
       { path: 'repuestos', element: <Lazy Page={PartsPage} /> },
       { path: 'catalogo', element: <Navigate to="/panel/repuestos" replace /> },
       { path: 'equipo', element: <Lazy Page={TeamPage} /> },
       { path: 'taller', element: <Lazy Page={WorkshopPage} /> },
-      { path: 'whatsapp-prueba', element: <Lazy Page={SimulatorPage} /> },
+      { path: 'whatsapp-prueba', element: <Gated funcion="whatsapp" Page={SimulatorPage} /> },
+      // V-11: el asistente del piso (R8); por ahora el chat vacío.
+      { path: 'asistente', element: <Lazy Page={AssistantPage} /> },
       { path: 'arranque', element: <Lazy Page={OnboardingPage} /> },
-      { path: 'plataforma', element: <Lazy Page={PlatformPage} /> },
+      { path: 'plataforma', element: <Gated funcion="plataforma" Page={PlatformPage} /> },
       // Celular: "Taller" / "Más" / "Yo" de la barra inferior (mockups móviles v1).
       { path: 'mas', element: <Lazy Page={MorePage} /> },
     ],

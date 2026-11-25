@@ -14,5 +14,9 @@ FOR UPDATE SKIP LOCKED;
 -- name: MarkOutboxProcessed :exec
 UPDATE outbox.evento SET procesado_en = $2, intentos = intentos + 1, ultimo_error = NULL WHERE id = $1;
 
+-- name: MarkOutboxSkipped :exec
+-- Omitido: se da por procesado sin efecto y el motivo queda en ultimo_error (p. ej. "omitido: whatsapp_apagado").
+UPDATE outbox.evento SET procesado_en = $2, intentos = intentos + 1, ultimo_error = $3 WHERE id = $1;
+
 -- name: MarkOutboxFailed :exec
 UPDATE outbox.evento SET intentos = intentos + 1, ultimo_error = $2, proximo_intento = $3 WHERE id = $1;

@@ -250,13 +250,17 @@ const origin = "https://demo.sweveh.local"
 func newLoader(d Deps, clk *clock.Fake) *loader {
 	key, _ := authn.GenerateDevKey()
 	mem := otp.NewMemory()
-	cfg := config.API{Env: config.EnvLocal, WhatsApp: config.WhatsApp{Provider: "local"}, AI: config.AI{Provider: "reglas"}}
+	// La carga usa su propio servidor en el proceso con todo encendido (también el simulador de WhatsApp) para
+	// dejar el guion completo en la base; con FEATURE_WHATSAPP apagada esos datos quedan quietos (V-01).
+	all := config.Features{WhatsApp: true, Platform: true}
+	cfg := config.API{Env: config.EnvLocal, WhatsApp: config.WhatsApp{Provider: "local"}, AI: config.AI{Provider: "reglas"}, Features: all}
 	h := server.New(server.Deps{
 		Pool: d.API, Log: d.Log, Clock: clk,
 		Signer:    authn.NewSigner(key, "demo-1", clk),
 		Verifier:  authn.NewVerifier(map[string]*ecdsa.PublicKey{"demo-1": &key.PublicKey}, clk),
 		OTPSender: mem, OTPPepper: []byte("carga-de-la-demo-solo-en-este-proceso"),
 		AllowedOrigins: []string{origin}, LoginPerMinute: 1e6, Storage: d.Storage, Extra: wire.Extra(cfg),
+		Features: server.Features(all),
 	})
 	return &loader{h: h, clk: clk, otp: mem, cookies: map[string]*http.Cookie{}, phones: d.Phones, ids: map[string]string{}, photo: samplePhoto(),
 		now: d.Now}

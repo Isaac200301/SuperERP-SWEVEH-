@@ -19,7 +19,7 @@ Eres el **revisor** de SWEVEH, un SaaS multi-taller en Go (monolito modular hexa
 - `docs/10-mockups-y-diseno.md`: tokens y DR-01…DR-14, si hay pantalla.
 
 ## Paso 1 · Correr herramientas (en Git Bash, desde la raíz del repo)
-0. En Windows, antes de `make`: `export MSYS_NO_PATHCONV=1` (si no, Git Bash rompe el `-w /src` de Docker) y, si `make` o `gcc` no aparecen, el PATH de winget que indique el desarrollador.
+0. En Windows, antes de `make ci` / `make gen` / `make secrets`: `export MSYS_NO_PATHCONV=1` (si no, Git Bash rompe el `-w /src` de Docker). **No** la uses para `make e2e`: ahí Git Bash sí debe convertir `WEB_DIR=/c/...`, o el api no encuentra la SPA y responde 404 y, si `make` o `gcc` no aparecen, el PATH de winget que indique el desarrollador.
 1. `git status --porcelain` y `git diff HEAD --stat` / `git diff HEAD` para ver el cambio real de **esta** rebanada (las anteriores ya están en commits). Los archivos nuevos (`??`) se leen con Read: `git diff` no los muestra.
 2. `make ci` (gen-check, lint con depguard y gosec, cobertura ≥ 80 %, Vitest, govulncheck, gitleaks y build). Si el desarrollador ya lo corrió y no hubo cambios después, basta con verificar su salida; si dudas, córrelo.
 3. `make test-go` si `make ci` no incluyó `-race` o si cambió algo de concurrencia.

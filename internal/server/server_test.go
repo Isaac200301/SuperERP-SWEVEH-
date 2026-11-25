@@ -52,8 +52,22 @@ func newEnv(t *testing.T) *env {
 	return newEnvWith(t, config.API{Env: config.EnvLocal})
 }
 
+// allOn: las pruebas de antes corren con WhatsApp y Plataforma encendidos (V-01, V-02); las de la entrega del 27-nov
+// los apagan a propósito (features_test.go).
+var allOn = config.Features{WhatsApp: true, Platform: true}
+
 // newEnvWith es newEnv con la configuración del motor (WhatsApp, IA) y los webhooks públicos montados.
+// Sin banderas en cfg, todo encendido (allOn): así siguen pasando las pruebas de antes.
 func newEnvWith(t *testing.T, cfg config.API) *env {
+	t.Helper()
+	if cfg.Features == (config.Features{}) {
+		cfg.Features = allOn
+	}
+	return newEnvRaw(t, cfg)
+}
+
+// newEnvRaw usa las banderas tal como vienen, incluso todas apagadas (como en la entrega del 27-nov).
+func newEnvRaw(t *testing.T, cfg config.API) *env {
 	t.Helper()
 	d := testdb.New(t)
 	key, err := authn.GenerateDevKey()
@@ -77,6 +91,7 @@ func newEnvWith(t *testing.T, cfg config.API) *env {
 		OTPSender: mem, OTPPepper: []byte("pepper-de-pruebas-de-32-caracteres!!"),
 		AllowedOrigins: []string{origin}, LoginPerMinute: 100000, Storage: st,
 		Extra: wire.Extra(cfg), Public: wire.Public(d.API, cfg, log), PlatformAdmins: cfg.Platform.Admins,
+		Features: server.Features(cfg.Features),
 	})
 	srv.Config.Handler = mux
 	srv.StartTLS()

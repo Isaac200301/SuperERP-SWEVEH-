@@ -14,6 +14,7 @@ import { Segmented } from '../../shared/ui/Segmented';
 import { useCustomerByPhone, useOpenOrder, useVehicleByPlate, type NewOrderInput } from './api';
 import { conDefectos, faltantesFicha, fichaPayload, fichaVacia, type Ficha } from './sheet';
 import { VehicleSheet } from './VehicleSheet';
+import { useFeature } from '../auth/api';
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -29,6 +30,7 @@ export function NewOrderPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const primera = params.get('primera') === '1';
+  const whatsapp = useFeature('whatsapp'); // V-01
 
   // La hoja "Nueva orden" del celular manda aquí la placa de un vehículo nuevo.
   const [placa, setPlaca] = useState(params.get('placa') ?? '');
@@ -258,7 +260,8 @@ export function NewOrderPage() {
                 </div>
               ) : null}
               <p className="text-sm text-ink-2">
-                Queda con autorización de datos <b>pendiente</b>: no le escribimos por WhatsApp hasta que la dé.
+                Queda con autorización de datos <b>pendiente</b>
+                {whatsapp ? ': no le escribimos por WhatsApp hasta que la dé.' : '.'}
               </p>
             </Card>
           ) : null}

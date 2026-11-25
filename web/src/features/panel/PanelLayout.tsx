@@ -4,7 +4,7 @@ import type { Sesion } from '../../shared/api/client';
 import { roles } from '../../shared/i18n/es-CO';
 import { Brand } from '../../shared/ui/Logo';
 import { IconLogout } from '../../shared/ui/icons';
-import { can, useLogout } from '../auth/api';
+import { can, feature, useLogout } from '../auth/api';
 import { usePendingCards } from '../inbox/usePendingCards';
 import { WhatsappDown } from '../messaging/WhatsappDown';
 import { sectionsFor } from './sections';
@@ -14,7 +14,7 @@ export function PanelLayout({ session, soloYo = false }: { session: Sesion; solo
   const navigate = useNavigate();
   const logout = useLogout();
   // HU-66: contador y sonido cuando llega una tarjeta a Por revisar (dueño y recepción).
-  const pending = usePendingCards(can(session, 'inbox:manage'));
+  const pending = usePendingCards(feature(session, 'whatsapp') && can(session, 'inbox:manage'));
   return (
     <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col gap-5 p-4 md:flex-row md:p-5">
       <aside className="flex flex-col gap-5 md:w-[240px] md:flex-none">
@@ -65,7 +65,7 @@ export function PanelLayout({ session, soloYo = false }: { session: Sesion; solo
         </div>
       </aside>
       <main className="flex min-w-0 flex-1 flex-col gap-5">
-        <WhatsappDown enabled={can(session, 'workshop:manage')} />
+        <WhatsappDown enabled={feature(session, 'whatsapp') && can(session, 'workshop:manage')} />
         <Outlet />
       </main>
     </div>

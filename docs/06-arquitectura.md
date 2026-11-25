@@ -545,6 +545,15 @@ El agente es el componente más difícil de asegurar porque lee texto que escrib
 - Credenciales distintas por entorno (dev, staging, prod); el rol de base de datos de la API tiene el mínimo privilegio (sin DDL, sin BYPASSRLS).
 - **Redacción de logs:** lista de campos prohibidos (celular completo, tokens, contenido de mensajes) enmascarados por el logger.
 
+### 7.7.1 Banderas de funciones (entrega del 27-nov)
+
+`FEATURE_WHATSAPP` y `FEATURE_PLATFORM` (`config.Features`, `false` por defecto) apagan lo que depende de WhatsApp y del administrador del ERP sin borrar código (V-01, V-02 de `docs/plan-entrega-viernes.md`):
+
+- **API:** las rutas no se montan (`wire.Extra`, `wire.Public`, `cataloghttp.WithPriceListPhoto`) y responden como una ruta que no existe. En `api/openapi.yaml` cada path apagable lleva `x-feature: whatsapp|platform`; `TestRouterMatchesOpenAPIContract` (todo encendido) y `TestRouterHidesFeaturesThatAreOff` (todo apagado) comparan el router con el contrato.
+- **Worker:** los eventos que terminan en WhatsApp (`orders.estado_cambiado`, `quotes.enviada`, `messaging.*`) se marcan procesados con `ultimo_error = 'omitido: whatsapp_apagado'` (`outbox.Skip`), sin reintentos; no corren webhooks ni avisos diarios. Con la bandera apagada no se arma el cliente de WAHA aunque `WAHA_URL` siga en el entorno.
+- **Tablero:** los KPI "clientes que vuelven" (HU-72) y "minutos hasta responder un WhatsApp" (HU-73) solo salen con `FEATURE_WHATSAPP=true` (V-09).
+- **Web:** `/me` trae `funciones`; el menú, la barra y el router ocultan lo apagado (`feature()`, `RequireFeature`). Ocultar no protege: el servidor ya no lo monta.
+
 ### 7.8 Cadena de suministro
 
 `go.sum` verificado, `govulncheck` y Snyk en cada PR, Dependabot para actualizaciones, imagen base mínima (distroless o Alpine) ejecutada como usuario no root, SBOM (CycloneDX) generado en el build y GitHub Actions **fijadas por SHA**. Detalle en la sección 13.

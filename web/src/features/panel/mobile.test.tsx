@@ -38,23 +38,24 @@ describe('useIsMobile', () => {
 describe('TabBar (mockups móviles)', () => {
   const labels = () => screen.getAllByRole('link').map((l) => l.textContent);
 
-  it('el dueño ve Hoy, Órdenes, Nueva, Revisar con su contador y Taller', () => {
-    renderPage(<TabBar session={as(dueno)} pending={2} />, '/panel/tablero');
-    expect(labels()).toEqual(['Hoy', 'Órdenes', '2 por revisarRevisar', 'Taller']);
-    expect(screen.getByRole('button', { name: 'Nueva orden' })).toBeInTheDocument();
+  // Entrega del 27-nov (V-05, V-11; Figma "04 Hoy"): la misma barra para todos los roles.
+  it('el dueño ve Hoy, Órdenes, Asistente y Taller; Hoy es el tablero', () => {
+    renderPage(<TabBar session={as(dueno)} />, '/panel/tablero');
+    expect(labels()).toEqual(['Hoy', 'Órdenes', 'Asistente', 'Taller']);
     expect(screen.getByRole('link', { name: 'Hoy' })).toHaveAttribute('aria-current', 'page');
-  });
-
-  it('recepción no ve los números (HU-82): Órdenes, Nueva, Revisar y Más', () => {
-    renderPage(<TabBar session={as(recepcion)} pending={0} />);
-    expect(labels()).toEqual(['Órdenes', 'Revisar', 'Más']);
-  });
-
-  it('el mecánico solo ve sus órdenes, Recibir y Yo, sin crear órdenes (HU-81)', () => {
-    renderPage(<TabBar session={as(mechanic)} pending={0} />);
-    expect(labels()).toEqual(['Órdenes', 'Recibir', 'Yo']);
-    expect(screen.getByRole('link', { name: 'Órdenes' })).toHaveAttribute('href', '/panel/piso');
+    expect(screen.getByRole('link', { name: 'Asistente' })).toHaveAttribute('href', '/panel/asistente');
     expect(screen.queryByRole('button', { name: 'Nueva orden' })).not.toBeInTheDocument();
+  });
+
+  it('recepción tiene la misma barra', () => {
+    renderPage(<TabBar session={as(recepcion)} />);
+    expect(labels()).toEqual(['Hoy', 'Órdenes', 'Asistente', 'Taller']);
+  });
+
+  it('el mecánico también; sin los números, Hoy es su piso', () => {
+    renderPage(<TabBar session={as(mechanic)} />);
+    expect(labels()).toEqual(['Hoy', 'Órdenes', 'Asistente', 'Taller']);
+    expect(screen.getByRole('link', { name: 'Hoy' })).toHaveAttribute('href', '/panel/piso');
   });
 });
 

@@ -8,6 +8,7 @@ import { Button } from '../../shared/ui/Button';
 import { WahaCard } from '../messaging/WahaCard';
 import { card, ProfileForm, type Taller } from './ProfileForm';
 import { SettingsForm } from './SettingsForm';
+import { useFeature } from '../auth/api';
 
 const select = 'min-h-[52px] rounded-btn border-[1.5px] border-line bg-white px-4 text-base';
 const dias = { lun: 'Lunes', mar: 'Martes', mie: 'Miércoles', jue: 'Jueves', vie: 'Viernes', sab: 'Sábado', dom: 'Domingo' } as const;
@@ -60,20 +61,23 @@ export function Schedule({ t, onSaved }: { t: Taller; onSaved?: () => void }) {
 
 export function WorkshopPage() {
   const q = useQuery({ queryKey: ['taller'], queryFn: async () => unwrap(await api.GET('/workshop')) });
+  const whatsapp = useFeature('whatsapp'); // V-01: sin WhatsApp no hay simulador ni tarjeta de WAHA
   if (q.isPending) return <p role="status">Cargando…</p>;
   if (q.isError) return <Alert>{q.error.message}</Alert>;
   return (
     <>
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[28px] font-extrabold">Mi taller</h1>
-        <Link to="/panel/whatsapp-prueba" className="inline-flex min-h-[44px] items-center font-bold text-primary">
-          Probar WhatsApp
-        </Link>
+        {whatsapp ? (
+          <Link to="/panel/whatsapp-prueba" className="inline-flex min-h-[44px] items-center font-bold text-primary">
+            Probar WhatsApp
+          </Link>
+        ) : null}
       </header>
       <ProfileForm t={q.data} />
       <Schedule t={q.data} />
       <SettingsForm />
-      <WahaCard />
+      {whatsapp ? <WahaCard /> : null}
     </>
   );
 }

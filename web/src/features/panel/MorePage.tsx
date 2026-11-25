@@ -11,7 +11,7 @@ import { sectionsFor } from './sections';
 import { TallerOverview } from './TallerOverview';
 
 /** Lo que ya está en la barra inferior no se repite en la lista. */
-const enLaBarra = ['/panel/tablero', '/panel/ordenes', '/panel/por-revisar'];
+const enLaBarra = ['/panel/tablero', '/panel/ordenes', '/panel/asistente'];
 
 /**
  * "Taller" / "Más" / "Yo" en el celular (mockup Taller): las demás secciones que el rol puede usar y cerrar sesión.

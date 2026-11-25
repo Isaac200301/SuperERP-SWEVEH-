@@ -18,9 +18,23 @@ import (
 	"sweveh/internal/shared"
 )
 
+// whatsappEvents son los eventos que terminan en un mensaje de WhatsApp (avisos AU-01…AU-07, autorización, asesor y
+// envíos). Con FEATURE_WHATSAPP apagada quedan omitidos con su motivo y no se reintentan (V-01).
+var whatsappEvents = []string{"orders.estado_cambiado", "quotes.enviada", "messaging.mensaje_recibido", "messaging.enviar", "messaging.envio_fallido"}
+
 // Register conecta los consumidores del outbox. Todos son idempotentes (entrega "al menos una vez").
-// Cada uno fija el taller del evento antes de tocar datos (RLS).
-func Register(d *outbox.Dispatcher, s *Services) {
+// Cada uno fija el taller del evento antes de tocar datos (RLS). whatsapp=false omite los eventos de WhatsApp.
+func Register(d *outbox.Dispatcher, s *Services, whatsapp bool) {
+	registerAll(d, s)
+	if whatsapp {
+		return
+	}
+	for _, ev := range whatsappEvents { // reemplaza al consumidor de verdad
+		d.On(ev, func(context.Context, outbox.Message) error { return outbox.Skip("whatsapp_apagado") })
+	}
+}
+
+func registerAll(d *outbox.Dispatcher, s *Services) {
 	with := func(fn func(ctx context.Context, m outbox.Message, p map[string]any) error) outbox.Handler {
 		return func(ctx context.Context, m outbox.Message) error {
 			var p map[string]any
@@ -57,7 +71,11 @@ func Register(d *outbox.Dispatcher, s *Services) {
 
 // Loops corre en el worker: webhooks crudos cada segundo y las tareas diarias (AU-06, AU-07) cada hora,
 // con candado consultivo para que solo una instancia las ejecute (R-07).
-func Loops(ctx context.Context, pool *pgxpool.Pool, s *Services, log *slog.Logger) {
+// Con whatsapp=false no hay webhooks ni avisos diarios que correr (V-01).
+func Loops(ctx context.Context, pool *pgxpool.Pool, s *Services, log *slog.Logger, whatsapp bool) {
+	if !whatsapp {
+		return
+	}
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	lastDaily := time.Time{}
@@ -111,6 +129,7 @@ func daily(ctx context.Context, pool *pgxpool.Pool, tx *db.TxManager, s *Service
 type WorkerConfig struct {
 	WhatsApp config.WhatsApp
 	AI       config.AI
+	Features config.Features
 	Poll     time.Duration
 	Batch    int32
 }
@@ -119,11 +138,11 @@ type WorkerConfig struct {
 // webhooks y las tareas diarias hasta que ctx se cancela. Lo usan cmd/worker y, con RUN_WORKER=true, cmd/api.
 func StartWorker(ctx context.Context, pool *pgxpool.Pool, st storage.Store, clk clock.Clock, log *slog.Logger, c WorkerConfig) {
 	m := server.Build(db.NewTxManager(pool), st, clk, log)
-	s := Build(m, c.WhatsApp, c.AI)
+	s := Build(m, Engine(c.WhatsApp, c.Features), c.AI)
 	d := outbox.NewDispatcher(pool, clk, log, c.Batch)
-	Register(d, s)
-	log.Info("worker despachando outbox y webhooks", "cada", c.Poll.String())
-	go Loops(ctx, pool, s, log)
+	Register(d, s, c.Features.WhatsApp)
+	log.Info("worker despachando outbox y webhooks", "cada", c.Poll.String(), "whatsapp", c.Features.WhatsApp)
+	go Loops(ctx, pool, s, log, c.Features.WhatsApp)
 	d.Run(ctx, c.Poll)
 	log.Info("worker detenido")
 }

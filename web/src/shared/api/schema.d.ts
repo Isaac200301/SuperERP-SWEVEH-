@@ -1865,6 +1865,11 @@ export interface components {
             cuentaNueva: boolean;
             /** @description Es administrador del ERP: ve el medidor de todos los talleres (HU-74, ADR-0030) */
             adminPlataforma?: boolean;
+            /** @description Lo encendido en este servidor (FEATURE_WHATSAPP, FEATURE_PLATFORM; V-01 y V-02). Las rutas con x-feature apagada no existen (404) */
+            funciones?: {
+                whatsapp: boolean;
+                plataforma: boolean;
+            };
         };
         Cliente: {
             /** Format: uuid */

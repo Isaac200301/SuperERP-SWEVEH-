@@ -78,7 +78,7 @@ Personas:       prueban en el celular al final de cada día; aprueban el PR
 ### 2.1 Desarrollador
 - Lee la ficha de la rebanada, las HU que cita (`docs/04`) y la pantalla de Figma que le corresponde.
 - Escribe primero la prueba que falla y después el código (dominio → caso de uso → adaptador → pantalla).
-- Al terminar, hace `git add` de lo generado (sqlc y `schema.d.ts`; `make gen-check` compara contra el índice) y corre `make ci` y `make test-go` en Git Bash con `MSYS_NO_PATHCONV=1`. Si `-race` no corre, lo dice (R-15).
+- Al terminar, hace `git add` de lo generado (sqlc y `schema.d.ts`; `make gen-check` compara contra el índice) y corre `make ci` y `make test-go` en Git Bash con `MSYS_NO_PATHCONV=1` (no para `make e2e`: ahí rompe `WEB_DIR`). Si `-race` no corre, lo dice (R-15).
 - Lanza el subagente **revisor** (`.claude/agents/revisor.md`) con: la rebanada, los archivos tocados y la salida de `make ci`. El revisor mira `git diff HEAD` y `git status`, porque revisa antes del commit.
 - **No pasa a la siguiente rebanada** hasta que el revisor diga **Aprobada**. Máximo 2 rondas: si sigue un desacuerdo, decide Pablo. Después de cada revisión, `git status` confirma que el revisor no cambió archivos.
 - Actualiza la documentación **en el mismo commit**: `docs/09` (estado y bitácora), el ADR de la rebanada, `docs/07` (preguntas nuevas) y `docs/04` (HU nueva o cambiada).

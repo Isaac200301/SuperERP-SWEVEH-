@@ -15,6 +15,7 @@ import { DiagnosisPanel } from './DiagnosisPanel';
 import { OrderMessages } from './OrderDetailPage';
 import { OrderActions, QuotePanel, ReceptionPanel } from './OrderWork';
 import { vehiculoDe } from './OrdersMobile';
+import { useFeature } from '../auth/api';
 
 type Pestana = 'estado' | 'cotizacion' | 'whatsapp' | 'historial';
 
@@ -116,6 +117,7 @@ function Historial({ orden }: { orden: Orden }) {
 /** La orden en el celular (mockup Orden): encabezado compacto, pestañas y la acción principal fija abajo. */
 export function OrderDetailMobile({ orden: o }: { orden: Orden }) {
   const [tab, setTab] = useState<Pestana>('estado');
+  const whatsapp = useFeature('whatsapp'); // V-01
   const cotizable = !['por_recibir', 'recibido', 'cancelada'].includes(o.estado);
   const conAcciones = o.estado !== 'entregado' && o.estado !== 'cancelada';
   return (
@@ -157,7 +159,7 @@ export function OrderDetailMobile({ orden: o }: { orden: Orden }) {
         tabs={[
           { value: 'estado', label: 'Estado' },
           { value: 'cotizacion', label: 'Cotización' },
-          { value: 'whatsapp', label: 'WhatsApp' },
+          ...(whatsapp ? [{ value: 'whatsapp' as const, label: 'WhatsApp' }] : []),
           { value: 'historial', label: 'Historial' },
         ]}
       >
@@ -179,7 +181,7 @@ export function OrderDetailMobile({ orden: o }: { orden: Orden }) {
             <p className="rounded-[22px] bg-white p-4 text-sm text-ink-2">La cotización se arma después del diagnóstico.</p>
           )
         ) : null}
-        {tab === 'whatsapp' ? <OrderMessages orden={o} /> : null}
+        {whatsapp && tab === 'whatsapp' ? <OrderMessages orden={o} /> : null}
         {tab === 'historial' ? <Historial orden={o} /> : null}
       </Tabs>
       {conAcciones ? <OrderActions orden={o} bar /> : null}

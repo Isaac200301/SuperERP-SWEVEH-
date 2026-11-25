@@ -21,7 +21,7 @@ func TestStartWorker_ProcessesInboundAlone(t *testing.T) {
 	go func() {
 		defer close(done)
 		wire.StartWorker(ctx, e.db.Worker, e.st, e.clk, e.log, wire.WorkerConfig{WhatsApp: config.WhatsApp{Provider: "local"},
-			AI: config.AI{Provider: "reglas"}, Poll: 50 * time.Millisecond, Batch: 50})
+			AI: config.AI{Provider: "reglas"}, Features: allOn, Poll: 50 * time.Millisecond, Batch: 50})
 	}()
 
 	owner.must(http.StatusAccepted, owner.do("POST", "/api/v1/simulator/inbound", map[string]any{"celular": "3001234920", "nombre": "Laura", "texto": "Hola"}))

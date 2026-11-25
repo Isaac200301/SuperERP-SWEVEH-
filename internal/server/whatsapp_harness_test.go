@@ -46,7 +46,7 @@ func (e *env) whatsappWith(t *testing.T, owner *client, ch messagingapp.Channel,
 	}
 	s := wire.BuildWith(m, ch, it, config.AI{Provider: "reglas"})
 	d := outbox.NewDispatcher(e.db.Worker, e.clk, e.log, 100)
-	wire.Register(d, s)
+	wire.Register(d, s, true)
 	w := &wa{t: t, e: e, owner: owner, s: s, d: d}
 	// Las pruebas miran el borrador en "Por revisar": apagan el envío automático (ADR-0028). TestAgent_AutoReply
 	// lo prueba encendido.

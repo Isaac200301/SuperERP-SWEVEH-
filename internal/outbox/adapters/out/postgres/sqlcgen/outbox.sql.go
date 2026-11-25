@@ -118,3 +118,19 @@ func (q *Queries) MarkOutboxProcessed(ctx context.Context, arg MarkOutboxProcess
 	_, err := q.db.Exec(ctx, markOutboxProcessed, arg.ID, arg.ProcesadoEn)
 	return err
 }
+
+const markOutboxSkipped = `-- name: MarkOutboxSkipped :exec
+UPDATE outbox.evento SET procesado_en = $2, intentos = intentos + 1, ultimo_error = $3 WHERE id = $1
+`
+
+type MarkOutboxSkippedParams struct {
+	ID          uuid.UUID
+	ProcesadoEn *time.Time
+	UltimoError *string
+}
+
+// Omitido: se da por procesado sin efecto y el motivo queda en ultimo_error (p. ej. "omitido: whatsapp_apagado").
+func (q *Queries) MarkOutboxSkipped(ctx context.Context, arg MarkOutboxSkippedParams) error {
+	_, err := q.db.Exec(ctx, markOutboxSkipped, arg.ID, arg.ProcesadoEn, arg.UltimoError)
+	return err
+}

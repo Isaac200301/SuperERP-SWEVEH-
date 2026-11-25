@@ -149,8 +149,11 @@ jobs:
         working-directory: web
       - run: npx playwright install --with-deps chromium
         working-directory: web
-      - name: Recorrido en navegador (Playwright)
+      - name: Recorrido en navegador (Playwright), sin WhatsApp como el piloto (V-01)
         run: sh scripts/e2e.sh
+      # Con WhatsApp encendido sigue pasando el recorrido de WhatsApp (lo apagado no se borra, V-01).
+      - name: Recorrido de WhatsApp con FEATURE_WHATSAPP=true
+        run: E2E_WHATSAPP=true sh scripts/e2e.sh whatsapp.spec.ts
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

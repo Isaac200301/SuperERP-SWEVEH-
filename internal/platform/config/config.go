@@ -42,12 +42,25 @@ type API struct {
 	WhatsApp         WhatsApp
 	AI               AI
 	Platform         Platform
+	Features         Features
 	// RunWorker: el api corre también el worker (outbox, webhooks y tareas diarias) en el mismo proceso, para la demo
 	// en un solo servicio gratis (ADR-0036). En producción van separados. Usa su propio rol de base (WorkerDatabaseURL).
 	RunWorker         bool
 	WorkerDatabaseURL string
 	PollInterval      time.Duration
 	BatchSize         int32
+}
+
+// Features son las banderas de la entrega del 27-nov (docs/plan-entrega-viernes.md, V-01 y V-02): lo apagado
+// no se borra, solo no se monta. WhatsApp agrupa mensajería, automatizaciones, bandeja, asesor, notas de voz,
+// lista de precios por foto y el simulador; Platform el medidor y el registro técnico del administrador del ERP.
+type Features struct {
+	WhatsApp bool // FEATURE_WHATSAPP, por defecto false
+	Platform bool // FEATURE_PLATFORM, por defecto false
+}
+
+func loadFeatures(errs *[]error) Features {
+	return Features{WhatsApp: getBool("FEATURE_WHATSAPP", false, errs), Platform: getBool("FEATURE_PLATFORM", false, errs)}
 }
 
 // Platform es lo del administrador del ERP (HU-74, ADR-0030): quiénes son y con qué números se compara el consumo.
@@ -105,6 +118,7 @@ type Worker struct {
 	LogLevel     string
 	WhatsApp     WhatsApp
 	AI           AI
+	Features     Features
 }
 
 func engine(env Env, errs *[]error) (WhatsApp, AI) {
@@ -192,6 +206,7 @@ func LoadAPI() (API, error) {
 		StorageDir:        get("STORAGE_DIR", ".data/fotos"),
 	}
 	c.WhatsApp, c.AI = engine(c.Env, &errs)
+	c.Features = loadFeatures(&errs)
 	c.Platform = Platform{IncludedMessages: getInt("PLAN_MENSAJES_INCLUIDOS", 1000, &errs), COPPerUSD: getInt("TRM_COP_POR_USD", 4000, &errs)}
 	for _, raw := range splitList(os.Getenv("PLATFORM_ADMINS")) {
 		phone, err := shared.ParseColombianMobile(raw)
@@ -249,6 +264,7 @@ func LoadWorker() (Worker, error) {
 		LogLevel:     get("LOG_LEVEL", "info"),
 	}
 	c.WhatsApp, c.AI = engine(c.Env, &errs)
+	c.Features = loadFeatures(&errs)
 	if err := c.Env.validate(); err != nil {
 		errs = append(errs, err)
 	}

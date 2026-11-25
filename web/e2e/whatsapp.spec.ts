@@ -9,6 +9,10 @@ import { registerWorkshop, shot } from './helpers';
  */
 const uniq = Date.now().toString().slice(-6);
 
+// Entrega del 27-nov (V-01): WhatsApp está apagado por defecto. Este recorrido corre con `E2E_WHATSAPP=true make e2e`,
+// que levanta el api y el worker con FEATURE_WHATSAPP=true.
+test.skip(process.env.E2E_WHATSAPP !== 'true', 'WhatsApp apagado (FEATURE_WHATSAPP=false, V-01)');
+
 test('cliente nuevo por WhatsApp: autorización y respuesta automática', async ({ page }) => {
   await registerWorkshop(page, `311${uniq}2`);
 

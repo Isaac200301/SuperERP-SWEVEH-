@@ -9,7 +9,7 @@ import { IconBack, IconCheck, IconWarn } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
 import { StatePill } from '../../shared/ui/StatePill';
 import { useIsMobile } from '../../shared/ui/useIsMobile';
-import { useSession } from '../auth/api';
+import { useFeature, useSession } from '../auth/api';
 import { Thread } from '../messaging/Thread';
 import { useSettings } from '../workshop/SettingsForm';
 import { useOrder } from './api';
@@ -109,6 +109,7 @@ export function OrderDetailPage() {
   const [params] = useSearchParams();
   const q = useOrder(id);
   const mobile = useIsMobile();
+  const whatsapp = useFeature('whatsapp'); // V-01: sin WhatsApp no hay conversación en la orden
   if (q.isPending) return <p role="status">Cargando la orden…</p>;
   if (q.isError) {
     return (
@@ -137,7 +138,8 @@ export function OrderDetailPage() {
         <p className="text-ink-2">Abierta el {formatoFechaHora(o.creadoEn)}</p>
         <ReceiptAnswer orden={o} />
       </header>
-      {params.get('primera') === '1' ? <ReceivedPreview orden={o} /> : null}
+      {/* Vista previa del aviso de WhatsApp (HU-05): sale con V-01. */}
+      {whatsapp && params.get('primera') === '1' ? <ReceivedPreview orden={o} /> : null}
       <section className="rounded-card bg-white p-5">
         <StateStepper orden={o} />
       </section>
@@ -166,7 +168,7 @@ export function OrderDetailPage() {
       {!['por_recibir', 'cancelada'].includes(o.estado) ? <DiagnosisPanel orden={o} /> : null}
       {/* Se cotiza desde el diagnóstico; en reparación sale la adicional (HU-31). */}
       {!['por_recibir', 'recibido', 'cancelada'].includes(o.estado) ? <QuotePanel orden={o} /> : null}
-      <OrderMessages orden={o} />
+      {whatsapp ? <OrderMessages orden={o} /> : null}
     </>
   );
 }

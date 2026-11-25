@@ -47,7 +47,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	wire.StartWorker(ctx, pool, store, clk, log, wire.WorkerConfig{WhatsApp: cfg.WhatsApp, AI: cfg.AI, Poll: cfg.PollInterval,
+	wire.StartWorker(ctx, pool, store, clk, log, wire.WorkerConfig{WhatsApp: cfg.WhatsApp, AI: cfg.AI, Features: cfg.Features, Poll: cfg.PollInterval,
 		Batch: cfg.BatchSize})
 	return nil
 }

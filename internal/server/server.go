@@ -61,8 +61,16 @@ type Deps struct {
 	Extra func(m *Modules, g *authn.Guard) []func(chi.Router)
 	// Public monta rutas sin sesión de usuario (webhook de WhatsApp). Puede ser nil.
 	Public func(r chi.Router)
+	// Features son las banderas de la entrega del 27-nov (V-01, V-02). Misma forma que config.Features.
+	Features Features
 	// PlatformAdmins son los celulares (E.164) de los administradores del ERP (HU-74, ADR-0030).
 	PlatformAdmins []string
+}
+
+// Features: lo que está encendido. Lo apagado no se monta (404) y /me lo dice a la pantalla.
+type Features struct {
+	WhatsApp bool
+	Platform bool
 }
 
 // New devuelve el router HTTP completo.
@@ -91,6 +99,7 @@ func New(d Deps) *chi.Mux {
 	}
 	identityH := identityhttp.NewHandler(identitySvc, d.Log, httpx.NewRateLimiter(d.LoginPerMinute, 5), d.TrustProxy)
 	identityH.SetPlatformAdmins(d.PlatformAdmins)
+	identityH.SetFeatures(d.Features.WhatsApp, d.Features.Platform)
 	customersH := customershttp.NewHandler(m.Customers, guard, d.Log)
 	vehiclesH := vehicleshttp.NewHandler(m.Vehicles, guard, d.Log)
 	ordersH := ordershttp.NewHandler(m.Orders, m.Flow, guard, d.Log)
@@ -98,7 +107,7 @@ func New(d Deps) *chi.Mux {
 		identityH.PrivateRoutes, customersH.Routes, customersH.ExtraRoutes, vehiclesH.Routes, vehiclesH.ExtraRoutes, ordersH.Routes,
 		func(r chi.Router) { identityH.UserRoutes(r, guard) },
 		tenancyhttp.NewHandler(m.Admin, guard, d.Log).Routes,
-		cataloghttp.NewHandler(m.Catalog, guard, d.Log).Routes,
+		cataloghttp.NewHandler(m.Catalog, guard, d.Log).WithPriceListPhoto(d.Features.WhatsApp).Routes, // HU-93 va con V-01
 		inventoryhttp.NewHandler(m.Inventory, guard, d.Log).Routes,
 		quoteshttp.NewHandler(m.Quotes, guard, d.Log).Routes,
 		ordershttp.NewFindingsHandler(m.Findings, guard, d.Log).Routes,

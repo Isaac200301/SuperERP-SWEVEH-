@@ -6,10 +6,12 @@ import { estados } from '../../shared/i18n/es-CO';
 import { formatoFechaHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Chips } from '../../shared/ui/Chips';
-import { IconCar, IconChevron, IconMoto } from '../../shared/ui/icons';
+import { IconCar, IconChevron, IconMoto, IconPlus } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
 import { StatePill } from '../../shared/ui/StatePill';
+import { usePermission } from '../auth/api';
 import { SearchBox } from '../panel/SearchBox';
+import { abrirNuevaOrden } from '../panel/TabBar';
 import { useRecentOrders } from './api';
 
 export function vehiculoDe(o: Orden): string {
@@ -67,15 +69,28 @@ export function OrdersMobile() {
   const presentes = [...new Set([...todas.map((o) => o.estado), ...(filtro !== 'abiertas' && filtro !== 'todas' ? [filtro] : [])])];
   const lista = filtro === 'todas' ? todas : filtro === 'abiertas' ? abiertas : todas.filter((o) => o.estado === filtro);
   const espera = abiertas.filter((o) => o.estado === 'esperando_aprobacion').length;
+  const nueva = usePermission('order:create'); // la barra ya no tiene "+ Nueva" (V-11): se abre desde aquí
   return (
     <>
       <header className="-mx-4 -mt-4 flex flex-col gap-3.5 rounded-b-[28px] bg-white px-[18px] pt-5 pb-4">
-        <div>
-          <h1 className="text-[26px] font-extrabold tracking-[-.02em]">Órdenes</h1>
-          <p className="text-[13px] text-ink-2">
-            {abiertas.length} {abiertas.length === 1 ? 'abierta' : 'abiertas'}
-            {espera ? ` · ${espera} espera${espera === 1 ? '' : 'n'} al cliente` : ''}
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[26px] font-extrabold tracking-[-.02em]">Órdenes</h1>
+            <p className="text-[13px] text-ink-2">
+              {abiertas.length} {abiertas.length === 1 ? 'abierta' : 'abiertas'}
+              {espera ? ` · ${espera} espera${espera === 1 ? '' : 'n'} al cliente` : ''}
+            </p>
+          </div>
+          {nueva ? (
+            <button
+              type="button"
+              onClick={abrirNuevaOrden}
+              className="inline-flex min-h-[44px] flex-none items-center gap-1.5 rounded-btn bg-primary px-4 font-extrabold text-white"
+            >
+              <IconPlus size={18} />
+              Nueva orden
+            </button>
+          ) : null}
         </div>
         <SearchBox placeholder="Placa, cliente u OS" tone="surface" />
       </header>

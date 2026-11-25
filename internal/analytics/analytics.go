@@ -67,7 +67,13 @@ type Handler struct {
 	guard  *authn.Guard
 	log    *slog.Logger
 	now    func() time.Time
+	// legacyKPIs: "clientes que vuelven" (HU-72) y "minutos hasta responder un WhatsApp" (HU-73). Salen del tablero en
+	// la entrega del 27-nov (V-09); vuelven con FEATURE_WHATSAPP. El cálculo sigue en Stats.
+	legacyKPIs bool
 }
+
+// WithLegacyKPIs vuelve a sumar al tablero los KPI 6 y 7 (V-09).
+func (h *Handler) WithLegacyKPIs(on bool) *Handler { h.legacyKPIs = on; return h }
 
 func NewHandler(u UnitOfWork, o orders.Orders, q quotes.Quotes, e Extra, g *authn.Guard, log *slog.Logger, now func() time.Time) *Handler {
 	return &Handler{uow: u, orders: o, quotes: q, extra: e, guard: g, log: log, now: now}
@@ -116,7 +122,7 @@ func money(v int64) string {
 	return "$" + out
 }
 
-// dashboard son los 6 números del taller (HU-68 a HU-73). ?tipo=carro|moto los separa por tipo de vehículo (HU-68 y
+// dashboard son los números del taller (HU-68 a HU-71; HU-72 y HU-73 solo con FEATURE_WHATSAPP, V-09). ?tipo=carro|moto los separa por tipo de vehículo (HU-68 y
 // HU-70, Should). Las órdenes de ejemplo (registro y taller ficticio) suman para que los números no salgan en cero, y
 // los números que salen de órdenes llevan la marca "ejemplo" mientras existan (HU-71, docs/03 "taller ficticio").
 func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -228,40 +234,12 @@ func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, erro
 		}
 		kpis = append(kpis, k)
 
-		back, total, err := st.Returning(ctx, p.TallerID, now.AddDate(-1, 0, 0), flt)
-		if err != nil {
-			return err
+		if !h.legacyKPIs {
+			return nil
 		}
-		k = KPI{Code: "vuelven", Label: "Clientes que vuelven", Display: "sin datos",
-			Meaning: "De los vehículos atendidos en 12 meses, cuántos volvieron al menos otra vez."}
-		if total > 0 {
-			pct := float64(back) * 100 / float64(total)
-			k.Value, k.Display, k.Detail = f(pct), fmt.Sprintf("%.0f %%", pct), fmt.Sprintf("%d de %d vehículos", back, total)
-		}
-		kpis = append(kpis, k)
-
-		times, err := h.extra.ResponseMinutes(ctx, p.TallerID, monthStart)
-		if err != nil {
-			return err
-		}
-		k = KPI{Code: "respuesta", Label: "Minutos hasta responder un WhatsApp", Display: "sin datos",
-			Meaning: "La mediana de minutos entre que el cliente escribe y alguien del taller (o el asesor) le contesta, este mes. Las respuestas automáticas del estado del vehículo (AU-05) salen al instante y se cuentan aparte para no maquillar el número."}
-		var people, auto []float64
-		for _, t := range times {
-			if t.Auto {
-				auto = append(auto, t.Minutes)
-			} else {
-				people = append(people, t.Minutes)
-			}
-		}
-		if m := median(people); m != nil {
-			k.Value, k.Display = m, fmt.Sprintf("%.0f min", *m)
-		}
-		if len(auto) > 0 {
-			k.Detail = fmt.Sprintf("aparte, %d respuestas automáticas del estado (AU-05)", len(auto))
-		}
-		kpis = append(kpis, k)
-		return nil
+		legacy, err := h.legacy(ctx, p.TallerID, st, now, monthStart, flt)
+		kpis = append(kpis, legacy...)
+		return err
 	})
 	for i := range kpis {
 		kpis[i].Example = example && kpis[i].Code != "aprobaciones" && kpis[i].Code != "respuesta"
@@ -446,4 +424,48 @@ func (h *Handler) today(r *http.Request, p reqctx.Principal) (int, any, error) {
 		return nil
 	})
 	return http.StatusOK, map[string]any{"pendientes": out}, err
+}
+
+// returning es la parte de las cifras de órdenes que usa el KPI 6.
+type returning interface {
+	Returning(ctx context.Context, tallerID shared.ID, since time.Time, f orders.Filter) (int, int, error)
+}
+
+// legacy arma los KPI 6 y 7 (HU-72 y HU-73), apagados en la entrega del 27-nov (V-09).
+func (h *Handler) legacy(ctx context.Context, tallerID shared.ID, st returning, now, monthStart time.Time, flt orders.Filter) ([]KPI, error) {
+	var kpis []KPI
+	back, total, err := st.Returning(ctx, tallerID, now.AddDate(-1, 0, 0), flt)
+	if err != nil {
+		return nil, err
+	}
+	k := KPI{Code: "vuelven", Label: "Clientes que vuelven", Display: "sin datos",
+		Meaning: "De los vehículos atendidos en 12 meses, cuántos volvieron al menos otra vez."}
+	if total > 0 {
+		pct := float64(back) * 100 / float64(total)
+		k.Value, k.Display, k.Detail = f(pct), fmt.Sprintf("%.0f %%", pct), fmt.Sprintf("%d de %d vehículos", back, total)
+	}
+	kpis = append(kpis, k)
+
+	times, err := h.extra.ResponseMinutes(ctx, tallerID, monthStart)
+	if err != nil {
+		return nil, err
+	}
+	k = KPI{Code: "respuesta", Label: "Minutos hasta responder un WhatsApp", Display: "sin datos",
+		Meaning: "La mediana de minutos entre que el cliente escribe y alguien del taller (o el asesor) le contesta, este mes. Las respuestas automáticas del estado del vehículo (AU-05) salen al instante y se cuentan aparte para no maquillar el número."}
+	var people, auto []float64
+	for _, t := range times {
+		if t.Auto {
+			auto = append(auto, t.Minutes)
+		} else {
+			people = append(people, t.Minutes)
+		}
+	}
+	if m := median(people); m != nil {
+		k.Value, k.Display = m, fmt.Sprintf("%.0f min", *m)
+	}
+	if len(auto) > 0 {
+		k.Detail = fmt.Sprintf("aparte, %d respuestas automáticas del estado (AU-05)", len(auto))
+	}
+	kpis = append(kpis, k)
+	return kpis, nil
 }

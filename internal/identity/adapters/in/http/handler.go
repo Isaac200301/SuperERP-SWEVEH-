@@ -25,6 +25,7 @@ type Handler struct {
 	limiter    *httpx.RateLimiter
 	trustProxy bool
 	admins     []string // HU-74: celulares de los administradores del ERP
+	features   featuresDTO
 }
 
 func NewHandler(svc *app.Service, log *slog.Logger, limiter *httpx.RateLimiter, trustProxy bool) *Handler {
@@ -93,6 +94,18 @@ type sessionResp struct {
 	Permisos    []string    `json:"permisos"`
 	// AdminPlataforma: es administrador del ERP y ve el medidor de todos los talleres (HU-74, ADR-0030).
 	AdminPlataforma bool `json:"adminPlataforma"`
+	// Funciones: lo encendido en este servidor (V-01, V-02). La pantalla oculta lo apagado; el servidor ya no lo monta.
+	Funciones featuresDTO `json:"funciones"`
+}
+
+type featuresDTO struct {
+	WhatsApp   bool `json:"whatsapp"`
+	Plataforma bool `json:"plataforma"`
+}
+
+// SetFeatures dice qué está encendido (FEATURE_WHATSAPP, FEATURE_PLATFORM) para /me y las respuestas de sesión.
+func (h *Handler) SetFeatures(whatsapp, platform bool) {
+	h.features = featuresDTO{WhatsApp: whatsapp, Plataforma: platform}
 }
 
 // SetPlatformAdmins son los celulares (E.164) de los administradores del ERP, para /me (HU-74).
@@ -165,6 +178,7 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 		Usuario: userDTO{ID: u.ID.String(), Nombre: u.Name, Celular: shared.NationalNumber(u.Phone)},
 		Taller:  workshopDTO{ID: ws.ID.String(), Nombre: ws.Name},
 		Roles:   p.Roles, Permisos: domain.Permissions(p.Roles), AdminPlataforma: slices.Contains(h.admins, u.Phone),
+		Funciones: h.features,
 	})
 }
 
@@ -175,6 +189,6 @@ func (h *Handler) writeSession(w http.ResponseWriter, s app.Session, status int)
 		Usuario: userDTO{ID: s.User.ID.String(), Nombre: s.User.Name, Celular: shared.NationalNumber(s.User.Phone)},
 		Taller:  workshopDTO{ID: s.Workshop.ID.String(), Nombre: s.Workshop.Name},
 		Roles:   s.Roles, Permisos: domain.Permissions(s.Roles),
-		CuentaNueva: s.NewAccount,
+		CuentaNueva: s.NewAccount, Funciones: h.features,
 	})
 }

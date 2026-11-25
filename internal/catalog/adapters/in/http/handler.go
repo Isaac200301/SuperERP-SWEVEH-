@@ -18,7 +18,11 @@ type Handler struct {
 	svc   *app.Service
 	guard *authn.Guard
 	log   *slog.Logger
+	photo bool // HU-93: lista de precios por foto; apagada en la entrega del 27-nov (V-01)
 }
+
+// WithPriceListPhoto monta o no las rutas de la lista de precios por foto (HU-93).
+func (h *Handler) WithPriceListPhoto(on bool) *Handler { h.photo = on; return h }
 
 func NewHandler(svc *app.Service, g *authn.Guard, log *slog.Logger) *Handler {
 	return &Handler{svc: svc, guard: g, log: log}
@@ -29,6 +33,9 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(h.guard.Require("service:manage")).Post("/services", httpx.JSON(h.log, h.create))
 	r.With(h.guard.Require("service:manage")).Patch("/services/{id}", httpx.JSON(h.log, h.update))
 	r.With(h.guard.Require("service:manage")).Delete("/services/{id}", httpx.JSON(h.log, h.remove))
+	if !h.photo {
+		return
+	}
 	// HU-93: lista de precios por foto (ADR-0032).
 	r.With(h.guard.Require("service:manage")).Post("/services/photo", httpx.JSON(h.log, h.importPhoto))
 	r.With(h.guard.Require("service:manage")).Get("/services/proposals", httpx.JSON(h.log, h.proposals))

@@ -333,7 +333,7 @@ func TestWhatsApp_FailedDeliveryIsVisibleAndRetried(t *testing.T) {
 func TestWhatsApp_WebhookSignature(t *testing.T) {
 	e := newEnv(t)
 	r := chi.NewRouter()
-	wire.Public(e.db.API, config.API{WhatsApp: config.WhatsApp{AppSecret: "secreto", VerifyToken: "tok"}}, e.log)(r)
+	wire.Public(e.db.API, config.API{WhatsApp: config.WhatsApp{AppSecret: "secreto", VerifyToken: "tok"}, Features: allOn}, e.log)(r)
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 

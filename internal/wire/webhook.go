@@ -24,6 +24,9 @@ import (
 func Public(pool *pgxpool.Pool, cfg config.API, log *slog.Logger) func(chi.Router) {
 	svc := messagingapp.NewService(db.NewTxManager(pool), messagingpg.Repository{}, nil, nil, nil, clock.System{})
 	return func(r chi.Router) {
+		if !cfg.Features.WhatsApp { // V-01: sin WhatsApp no hay webhooks (404 como cualquier ruta que no existe)
+			return
+		}
 		r.Get("/webhooks/whatsapp", func(w http.ResponseWriter, r *http.Request) {
 			challenge, ok := meta.VerifyChallenge(cfg.WhatsApp.VerifyToken, r.URL.Query())
 			if !ok {

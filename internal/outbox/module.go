@@ -5,6 +5,7 @@ package outbox
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -59,6 +60,15 @@ type Message struct {
 // Handler procesa un evento. Debe ser idempotente: la entrega es "al menos una vez".
 type Handler func(ctx context.Context, m Message) error
 
+// Skipped es lo que devuelve un manejador que decide no hacer nada a propósito (p. ej. WhatsApp apagado, V-01):
+// el evento queda procesado, sin reintentos, con "omitido: <motivo>" en ultimo_error para poder auditarlo.
+type Skipped struct{ Reason string }
+
+func (s Skipped) Error() string { return "omitido: " + s.Reason }
+
+// Skip devuelve el error que marca el evento como omitido con su motivo.
+func Skip(reason string) error { return Skipped{Reason: reason} }
+
 // Dispatcher reparte los eventos pendientes a sus manejadores por tipo.
 type Dispatcher struct {
 	pool     *pgxpool.Pool // conexión con el rol sweveh_worker
@@ -90,7 +100,18 @@ func (d *Dispatcher) RunOnce(ctx context.Context) (int, error) {
 			m := Message{ID: r.ID, TallerID: r.TallerID, Type: r.Tipo, AggregateID: r.AgregadoID,
 				Payload: r.Payload, Attempts: int(r.Intentos)}
 			if h, ok := d.handlers[r.Tipo]; ok {
-				if herr := h(ctx, m); herr != nil {
+				herr := h(ctx, m)
+				var skip Skipped
+				if errors.As(herr, &skip) {
+					msg := skip.Error()
+					d.log.InfoContext(ctx, "outbox: evento omitido", "evento", r.Tipo, "motivo", skip.Reason)
+					if err := q.MarkOutboxSkipped(ctx, sqlcgen.MarkOutboxSkippedParams{ID: r.ID, ProcesadoEn: &now, UltimoError: &msg}); err != nil {
+						return err
+					}
+					n++
+					continue
+				}
+				if herr != nil {
 					msg := herr.Error()
 					next := now.Add(backoff(m.Attempts))
 					d.log.WarnContext(ctx, "outbox: fallo al procesar", "evento", r.Tipo, "intentos", m.Attempts+1, "error", msg)

@@ -31,11 +31,20 @@ import (
 // Extra monta las rutas del motor en el api (mensajería, simulador, automatizaciones, bandeja, KPIs, bitácora).
 func Extra(cfg config.API) func(m *server.Modules, g *authn.Guard) []func(chi.Router) {
 	return func(m *server.Modules, g *authn.Guard) []func(chi.Router) {
-		s := Build(m, cfg.WhatsApp, cfg.AI)
+		s := Build(m, Engine(cfg.WhatsApp, cfg.Features), cfg.AI)
 		h := &handler{s: s, g: g, log: m.Log, cfg: cfg}
-		an := analytics.NewHandler(m.Tx, m.OrdersF, m.QuotesF, extra{s}, g, m.Log, m.Clock.Now)
+		an := analytics.NewHandler(m.Tx, m.OrdersF, m.QuotesF, extra{s}, g, m.Log, m.Clock.Now).WithLegacyKPIs(cfg.Features.WhatsApp)
 		return []func(chi.Router){h.routes, an.Routes}
 	}
+}
+
+// Engine es la configuración de WhatsApp que llega al motor: con FEATURE_WHATSAPP apagada no se arma el cliente de
+// WAHA aunque WAHA_URL siga en el entorno (V-01).
+func Engine(wa config.WhatsApp, f config.Features) config.WhatsApp {
+	if !f.WhatsApp {
+		wa.WAHA = config.WAHA{}
+	}
+	return wa
 }
 
 type handler struct {
@@ -47,6 +56,22 @@ type handler struct {
 
 func (h *handler) routes(r chi.Router) {
 	j := func(fn httpx.Func) http.HandlerFunc { return httpx.JSON(h.log, fn) }
+	r.With(h.g.Require("audit:read")).Get("/audit", j(h.audit))
+	r.With(h.g.Require("data_request:manage")).Get("/customers/{id}/export", j(h.exportCustomer))
+	// V-01 y V-02 (entrega del 27-nov): con la bandera apagada estas rutas no se montan y responden 404, igual que
+	// una ruta que no existe. El código queda para volver a encenderlas (FEATURE_WHATSAPP, FEATURE_PLATFORM).
+	if h.cfg.Features.WhatsApp {
+		h.whatsappRoutes(r, j)
+	}
+	if h.cfg.Features.Platform {
+		r.Get("/platform/usage", j(h.usage))         // HU-74: lo decide PlatformAdmin, no un permiso de taller
+		r.Get("/platform/messages", j(h.messageLog)) // HU-100: registro técnico por número, solo PlatformAdmin
+	}
+}
+
+// whatsappRoutes son las rutas que dependen de WhatsApp: conversaciones, canal, simulador, automatizaciones,
+// bandeja de borradores y el envío automático del asesor.
+func (h *handler) whatsappRoutes(r chi.Router, j func(httpx.Func) http.HandlerFunc) {
 	r.With(h.g.Require("conversation:read")).Get("/conversations", j(h.conversations))
 	r.With(h.g.Require("conversation:read")).Get("/conversations/{id}", j(h.conversation))
 	r.With(h.g.Require("inbox:manage")).Post("/conversations/{id}/messages", j(h.reply))
@@ -66,10 +91,6 @@ func (h *handler) routes(r chi.Router) {
 	r.With(h.g.Require("inbox:manage")).Get("/inbox/stats", j(h.inboxStats))
 	r.With(h.g.Require("inbox:manage")).Get("/assistant/settings", j(h.assistantSettings))
 	r.With(h.g.Require("automation:manage")).Put("/assistant/settings", j(h.setAssistantSettings))
-	r.With(h.g.Require("audit:read")).Get("/audit", j(h.audit))
-	r.With(h.g.Require("data_request:manage")).Get("/customers/{id}/export", j(h.exportCustomer))
-	r.Get("/platform/usage", j(h.usage))         // HU-74: lo decide PlatformAdmin, no un permiso de taller
-	r.Get("/platform/messages", j(h.messageLog)) // HU-100: registro técnico por número, solo PlatformAdmin
 }
 
 type msgDTO struct {

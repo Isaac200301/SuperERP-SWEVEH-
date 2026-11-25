@@ -83,7 +83,7 @@ func run() error {
 		Pool: pool, Log: log, Clock: clk, Signer: signer, Verifier: verifier, OTPSender: sender,
 		OTPPepper: []byte(cfg.OTPPepper), AllowedOrigins: cfg.AllowedOrigins, TrustProxy: cfg.TrustProxy,
 		HSTS: cfg.Env != config.EnvLocal, WebDir: cfg.WebDir, LoginPerMinute: cfg.LoginPerMinute,
-		PlatformAdmins: cfg.Platform.Admins,
+		PlatformAdmins: cfg.Platform.Admins, Features: server.Features(cfg.Features),
 	})
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -126,7 +126,7 @@ func startWorker(ctx context.Context, cfg config.API, store storage.Store, clk c
 	go func() {
 		defer close(done)
 		wire.StartWorker(wctx, pool, store, clk, log.With("proceso", "worker"),
-			wire.WorkerConfig{WhatsApp: cfg.WhatsApp, AI: cfg.AI, Poll: cfg.PollInterval, Batch: cfg.BatchSize})
+			wire.WorkerConfig{WhatsApp: cfg.WhatsApp, AI: cfg.AI, Features: cfg.Features, Poll: cfg.PollInterval, Batch: cfg.BatchSize})
 	}()
 	return func() {
 		cancel()

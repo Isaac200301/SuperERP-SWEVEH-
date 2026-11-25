@@ -7,7 +7,7 @@ import { formatoCOP, formatoFechaHora } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { Field } from '../../shared/ui/Field';
-import { usePermission } from '../auth/api';
+import { useFeature, usePermission } from '../auth/api';
 import { categorias, fotoRepuesto, motivos, plantillaCSV, useMovements, usePartActions, useParts, type Categoria, type Filtros, type Repuesto } from './api';
 
 const card = 'flex flex-col gap-3 rounded-card bg-white p-5';
@@ -99,6 +99,7 @@ function PartDetail({ p, onClose }: { p: Repuesto; onClose: () => void }) {
   const { update, entry, photo } = usePartActions();
   const [fotoV, setFotoV] = useState(0);
   const verCosto = usePermission('part:cost');
+  const whatsapp = useFeature('whatsapp');
   const movs = useMovements(p.id);
   const [f, setF] = useState({
     nombre: p.nombre, marca: p.marca ?? '', categoria: p.categoria ?? '', ubicacion: p.ubicacion ?? '', oem: p.referenciaOem ?? '',
@@ -165,34 +166,37 @@ function PartDetail({ p, onClose }: { p: Repuesto; onClose: () => void }) {
           </Button>
         </div>
       </form>
-      <fieldset className="flex flex-col gap-3 rounded-2xl bg-surface p-4">
-        <legend className="font-extrabold">Vitrina de WhatsApp</legend>
-        <label className="flex min-h-[44px] items-center gap-2 font-bold">
-          <input
-            type="checkbox"
-            role="switch"
-            aria-checked={p.ofrecerWhatsapp ?? false}
-            checked={p.ofrecerWhatsapp ?? false}
-            disabled={update.isPending}
-            onChange={(e) => update.mutate({ id: p.id, body: { ofrecerWhatsapp: e.target.checked, version: p.version } })}
-          />
-          Ofrecer por WhatsApp
-        </label>
-        <p className="text-sm text-ink-2">El asesor lo ofrece a los clientes con su precio y la foto. Nunca muestra el costo.</p>
-        {p.tieneFoto ? <img src={fotoRepuesto(p.id, fotoV)} alt={`Foto de ${p.nombre}`} className="h-32 w-32 rounded-btn border border-line bg-white object-contain" /> : null}
-        <label className="flex flex-col gap-1 font-bold">
-          {p.tieneFoto ? 'Cambiar la foto' : 'Foto para WhatsApp (JPG, PNG o WebP, hasta 5 MB)'}
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            disabled={photo.isPending}
-            onChange={(e) => {
-              const foto = e.target.files?.[0];
-              if (foto) photo.mutate({ id: p.id, foto }, { onSuccess: () => setFotoV((v) => v + 1) });
-            }}
-          />
-        </label>
-      </fieldset>
+      {/* La vitrina es del asesor de WhatsApp (ADR-0029): sale con V-01. */}
+      {whatsapp ? (
+        <fieldset className="flex flex-col gap-3 rounded-2xl bg-surface p-4">
+          <legend className="font-extrabold">Vitrina de WhatsApp</legend>
+          <label className="flex min-h-[44px] items-center gap-2 font-bold">
+            <input
+              type="checkbox"
+              role="switch"
+              aria-checked={p.ofrecerWhatsapp ?? false}
+              checked={p.ofrecerWhatsapp ?? false}
+              disabled={update.isPending}
+              onChange={(e) => update.mutate({ id: p.id, body: { ofrecerWhatsapp: e.target.checked, version: p.version } })}
+            />
+            Ofrecer por WhatsApp
+          </label>
+          <p className="text-sm text-ink-2">El asesor lo ofrece a los clientes con su precio y la foto. Nunca muestra el costo.</p>
+          {p.tieneFoto ? <img src={fotoRepuesto(p.id, fotoV)} alt={`Foto de ${p.nombre}`} className="h-32 w-32 rounded-btn border border-line bg-white object-contain" /> : null}
+          <label className="flex flex-col gap-1 font-bold">
+            {p.tieneFoto ? 'Cambiar la foto' : 'Foto para WhatsApp (JPG, PNG o WebP, hasta 5 MB)'}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={photo.isPending}
+              onChange={(e) => {
+                const foto = e.target.files?.[0];
+                if (foto) photo.mutate({ id: p.id, foto }, { onSuccess: () => setFotoV((v) => v + 1) });
+              }}
+            />
+          </label>
+        </fieldset>
+      ) : null}
       {error ? <Alert>{error.message}</Alert> : null}
       <h3 className="font-extrabold">Movimientos</h3>
       {movs.isPending ? <p role="status">Cargando…</p> : null}
@@ -222,6 +226,7 @@ export function PartsPage() {
   const [filtros, setFiltros] = useState<Filtros>({ q: '', categoria: '', bajo: params.get('bajo') === '1', inactivos: false });
   const [abierto, setAbierto] = useState<string | null>(null);
   const puedeImportar = usePermission('import:run');
+  const whatsapp = useFeature('whatsapp');
   const qc = useQueryClient();
   const list = useParts(filtros);
   const repuestos = list.data ?? [];
@@ -273,7 +278,7 @@ export function PartsPage() {
                   {p.nombre}
                   {p.marca ? <span className="font-normal text-ink-2"> · {p.marca}</span> : null}
                   {p.activo ? null : <span className="font-normal"> · inactivo</span>}
-                  {p.ofrecerWhatsapp ? <span className="font-normal text-primary"> · en vitrina</span> : null}
+                  {whatsapp && p.ofrecerWhatsapp ? <span className="font-normal text-primary"> · en vitrina</span> : null}
                 </span>
                 {p.ubicacion ? <span className="text-sm text-ink-2">{p.ubicacion}</span> : null}
                 <span className={p.bajoMinimo ? 'font-bold text-warn-ink' : ''}>
