@@ -1,0 +1,53 @@
+# CodeQL: análisis de seguridad semántico de Go y TypeScript (V-20, docs/plan-entrega-viernes.md).
+# Gratis en repos públicos: https://docs.github.com/en/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning
+# Acciones fijadas por SHA (ADR-0023). codeql-action v4.39.5 = 915412ff…, leído de la API de tags de github/codeql-action.
+name: codeql
+
+on:
+  push:
+    branches: [main, developer, 'dev/**', 'feat/**']
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '17 6 * * 1' # lunes 1:17 a. m. hora de Colombia
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analizar (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: matrix.language == 'go'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: github/codeql-action/init@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+      - if: matrix.language == 'go'
+        name: Compilar Go
+        run: go build ./...
+      - uses: github/codeql-action/analyze@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          category: /language:${{ matrix.language }}

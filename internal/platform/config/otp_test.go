@@ -23,6 +23,7 @@ func TestOTPSenderWAHA(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			cleanEngineEnv(t)
 			for _, k := range []string{"APP_ENV", "OTP_SENDER", "WAHA_URL", "WAHA_API_KEY", "WAHA_WEBHOOK_SECRET", "WHATSAPP_PROVIDER", "AI_PROVIDER"} {
 				t.Setenv(k, "")
 			}
@@ -69,6 +70,7 @@ func TestRunWorkerNeedsWorkerDatabase(t *testing.T) {
 		{"RUN_WORKER sin base del worker", "true", "", "RUN_WORKER=true necesita WORKER_DATABASE_URL", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			cleanEngineEnv(t)
 			t.Setenv("APP_ENV", "local")
 			t.Setenv("DATABASE_URL", "postgres://api")
 			t.Setenv("OTP_SENDER", "consola")

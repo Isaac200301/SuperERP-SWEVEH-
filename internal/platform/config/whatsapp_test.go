@@ -5,6 +5,20 @@ import (
 	"testing"
 )
 
+// engineVars son todas las variables que lee engine. Cada caso parte de cero: así el .env de quien corre las
+// pruebas (make exporta su contenido) no cambia el resultado.
+var engineVars = []string{"WHATSAPP_PROVIDER", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_APP_SECRET", "WHATSAPP_PHONE_NUMBER_ID",
+	"WHATSAPP_VERIFY_TOKEN", "WHATSAPP_API_BASE", "WAHA_URL", "WAHA_API_KEY", "WAHA_WEBHOOK_SECRET", "WAHA_SESSION",
+	"AI_PROVIDER", "AI_API_KEY", "AI_MODEL", "AI_API_BASE", "AI_MONTHLY_CAP_MICRO_USD", "AI_VISION_MODEL",
+	"STT_PROVIDER", "STT_API_KEY", "STT_MODEL", "STT_API_BASE"}
+
+func cleanEngineEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range engineVars {
+		t.Setenv(k, "")
+	}
+}
+
 // WHATSAPP_PROVIDER: "meta" si hay token, si no el simulador; meta necesita token y secreto; el simulador no va
 // a producción (docs/07).
 func TestWhatsAppProvider(t *testing.T) {
@@ -24,6 +38,7 @@ func TestWhatsAppProvider(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			cleanEngineEnv(t)
 			for _, k := range []string{"WHATSAPP_PROVIDER", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_APP_SECRET"} {
 				t.Setenv(k, tc.vars[k])
 			}
@@ -59,6 +74,7 @@ func TestAIProvider(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			cleanEngineEnv(t)
 			for _, k := range []string{"AI_PROVIDER", "AI_API_KEY", "AI_MODEL", "WHATSAPP_PROVIDER", "WHATSAPP_ACCESS_TOKEN"} {
 				t.Setenv(k, tc.vars[k])
 			}
@@ -96,6 +112,7 @@ func TestWAHA(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			cleanEngineEnv(t)
 			for _, k := range []string{"WAHA_URL", "WAHA_API_KEY", "WAHA_WEBHOOK_SECRET", "WAHA_SESSION"} {
 				t.Setenv(k, tc.vars[k])
 			}

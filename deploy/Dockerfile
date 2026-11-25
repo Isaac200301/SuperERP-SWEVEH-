@@ -10,7 +10,7 @@ COPY api/openapi.yaml /src/api/openapi.yaml
 COPY web/ ./
 RUN npm run build
 
-FROM golang:1.27 AS go
+FROM golang:1.27.4 AS go
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

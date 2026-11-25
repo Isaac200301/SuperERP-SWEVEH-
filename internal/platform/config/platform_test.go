@@ -8,6 +8,7 @@ import (
 // HU-74 (ADR-0030): PLATFORM_ADMINS son celulares colombianos y quedan en E.164; uno mal escrito no deja arrancar.
 // Mensajes incluidos y pesos por dólar tienen valor provisional (D-04, Q-24) y deben ser positivos.
 func TestPlatformAdmins(t *testing.T) {
+	cleanEngineEnv(t)
 	t.Setenv("DATABASE_URL", "postgres://x")
 	t.Setenv("PLATFORM_ADMINS", "310 555 0640, +573105550641")
 	t.Setenv("PLAN_MENSAJES_INCLUIDOS", "")

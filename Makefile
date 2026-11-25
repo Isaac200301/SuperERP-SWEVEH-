@@ -77,8 +77,8 @@ cover: up ## Cobertura de Go; falla si dominio o aplicación quedan bajo 80 % (R
 vuln: ## govulncheck
 	go run $(GOVULNCHECK) ./...
 
-secrets: ## gitleaks sobre el árbol de trabajo
-	docker run --rm -v "$(CURDIR):/repo" $(GITLEAKS_IMAGE) dir /repo --no-banner --redact --config /repo/.gitleaks.toml
+secrets: ## gitleaks sobre el árbol de trabajo (config local: excluye los .env ignorados; el CI usa .gitleaks.toml)
+	docker run --rm -v "$(CURDIR):/repo" $(GITLEAKS_IMAGE) dir /repo --no-banner --redact --config /repo/.gitleaks.local.toml
 
 ci: gen-check lint cover test-web vuln secrets build ## Lo mismo que el pipeline
 	@echo "make ci: todo en verde"

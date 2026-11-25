@@ -1,0 +1,18 @@
+# gitleaks SOLO para `make secrets` en la máquina de cada persona (escaneo `dir` de la carpeta).
+# El CI usa .gitleaks.toml sobre el historial de git y sigue vigilando los .env: si alguien sube un .env por
+# error, el CI lo atrapa (Q-39). Aquí se excluyen además los .env locales: están en .gitignore (".env" y ".env.*"),
+# nunca se versionan y sí tienen secretos reales, así que sin esto `make secrets` falla en toda máquina con su .env.
+# .env.example SÍ se revisa. Mantener las demás rutas iguales a .gitleaks.toml.
+# Agregado el 2026-11-25 (R0, entrega del viernes); revisar el 2027-01-31.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Cachés locales, dependencias de terceros y .env locales no versionados"
+paths = [
+  '''(^|/)\.cache/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)web/dist/''',
+  '''(^|/)\.env$''',
+  '''(^|/)\.env\.(staging|waha|local|production|test)$''',
+]

@@ -52,13 +52,15 @@ SWEVEH pasa a ser un **gestor de taller para el celular**. Se recibe, diagnostic
 
 ---
 
-## 1. Calendario (no hay margen)
+## 1. Orden (de corrido, sin calendario por días)
 
-| Día | Desarrollador (rama `feat/entrega-viernes`) | En paralelo | Personas |
-|---|---|---|---|
-| **Mié 25** | R0 → R1 → R2 → R3 | **P1: prototipo del video** (otro worktree) | Crear SonarQube Cloud y Snyk; conseguir 3 o 4 videos de prueba con el carro de alguien del equipo, nunca del cliente |
-| **Jue 26** | R4 → R5 → R6 → R7 → R8 | (P1 integrado en R9) | Probar en el celular al final del día |
-| **Vie 27** | R9 → R10 → R11 → R12 (ensayo, despliegue) | | Revisar y aprobar el PR; entrega |
+**Cambio de Pablo (25-nov):** no se trabaja por día. Las rebanadas van **seguidas**, R0 → R1 → … → R12, cada una con su revisión (sección 2), sin esperar al día siguiente. El desarrollador solo para por lo de `docs/02` §3.3, por la lista de bugs de R10 (la da Pablo) o por un desacuerdo con el revisor después de 2 rondas.
+
+| Quién | Qué |
+|---|---|
+| Desarrollador (rama `feat/entrega-viernes`) | R0 → R12 de corrido |
+| En paralelo | **P1: prototipo del video** (otro worktree), integrado en R9 |
+| Personas | Crear SonarQube Cloud y Snyk; conseguir 3 o 4 videos de prueba con el carro de alguien del equipo (nunca del cliente); probar en el celular; revisar y aprobar el PR |
 
 **Prioridad si no alcanza:** R0 a R7 y R11 son **imprescindibles**. R8 (asistente) es el corazón de la propuesta: si se atrasa, se entrega **solo el chat de texto** y se deja la voz. R9 (video) tiene un recorte previsto: **fotos + nota de voz** en lugar de video. R10 (bugs del celular) depende de la lista que dará Pablo.
 
@@ -76,9 +78,9 @@ Personas:       prueban en el celular al final de cada día; aprueban el PR
 ### 2.1 Desarrollador
 - Lee la ficha de la rebanada, las HU que cita (`docs/04`) y la pantalla de Figma que le corresponde.
 - Escribe primero la prueba que falla y después el código (dominio → caso de uso → adaptador → pantalla).
-- Al terminar, corre `make ci` en Git Bash. Si `-race` no corre por falta de gcc, lo dice (R-15).
-- Lanza el subagente **revisor** (`.claude/agents/revisor.md`) con: la rebanada, los archivos tocados y la salida de `make ci`.
-- **No pasa a la siguiente rebanada** hasta que el revisor diga **Aprobada**.
+- Al terminar, hace `git add` de lo generado (sqlc y `schema.d.ts`; `make gen-check` compara contra el índice) y corre `make ci` y `make test-go` en Git Bash con `MSYS_NO_PATHCONV=1`. Si `-race` no corre, lo dice (R-15).
+- Lanza el subagente **revisor** (`.claude/agents/revisor.md`) con: la rebanada, los archivos tocados y la salida de `make ci`. El revisor mira `git diff HEAD` y `git status`, porque revisa antes del commit.
+- **No pasa a la siguiente rebanada** hasta que el revisor diga **Aprobada**. Máximo 2 rondas: si sigue un desacuerdo, decide Pablo. Después de cada revisión, `git status` confirma que el revisor no cambió archivos.
 - Actualiza la documentación **en el mismo commit**: `docs/09` (estado y bitácora), el ADR de la rebanada, `docs/07` (preguntas nuevas) y `docs/04` (HU nueva o cambiada).
 
 ### 2.2 Revisor (subagente, solo lectura)
@@ -126,7 +128,7 @@ Cada ficha trae: **objetivo**, **decisiones y HU**, **pantalla de Figma**, **bac
   - Q-38: "las skills `sweveh-*` de `CLAUDE.md` §3.1 no están en el repo". Recomendación: recrearlas después de la entrega o quitar la tabla.
   - Q-39: "datos reales con el repo público". Recomendación: revisar con gitleaks y el revisor en cada commit; nada del taller real en `docs/`.
 
-**Hecho cuando:** la rama existe, `codeql.yml` corre en GitHub (el agente tiene acceso al repo) y `docs/09` anota la línea base.
+**Hecho cuando:** la rama existe, `codeql.yml` está escrito con acciones fijadas por SHA y `docs/09` anota la línea base. Que CodeQL **corra en GitHub** lo confirma Pablo después de su push (el agente no hace push).
 
 ---
 
