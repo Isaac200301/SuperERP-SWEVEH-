@@ -482,6 +482,24 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /** Opciones de la cotización en borrador: "Mostrar detalle al cliente" de las partidas (V-07, ADR-0040). Permiso quote:edit */
+        patch: operations["setQuoteOptions"];
+        trace?: never;
+    };
+    "/orders/{id}/quote/lines/{lineId}/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reemplazar el detalle interno de una partida (V-07, ADR-0040). No cambia el valor de la partida ni el total. Permiso quote:edit */
+        put: operations["setPartidaDetail"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -1770,6 +1788,8 @@ export interface components {
                 descuentoPct?: number;
                 /** @description Mano de obra por horas × tarifa del taller */
                 horas?: number | null;
+                /** @description Solo en partidas: detalle interno del taller, no suma al total (V-07) */
+                detalle?: components["schemas"]["DetallePartida"][];
             }[];
             /** Format: date-time */
             enviadaEn: string | null;
@@ -1791,6 +1811,20 @@ export interface components {
             /** Format: date-time */
             venceEn?: string | null;
             vencida?: boolean;
+            /** @description El cliente ve el detalle de las partidas en la vista y el PDF (V-07) */
+            mostrarDetalle?: boolean;
+            /** @description Concurrencia optimista de las ediciones (R-07) */
+            version?: number;
+        };
+        DetallePartida: {
+            descripcion: string;
+            /** @description Por defecto 1 */
+            cantidad?: number;
+            /**
+             * Format: int64
+             * @description Valor de referencia interno, opcional; no suma
+             */
+            valorRef?: number | null;
         };
         ResultadoVehiculo: {
             /** Format: uuid */
@@ -3207,6 +3241,57 @@ export interface operations {
             404: components["responses"]["Problem"];
         };
     };
+    setQuoteOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    mostrarDetalle: boolean;
+                    /** @description La de la cotización que tenía la pantalla (R-07); si otra persona guardó después, 409 */
+                    version: number;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Cotizacion"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    setPartidaDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    detalle: components["schemas"]["DetallePartida"][];
+                    /** @description La de la cotización que tenía la pantalla (R-07); si otra persona guardó después, 409 */
+                    version: number;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Cotizacion"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
     addQuoteLine: {
         parameters: {
             query?: never;
@@ -3219,7 +3304,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description servicio o repuesto */
+                    /** @description servicio, repuesto o partida (V-07: nombre en descripcion y el valor que pone el taller en precioUnitario) */
                     tipo: string;
                     /** Format: uuid */
                     refId?: string | null;
@@ -3282,6 +3367,10 @@ export interface operations {
                     horas?: number;
                     /** @description Hasta el máximo del taller; permiso quote:discount */
                     descuentoPct?: number;
+                    /** @description Nombre de una partida o de un ítem libre (V-07); pide version */
+                    descripcion?: string;
+                    /** @description La de la cotización que tenía la pantalla (R-07). Obligatoria para renombrar; con ella, 409 si otra persona guardó después */
+                    version?: number;
                 };
             };
         };

@@ -1633,6 +1633,24 @@ _Módulo del MVP: Preparativos. Que la demo corra dos veces seguidas sin tocar c
 
 **Trazabilidad:** Cambia: HU-26, HU-27, HU-32 a HU-38 · ADR-0039
 
+### HU-105 · Cotizar por partidas con detalle interno
+
+**Épica:** E04 · **Roles:** Dueño del taller, Recepción, Mecánico · **Superficies:** Panel, Piso · **Prioridad:** Must · **Origen:** Pablo (24-nov-2026, entrega del viernes, V-07), por revisar con Isaac · **Aplica a motos:** sí
+
+**Como** persona del taller que hace trabajos grandes (latonería, restauración), **quiero** cotizar por bloques con un nombre y un valor que yo pongo, con un detalle interno opcional, **para** que la cotización sea corta y el cliente no discuta cada tornillo.
+
+**Criterios de aceptación**
+
+- **Dado** una cotización en borrador, **cuando** agrego una partida con nombre y valor, **entonces** suma su valor al total; sin valor no se agrega y nunca se sugiere uno.
+- **Dado** una partida, **cuando** le escribo su detalle interno, **entonces** el total no cambia y el detalle dice "solo el taller".
+- **Dado** "Mostrar detalle al cliente" apagado, **cuando** el cliente ve la cotización o el PDF, **entonces** ve la partida sin su detalle; encendido, lo ve.
+- **Dado** partidas y líneas detalladas en la misma cotización, **cuando** aplico descuento e IVA, **entonces** el total los suma igual que hoy.
+- **Dado** una cotización enviada, **cuando** intento cambiar el detalle o la opción, **entonces** no se permite.
+
+**Notas:** ADR-0040. La vista del cliente y el PDF llegan en R7 (HU-109).
+
+**Trazabilidad:** Depende de: HU-27 · ADR-0040
+
 ## Referencias citadas en las historias
 
 1. Meta for Developers, "Get started", WhatsApp Cloud API (número de prueba, 5 destinatarios, plantillas preaprobadas). <https://developers.facebook.com/docs/whatsapp/cloud-api/get-started/> (Oficial)

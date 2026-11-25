@@ -113,7 +113,7 @@ export function useQuote(id: string, enabled = true) {
   });
 }
 
-export type LineInput = { tipo: 'servicio' | 'repuesto'; refId?: string; descripcion?: string; cantidad: number; precioUnitario?: number; horas?: number };
+export type LineInput = { tipo: 'servicio' | 'repuesto' | 'partida'; refId?: string; descripcion?: string; cantidad: number; precioUnitario?: number; horas?: number };
 
 export function useQuoteActions(id: string) {
   const invalidate = useInvalidateOrder(id);
@@ -138,7 +138,7 @@ export function useQuoteActions(id: string) {
   });
   // Cantidad y, solo en precio libre, el precio de un ítem del borrador.
   const update = useMutation({
-    mutationFn: async ({ lineId, ...body }: { lineId: string; cantidad?: number; precioUnitario?: number; horas?: number; descuentoPct?: number }) =>
+    mutationFn: async ({ lineId, ...body }: { lineId: string; cantidad?: number; precioUnitario?: number; horas?: number; descuentoPct?: number; descripcion?: string; version?: number }) =>
       unwrap(await api.PATCH('/orders/{id}/quote/lines/{lineId}', { params: { path: { id, lineId } }, body })),
     onSettled: invalidate,
   });
@@ -154,7 +154,17 @@ export function useQuoteActions(id: string) {
     mutationFn: async () => unwrap(await api.POST('/orders/{id}/quote/renew', { params: { path: { id } } })),
     onSettled: invalidate,
   });
-  return { add, remove, send, respond, giveBack, update, renew };
+  // V-07 (ADR-0040): detalle interno de una partida (no suma al total) y "Mostrar detalle al cliente".
+  const detail = useMutation({
+    mutationFn: async (v: { lineId: string; version: number; detalle: { descripcion: string; cantidad?: number }[] }) =>
+      unwrap(await api.PUT('/orders/{id}/quote/lines/{lineId}/detail', { params: { path: { id, lineId: v.lineId } }, body: { detalle: v.detalle, version: v.version } })),
+    onSettled: invalidate,
+  });
+  const options = useMutation({
+    mutationFn: async (v: { mostrarDetalle: boolean; version: number }) => unwrap(await api.PATCH('/orders/{id}/quote', { params: { path: { id } }, body: v })),
+    onSettled: invalidate,
+  });
+  return { add, remove, send, respond, giveBack, update, renew, detail, options };
 }
 
 /** Por repuesto, lo que la orden descontó, devolvió y dejó pendiente (HU-33, HU-38). */

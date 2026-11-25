@@ -4974,6 +4974,65 @@
      "entonces": "el suyo no cambia"
     }
    ]
+  },
+  {
+   "id": "HU-105",
+   "epic": "E04",
+   "roles": [
+    "DU",
+    "RE",
+    "ME"
+   ],
+   "surf": [
+    "P",
+    "F"
+   ],
+   "titulo": "Cotizar por partidas con detalle interno",
+   "como": "persona del taller que hace trabajos grandes",
+   "quiero": "cotizar por bloques con nombre y un valor que yo pongo, con un detalle interno opcional",
+   "para": "que la cotización sea corta y el cliente no discuta cada tornillo",
+   "prio": "M",
+   "antes": "",
+   "src": "pablo-2026-11-24",
+   "moto": true,
+   "veh": "",
+   "dep": [
+    "HU-27"
+   ],
+   "rf": [],
+   "au": [],
+   "esc": [],
+   "ca": [],
+   "notas": "Entrega del 27-nov (V-07, ADR-0040). La vista del cliente y el PDF llegan en R7. Por revisar con Isaac.",
+   "refs": [],
+   "canc": "",
+   "ac": [
+    {
+     "dado": "una cotización en borrador",
+     "cuando": "agrego una partida con nombre y valor",
+     "entonces": "suma su valor; sin valor no se agrega y nunca se sugiere"
+    },
+    {
+     "dado": "una partida",
+     "cuando": "le escribo su detalle interno",
+     "entonces": "el total no cambia y el detalle es solo del taller"
+    },
+    {
+     "dado": "Mostrar detalle al cliente apagado",
+     "cuando": "el cliente ve la cotización o el PDF",
+     "entonces": "ve la partida sin detalle; encendido, lo ve"
+    },
+    {
+     "dado": "partidas y líneas detalladas",
+     "cuando": "aplico descuento e IVA",
+     "entonces": "el total los suma igual que hoy"
+    },
+    {
+     "dado": "una cotización enviada",
+     "cuando": "intento cambiar el detalle o la opción",
+     "entonces": "no se permite"
+    }
+   ]
   }
  ]
 }

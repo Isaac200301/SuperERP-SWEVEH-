@@ -17,6 +17,9 @@ import (
 	"sweveh/internal/shared"
 )
 
+// errVersionNeeded: las ediciones nuevas de la cotización piden la versión que tenía la pantalla (R-07).
+var errVersionNeeded = shared.Validation("version_requerida", "Falta la versión de la cotización; recarga la pantalla.").WithField("version")
+
 var errOrder = shared.NotFound("orden_no_encontrada", "No encontramos esa orden en tu taller.")
 
 type Handler struct {
@@ -34,6 +37,9 @@ func (h *Handler) Routes(r chi.Router) {
 	r.With(h.guard.Require("quote:edit")).Post("/orders/{id}/quote/lines", httpx.JSON(h.log, h.add))
 	r.With(h.guard.Require("quote:edit")).Delete("/orders/{id}/quote/lines/{lineId}", httpx.JSON(h.log, h.remove))
 	r.With(h.guard.Require("quote:edit")).Patch("/orders/{id}/quote/lines/{lineId}", httpx.JSON(h.log, h.update))
+	// V-07 (ADR-0040): detalle interno de una partida y "Mostrar detalle al cliente".
+	r.With(h.guard.Require("quote:edit")).Put("/orders/{id}/quote/lines/{lineId}/detail", httpx.JSON(h.log, h.setDetail))
+	r.With(h.guard.Require("quote:edit")).Patch("/orders/{id}/quote", httpx.JSON(h.log, h.setQuote))
 	r.With(h.guard.Require("quote:send")).Post("/orders/{id}/quote/send", httpx.JSON(h.log, h.send))
 	r.With(h.guard.Require("quote:register_response")).Post("/orders/{id}/quote/response", httpx.JSON(h.log, h.respond))
 	r.With(h.guard.Require("quote:send")).Post("/orders/{id}/quote/renew", httpx.JSON(h.log, h.renew))
@@ -69,6 +75,14 @@ type lineDTO struct {
 	Aprobada    *bool    `json:"aprobada"`
 	Descuento   int      `json:"descuentoPct"`
 	Horas       *float64 `json:"horas"`
+	// Detalle: solo en partidas; interno del taller, no suma al total (V-07).
+	Detalle *[]detailDTO `json:"detalle,omitempty"`
+}
+
+type detailDTO struct {
+	Descripcion string `json:"descripcion"`
+	Cantidad    int    `json:"cantidad"`
+	ValorRef    *int64 `json:"valorRef"`
 }
 
 type quoteDTO struct {
@@ -87,6 +101,8 @@ type quoteDTO struct {
 	ConIva     bool       `json:"preciosConIva"`
 	VenceEn    *time.Time `json:"venceEn"`
 	Vencida    bool       `json:"vencida"`
+	Mostrar    bool       `json:"mostrarDetalle"`
+	Version    int        `json:"version"` // If-Match de las ediciones (R-07)
 }
 
 func toDTO(q *domain.Quote) any {
@@ -96,7 +112,7 @@ func toDTO(q *domain.Quote) any {
 	t := q.Totals()
 	d := quoteDTO{ID: q.ID.String(), Numero: q.Number, Estado: string(q.State), Total: t.Total, Lineas: []lineDTO{},
 		EnviadaEn: q.SentAt, Respondida: q.RespondedAt, Canal: q.Channel, Subtotal: t.Gross, Descuento: t.Discount, IvaPct: q.VATPct,
-		Iva: t.VAT, ConIva: q.PricesIncludeVAT, VenceEn: q.ExpiresAt,
+		Iva: t.VAT, ConIva: q.PricesIncludeVAT, VenceEn: q.ExpiresAt, Mostrar: q.ShowDetail, Version: q.Version,
 		Vencida: (q.State == domain.Sent || q.State == domain.Doubts) && q.Expired(time.Now())}
 	for _, l := range q.Lines {
 		var ref *string
@@ -104,9 +120,17 @@ func toDTO(q *domain.Quote) any {
 			s := l.RefID.String()
 			ref = &s
 		}
-		d.Lineas = append(d.Lineas, lineDTO{ID: l.ID.String(), Tipo: l.Kind, RefID: ref, Descripcion: l.Description,
+		ld := lineDTO{ID: l.ID.String(), Tipo: l.Kind, RefID: ref, Descripcion: l.Description,
 			Cantidad: l.Qty, Precio: l.UnitPrice, Subtotal: l.Subtotal(), SinStock: l.NoStock, Aprobada: l.Approved, PrecioLibre: l.FreePrice,
-			Descuento: l.DiscountPct, Horas: hoursOut(l.HoursCent)})
+			Descuento: l.DiscountPct, Horas: hoursOut(l.HoursCent)}
+		if l.Kind == domain.KindPartida { // las partidas siempre traen su detalle, aunque esté vacío
+			det := []detailDTO{}
+			for _, it := range l.Detail {
+				det = append(det, detailDTO{Descripcion: it.Description, Cantidad: it.Qty, ValorRef: it.ValueRef})
+			}
+			ld.Detalle = &det
+		}
+		d.Lineas = append(d.Lineas, ld)
 	}
 	return map[string]any{"cotizacion": d}
 }
@@ -168,6 +192,8 @@ func (h *Handler) update(r *http.Request, p reqctx.Principal) (int, any, error) 
 		Precio    *int64   `json:"precioUnitario"`
 		Horas     *float64 `json:"horas"`
 		Descuento *int     `json:"descuentoPct"`
+		Nombre    *string  `json:"descripcion"` // partida o ítem libre (V-07)
+		Version   *int     `json:"version"`     // la de la pantalla; obligatoria para renombrar
 	}
 	if err := httpx.Decode(r, &q); err != nil {
 		return 0, nil, err
@@ -176,7 +202,58 @@ func (h *Handler) update(r *http.Request, p reqctx.Principal) (int, any, error) 
 		return 0, nil, domain.ErrDiscountDenied
 	}
 	out, err := h.svc.UpdateLine(r.Context(), p.TallerID, id, lid, p.Actor(), app.LineChange{Qty: q.Cantidad, Price: q.Precio,
-		HoursCent: hoursCent(q.Horas), DiscountPct: q.Descuento})
+		HoursCent: hoursCent(q.Horas), DiscountPct: q.Descuento, Name: q.Nombre, Version: q.Version})
+	return http.StatusOK, toDTO(&out), err
+}
+
+// setDetail reemplaza el detalle interno de una partida (V-07).
+func (h *Handler) setDetail(r *http.Request, p reqctx.Principal) (int, any, error) {
+	id, err := httpx.PathID(r, "id", errOrder)
+	if err != nil {
+		return 0, nil, err
+	}
+	lid, err := httpx.PathID(r, "lineId", domain.ErrLineNotFound)
+	if err != nil {
+		return 0, nil, err
+	}
+	var q struct {
+		Detalle []detailDTO `json:"detalle"`
+		Version *int        `json:"version"`
+	}
+	if err := httpx.Decode(r, &q); err != nil {
+		return 0, nil, err
+	}
+	items := make([]domain.DetailItem, 0, len(q.Detalle))
+	for _, d := range q.Detalle {
+		items = append(items, domain.DetailItem{Description: d.Descripcion, Qty: d.Cantidad, ValueRef: d.ValorRef})
+	}
+	if q.Version == nil {
+		return 0, nil, errVersionNeeded
+	}
+	out, err := h.svc.SetDetail(r.Context(), p.TallerID, id, lid, p.Actor(), *q.Version, items)
+	return http.StatusOK, toDTO(&out), err
+}
+
+// setQuote cambia lo de la cotización entera: hoy, "Mostrar detalle al cliente" (V-07).
+func (h *Handler) setQuote(r *http.Request, p reqctx.Principal) (int, any, error) {
+	id, err := httpx.PathID(r, "id", errOrder)
+	if err != nil {
+		return 0, nil, err
+	}
+	var q struct {
+		Mostrar *bool `json:"mostrarDetalle"`
+		Version *int  `json:"version"`
+	}
+	if err := httpx.Decode(r, &q); err != nil {
+		return 0, nil, err
+	}
+	if q.Mostrar == nil {
+		return 0, nil, shared.Validation("mostrar_detalle_requerido", "Indica si el cliente ve el detalle.").WithField("mostrarDetalle")
+	}
+	if q.Version == nil {
+		return 0, nil, errVersionNeeded
+	}
+	out, err := h.svc.SetShowDetail(r.Context(), p.TallerID, id, p.Actor(), *q.Version, *q.Mostrar)
 	return http.StatusOK, toDTO(&out), err
 }
 

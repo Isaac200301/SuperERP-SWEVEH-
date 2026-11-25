@@ -688,6 +688,50 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Cotizacion' }
         '404': { $ref: '#/components/responses/Problem' }
+    patch:
+      operationId: setQuoteOptions
+      summary: 'Opciones de la cotización en borrador: "Mostrar detalle al cliente" de las partidas (V-07, ADR-0040). Permiso quote:edit'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [mostrarDetalle, version]
+              properties:
+                mostrarDetalle: { type: boolean }
+                version: { type: integer, description: 'La de la cotización que tenía la pantalla (R-07); si otra persona guardó después, 409' }
+      responses:
+        '200': { $ref: '#/components/responses/Cotizacion' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /orders/{id}/quote/lines/{lineId}/detail:
+    put:
+      operationId: setPartidaDetail
+      summary: 'Reemplazar el detalle interno de una partida (V-07, ADR-0040). No cambia el valor de la partida ni el total. Permiso quote:edit'
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: lineId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [detalle, version]
+              properties:
+                detalle: { type: array, maxItems: 40, items: { $ref: '#/components/schemas/DetallePartida' } }
+                version: { type: integer, description: 'La de la cotización que tenía la pantalla (R-07); si otra persona guardó después, 409' }
+      responses:
+        '200': { $ref: '#/components/responses/Cotizacion' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
 
   /orders/{id}/quote/lines:
     post:
@@ -702,7 +746,7 @@ paths:
               type: object
               required: [tipo, cantidad]
               properties:
-                tipo: { type: string, description: 'servicio o repuesto' }
+                tipo: { type: string, description: 'servicio, repuesto o partida (V-07: nombre en descripcion y el valor que pone el taller en precioUnitario)' }
                 refId: { type: string, format: uuid, nullable: true }
                 descripcion: { type: string }
                 cantidad: { type: integer, minimum: 1 }
@@ -733,6 +777,8 @@ paths:
                 precioUnitario: { type: integer, format: int64, minimum: 0, description: 'Solo si la línea tiene precioLibre' }
                 horas: { type: number, minimum: 0.25, maximum: 200, description: 'Solo en líneas de mano de obra por horas' }
                 descuentoPct: { type: integer, minimum: 0, maximum: 100, description: 'Hasta el máximo del taller; permiso quote:discount' }
+                descripcion: { type: string, maxLength: 200, description: 'Nombre de una partida o de un ítem libre (V-07); pide version' }
+                version: { type: integer, description: 'La de la cotización que tenía la pantalla (R-07). Obligatoria para renombrar; con ella, 409 si otra persona guardó después' }
       responses:
         '200': { $ref: '#/components/responses/Cotizacion' }
         '400': { $ref: '#/components/responses/Problem' }
@@ -2464,6 +2510,7 @@ components:
               aprobada: { type: boolean, nullable: true }
               descuentoPct: { type: integer }
               horas: { type: number, nullable: true, description: 'Mano de obra por horas × tarifa del taller' }
+              detalle: { type: array, items: { $ref: '#/components/schemas/DetallePartida' }, description: 'Solo en partidas: detalle interno del taller, no suma al total (V-07)' }
         enviadaEn: { type: string, format: date-time, nullable: true }
         respondidaEn: { type: string, format: date-time, nullable: true }
         canalRespuesta: { type: string, nullable: true }
@@ -2474,6 +2521,17 @@ components:
         preciosConIva: { type: boolean }
         venceEn: { type: string, format: date-time, nullable: true }
         vencida: { type: boolean }
+        mostrarDetalle: { type: boolean, description: 'El cliente ve el detalle de las partidas en la vista y el PDF (V-07)' }
+        version: { type: integer, description: 'Concurrencia optimista de las ediciones (R-07)' }
+
+    DetallePartida:
+      type: object
+      additionalProperties: false
+      required: [descripcion]
+      properties:
+        descripcion: { type: string, maxLength: 200 }
+        cantidad: { type: integer, minimum: 1, description: 'Por defecto 1' }
+        valorRef: { type: integer, format: int64, nullable: true, minimum: 0, description: 'Valor de referencia interno, opcional; no suma' }
 
     ResultadoVehiculo:
       type: object

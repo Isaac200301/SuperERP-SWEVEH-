@@ -410,6 +410,7 @@ type QuotesCotizacion struct {
 	Subtotal       int64
 	Descuento      int64
 	Iva            int64
+	MostrarDetalle bool
 }
 
 type QuotesLinea struct {
@@ -427,6 +428,18 @@ type QuotesLinea struct {
 	PrecioLibre    bool
 	DescuentoPct   int32
 	HorasCent      *int32
+}
+
+type QuotesPartidaDetalle struct {
+	ID           uuid.UUID
+	TallerID     uuid.UUID
+	CotizacionID uuid.UUID
+	LineaID      uuid.UUID
+	Descripcion  string
+	Cantidad     int32
+	ValorRef     *int64
+	Orden        int32
+	CreatedAt    time.Time
 }
 
 type TenancyParametro struct {

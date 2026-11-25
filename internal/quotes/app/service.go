@@ -215,6 +215,11 @@ func (s *Quotes) AddLine(ctx context.Context, tallerID, orderID shared.ID, actor
 				return shared.NotFound("repuesto_no_encontrado", "No encontramos ese repuesto en tu taller.")
 			}
 			l.Description, l.UnitPrice, stock = p.Name+" ("+p.Ref+")", p.Price, &p.Stock
+		case in.Kind == domain.KindPartida: // V-07: nombre y el valor que pone el taller; el detalle va aparte
+			if in.UnitPrice == nil || *in.UnitPrice <= 0 {
+				return domain.ErrPartidaValue
+			}
+			l.UnitPrice, l.FreePrice, l.Qty = *in.UnitPrice, true, 1
 		case in.HoursCent != nil:
 			r, err := s.rulesIn(ctx, tallerID)
 			if err != nil {
@@ -257,6 +262,10 @@ type LineChange struct {
 	Price       *int64
 	HoursCent   *int
 	DiscountPct *int
+	Name        *string // partida o ítem libre (V-07)
+	// Version es la que tenía la pantalla (If-Match). Obligatoria para renombrar; opcional para lo demás (deuda de las
+	// líneas viejas, docs/07).
+	Version *int
 }
 
 // UpdateLine cambia cantidad, precio libre, horas o descuento de un ítem del borrador; recalcula "sin existencia".
@@ -269,6 +278,9 @@ func (s *Quotes) UpdateLine(ctx context.Context, tallerID, orderID, lineID share
 		}
 		if !ok {
 			return domain.ErrNotFound
+		}
+		if (ch.Version != nil && *ch.Version != q.Version) || (ch.Name != nil && ch.Version == nil) {
+			return shared.ErrVersionConflict
 		}
 		pv := q.Version
 		l, err := s.applyChange(ctx, &q, tallerID, lineID, ch)
@@ -321,6 +333,52 @@ func (s *Quotes) RemoveLine(ctx context.Context, tallerID, orderID, lineID share
 			EntityID: q.ID, After: map[string]any{"linea_id": lineID.String()}, OccurredAt: s.clock.Now()})
 	})
 	return out, err
+}
+
+// mutate carga el borrador de la orden, aplica fn, guarda con versión (R-07) y deja la bitácora en la misma transacción.
+// expected es la versión que tenía la pantalla (If-Match): si otra persona guardó después, 409 y no se cambia nada.
+func (s *Quotes) mutate(ctx context.Context, tallerID, orderID shared.ID, actor shared.Actor, expected *int, action string, fn func(q *domain.Quote) (map[string]any, error)) (domain.Quote, error) {
+	var out domain.Quote
+	err := s.uow.Do(ctx, func(ctx context.Context) error {
+		q, ok, err := s.repo.Latest(ctx, tallerID, orderID)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return domain.ErrNotFound
+		}
+		if expected != nil && *expected != q.Version {
+			return shared.ErrVersionConflict
+		}
+		pv := q.Version
+		after, err := fn(&q)
+		if err != nil {
+			return err
+		}
+		q.Version++
+		if err := s.repo.Save(ctx, q, pv); err != nil {
+			return err
+		}
+		out = q
+		return s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: action, Entity: "cotizacion",
+			EntityID: q.ID, After: after, OccurredAt: s.clock.Now()})
+	})
+	return out, err
+}
+
+// SetDetail reemplaza el detalle interno de una partida (V-07, ADR-0040). No cambia el valor ni el total.
+func (s *Quotes) SetDetail(ctx context.Context, tallerID, orderID, lineID shared.ID, actor shared.Actor, version int, items []domain.DetailItem) (domain.Quote, error) {
+	return s.mutate(ctx, tallerID, orderID, actor, &version, "cotizacion.detalle_partida", func(q *domain.Quote) (map[string]any, error) {
+		_, err := q.SetDetail(lineID, items)
+		return map[string]any{"linea_id": lineID.String(), "items": len(items)}, err
+	})
+}
+
+// SetShowDetail decide si el cliente ve el detalle de las partidas (vista del cliente y PDF, R7).
+func (s *Quotes) SetShowDetail(ctx context.Context, tallerID, orderID shared.ID, actor shared.Actor, version int, on bool) (domain.Quote, error) {
+	return s.mutate(ctx, tallerID, orderID, actor, &version, "cotizacion.mostrar_detalle", func(q *domain.Quote) (map[string]any, error) {
+		return map[string]any{"mostrar_detalle": on}, q.SetShowDetail(on)
+	})
 }
 
 // Send envía la cotización: la orden pasa a Esperando aprobación y sale el evento para AU-02 (HU-27, criterio 4).
@@ -472,6 +530,9 @@ func markNoStock(q *domain.Quote, partID shared.ID, stock int) {
 // applyChange aplica cantidad o precio, horas (con la tarifa del taller) y descuento (con su tope y permiso).
 func (s *Quotes) applyChange(ctx context.Context, q *domain.Quote, tallerID, lineID shared.ID, ch LineChange) (domain.Line, error) {
 	l, err := q.UpdateLine(lineID, ch.Qty, ch.Price)
+	if err == nil && ch.Name != nil {
+		l, err = q.Rename(lineID, *ch.Name)
+	}
 	if err != nil || (ch.HoursCent == nil && ch.DiscountPct == nil) {
 		return l, err
 	}

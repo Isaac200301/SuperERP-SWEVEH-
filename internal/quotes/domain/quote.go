@@ -33,16 +33,17 @@ var (
 // Line es un ítem con el precio de venta congelado al cotizar (HU-07, criterio 3).
 type Line struct {
 	ID          shared.ID
-	Kind        string // servicio | repuesto
+	Kind        string // servicio | repuesto | partida (V-07)
 	RefID       *shared.ID
 	Description string
 	Qty         int
 	UnitPrice   int64
 	NoStock     bool
 	Approved    *bool
-	FreePrice   bool // la persona puso el precio (ítem libre o servicio sin precio de lista): se puede corregir
-	DiscountPct int  // descuento de la línea, hasta el máximo del taller
-	HoursCent   *int // mano de obra por horas (150 = 1,5 h): el precio es horas × tarifa del taller
+	FreePrice   bool         // la persona puso el precio (ítem libre o servicio sin precio de lista): se puede corregir
+	DiscountPct int          // descuento de la línea, hasta el máximo del taller
+	HoursCent   *int         // mano de obra por horas (150 = 1,5 h): el precio es horas × tarifa del taller
+	Detail      []DetailItem // solo partidas: detalle interno, no suma al total (ADR-0040)
 }
 
 func (l Line) Subtotal() int64 { return int64(l.Qty) * l.UnitPrice }
@@ -63,6 +64,7 @@ type Quote struct {
 	VATPct           int        // IVA copiado de los parámetros al crear la cotización
 	PricesIncludeVAT bool       // los precios de lista ya traen el IVA
 	ExpiresAt        *time.Time // vigencia, se fija al enviar
+	ShowDetail       bool       // "Mostrar detalle al cliente" (partidas, V-07)
 }
 
 // Total en pesos sin decimales, con descuentos e IVA (ver Totals). Si hay respuesta ítem por ítem, solo cuenta lo aprobado.
@@ -74,8 +76,11 @@ func (q *Quote) AddLine(l Line) error {
 	}
 	l.Description = strings.Join(strings.Fields(l.Description), " ")
 	if l.Description == "" || len([]rune(l.Description)) > 200 || l.Qty <= 0 || l.UnitPrice < 0 ||
-		(l.Kind != "servicio" && l.Kind != "repuesto") {
+		(l.Kind != "servicio" && l.Kind != "repuesto" && l.Kind != KindPartida) {
 		return ErrLine
+	}
+	if l.Kind == KindPartida && l.UnitPrice <= 0 { // el valor de la partida lo pone el taller (RF-17)
+		return ErrPartidaValue
 	}
 	// El mismo repuesto o servicio del catálogo suma cantidad en vez de repetir la línea.
 	for i, cur := range q.Lines {
@@ -103,6 +108,9 @@ func (q *Quote) UpdateLine(id shared.ID, qty *int, price *int64) (Line, error) {
 		}
 		if (qty != nil && *qty <= 0) || (price != nil && *price < 0) {
 			return Line{}, ErrLine
+		}
+		if l.Kind == KindPartida && price != nil && *price <= 0 {
+			return Line{}, ErrPartidaValue
 		}
 		if qty != nil {
 			l.Qty = *qty

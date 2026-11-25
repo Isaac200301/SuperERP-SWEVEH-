@@ -26,6 +26,7 @@ type qRow struct {
 	IVA        int        `db:"iva_pct"`
 	ConIVA     bool       `db:"precios_con_iva"`
 	VenceEn    *time.Time `db:"vence_en"`
+	Detalle    bool       `db:"mostrar_detalle"`
 }
 
 type lRow struct {
@@ -42,18 +43,37 @@ type lRow struct {
 	Horas       *int       `db:"horas_cent"`
 }
 
+// dRow es un renglón del detalle interno de una partida (V-07, ADR-0040).
+type dRow struct {
+	LineaID     shared.ID `db:"linea_id"`
+	Descripcion string    `db:"descripcion"`
+	Cantidad    int       `db:"cantidad"`
+	ValorRef    *int64    `db:"valor_ref"`
+}
+
 const qCols = `id, taller_id, orden_id, numero, estado, enviada_en, respondida_en, canal_respuesta, respuesta_ref, version,
-	iva_pct, precios_con_iva, vence_en`
+	iva_pct, precios_con_iva, vence_en, mostrar_detalle`
 
 func (Repository) load(ctx context.Context, r qRow) (domain.Quote, error) {
 	q := domain.Quote{ID: r.ID, TallerID: r.TallerID, OrderID: r.OrdenID, Number: r.Numero, State: domain.State(r.Estado),
 		SentAt: r.EnviadaEn, RespondedAt: r.Respondida, Channel: r.Canal, ResponseRef: r.Ref, Version: r.Version,
-		VATPct: r.IVA, PricesIncludeVAT: r.ConIVA, ExpiresAt: r.VenceEn}
+		VATPct: r.IVA, PricesIncludeVAT: r.ConIVA, ExpiresAt: r.VenceEn, ShowDetail: r.Detalle}
 	lines, err := db.Many[lRow](ctx, `SELECT id, tipo, ref_id, descripcion, cantidad, precio_unitario, sin_stock, aprobada, precio_libre,
 		descuento_pct, horas_cent FROM quotes.linea WHERE taller_id = $1 AND cotizacion_id = $2 ORDER BY created_at, id`, r.TallerID, r.ID)
+	if err != nil {
+		return q, err
+	}
+	// El detalle de todas las partidas en una sola consulta (no una por partida).
+	details, err := db.Many[dRow](ctx, `SELECT linea_id, descripcion, cantidad, valor_ref FROM quotes.partida_detalle
+		WHERE taller_id = $1 AND cotizacion_id = $2 ORDER BY orden`, r.TallerID, r.ID)
+	byLine := map[shared.ID][]domain.DetailItem{}
+	for _, d := range details {
+		byLine[d.LineaID] = append(byLine[d.LineaID], domain.DetailItem{Description: d.Descripcion, Qty: d.Cantidad, ValueRef: d.ValorRef})
+	}
 	for _, l := range lines {
 		q.Lines = append(q.Lines, domain.Line{ID: l.ID, Kind: l.Tipo, RefID: l.RefID, Description: l.Descripcion, Qty: l.Cantidad,
-			UnitPrice: l.Precio, NoStock: l.SinStock, Approved: l.Aprobada, FreePrice: l.Libre, DiscountPct: l.Descuento, HoursCent: l.Horas})
+			UnitPrice: l.Precio, NoStock: l.SinStock, Approved: l.Aprobada, FreePrice: l.Libre, DiscountPct: l.Descuento, HoursCent: l.Horas,
+			Detail: byLine[l.ID]})
 	}
 	return q, err
 }
@@ -90,19 +110,23 @@ func (Repository) Insert(ctx context.Context, q domain.Quote) error {
 	return err
 }
 
-// Save reemplaza la cabecera (con versión) y las líneas.
+// Save reemplaza la cabecera (con versión), las líneas y el detalle de las partidas.
 func (Repository) Save(ctx context.Context, q domain.Quote, prev int) error {
 	t := q.Totals()
 	n, err := db.Exec(ctx, `UPDATE quotes.cotizacion SET estado = $3, total = $4, enviada_en = $5, respondida_en = $6,
-		canal_respuesta = $7, respuesta_ref = $8, version = $9, subtotal = $11, descuento = $12, iva = $13, vence_en = $14
+		canal_respuesta = $7, respuesta_ref = $8, version = $9, subtotal = $11, descuento = $12, iva = $13, vence_en = $14,
+		mostrar_detalle = $15
 		WHERE taller_id = $1 AND id = $2 AND version = $10`,
 		q.TallerID, q.ID, string(q.State), t.Total, q.SentAt, q.RespondedAt, q.Channel, q.ResponseRef, q.Version, prev,
-		t.Gross, t.Discount, t.VAT, q.ExpiresAt)
+		t.Gross, t.Discount, t.VAT, q.ExpiresAt, q.ShowDetail)
 	if err != nil {
 		return err
 	}
 	if n == 0 {
 		return shared.ErrVersionConflict
+	}
+	if _, err := db.Exec(ctx, `DELETE FROM quotes.partida_detalle WHERE taller_id = $1 AND cotizacion_id = $2`, q.TallerID, q.ID); err != nil {
+		return err
 	}
 	if _, err := db.Exec(ctx, `DELETE FROM quotes.linea WHERE taller_id = $1 AND cotizacion_id = $2`, q.TallerID, q.ID); err != nil {
 		return err
@@ -114,6 +138,13 @@ func (Repository) Save(ctx context.Context, q domain.Quote, prev int) error {
 			l.ID, q.TallerID, q.ID, l.Kind, l.RefID, l.Description, l.Qty, l.UnitPrice, l.NoStock, l.Approved, l.FreePrice,
 			l.DiscountPct, l.HoursCent, float64(i)/1000); err != nil {
 			return err
+		}
+		for j, d := range l.Detail {
+			if _, err := db.Exec(ctx, `INSERT INTO quotes.partida_detalle (id, taller_id, cotizacion_id, linea_id, descripcion, cantidad,
+				valor_ref, orden) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+				shared.NewID(), q.TallerID, q.ID, l.ID, d.Description, d.Qty, d.ValueRef, j); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

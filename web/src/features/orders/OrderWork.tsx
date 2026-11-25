@@ -477,6 +477,98 @@ function FreeItem({ busy, tarifa, onAdd }: {
   );
 }
 
+/** "+ Partida" (V-07, ADR-0040; Figma "09 Cotización por partidas"): un nombre y el valor que pone el taller. */
+function PartidaForm({ busy, onAdd }: { busy: boolean; onAdd: (v: { descripcion: string; precioUnitario: number }) => void }) {
+  const [nombre, setNombre] = useState('');
+  const [valor, setValor] = useState('');
+  const v = pesos(valor);
+  let falta: string | undefined;
+  if (!nombre.trim()) falta = 'Escribe el nombre de la partida.';
+  else if (v === undefined || v <= 0) falta = 'Escribe el valor de la partida.';
+  return (
+    <form
+      aria-label="Nueva partida"
+      className="grid gap-3 rounded-2xl bg-surface p-3 sm:grid-cols-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (falta || v === undefined) return;
+        onAdd({ descripcion: nombre.trim(), precioUnitario: v });
+        setNombre('');
+        setValor('');
+      }}
+    >
+      <div className="sm:col-span-2">
+        <Field label="Nombre de la partida" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+      </div>
+      <Field label="Valor de la partida (COP)" inputMode="numeric" value={valor} onChange={(e) => setValor(e.target.value)} />
+      <div className="sm:col-span-3">
+        <Button type="submit" variant="secondary" busy={busy} missing={falta}>
+          + Partida
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+type Detalle = { descripcion: string; cantidad?: number; valorRef?: number | null };
+
+/**
+ * Detalle interno de una partida (V-07): lo que el taller sabe que incluye. No suma al total y el cliente solo lo ve si
+ * la cotización tiene "Mostrar detalle al cliente". Plegado por defecto.
+ */
+function PartidaDetail({ nombre, items, editable, busy, onSave }: {
+  nombre: string; items: Detalle[]; editable: boolean; busy: boolean; onSave: (items: Detalle[]) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [nuevo, setNuevo] = useState('');
+  const resumen = `Detalle interno: ${items.length} ${items.length === 1 ? 'ítem' : 'ítems'} · solo el taller`;
+  return (
+    <div className="mt-1 text-xs">
+      <button type="button" aria-expanded={abierto} className="min-h-[32px] font-bold text-primary" onClick={() => setAbierto(!abierto)}>
+        {resumen}
+      </button>
+      {abierto ? (
+        <div className="flex flex-col gap-1.5 rounded-xl bg-surface p-2">
+          <ul className="flex flex-col gap-1">
+            {items.map((it, i) => (
+              <li key={`${it.descripcion}-${i}`} className="flex items-center gap-2">
+                <span className="flex-1">
+                  {it.cantidad && it.cantidad > 1 ? `${it.cantidad} × ` : ''}
+                  {it.descripcion}
+                </span>
+                {editable ? (
+                  <button type="button" className="font-bold text-err-ink" aria-label={`Quitar ${it.descripcion} del detalle`}
+                    onClick={() => onSave(items.filter((_, j) => j !== i))}>
+                    Quitar
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          {editable ? (
+            <form
+              className="flex items-end gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!nuevo.trim()) return;
+                onSave([...items, { descripcion: nuevo.trim() }]);
+                setNuevo('');
+              }}
+            >
+              <div className="flex-1">
+                <Field label={`Agregar al detalle de ${nombre}`} value={nuevo} onChange={(e) => setNuevo(e.target.value)} />
+              </div>
+              <Button type="submit" variant="secondary" busy={busy} missing={nuevo.trim() ? undefined : 'Escribe qué incluye.'}>
+                Agregar
+              </Button>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * Repuesto escrito a mano (V-06, ADR-0039): el taller lleva el inventario en otro programa. Nombre, cantidad y el valor
  * que pone el taller (nunca se sugiere, RF-17); no descuenta existencias.
@@ -543,8 +635,9 @@ export function QuotePanel({ orden }: { orden: Orden }) {
   // Sin cotización todavía: se arma una vacía; el primer ítem crea el borrador en el servidor.
   const cot = q.data ?? { numero: 1, estado: 'borrador' as const, total: 0, lineas: [] };
   const editable = cot.estado === 'borrador';
-  const err = act.add.error ?? act.remove.error ?? act.send.error ?? act.respond.error ?? act.giveBack.error ?? act.update.error ?? act.renew.error;
-  const t = { subtotal: 0, descuento: 0, iva: 0, ivaPct: 0, preciosConIva: true, venceEn: null, vencida: false, ...cot };
+  const err = act.add.error ?? act.remove.error ?? act.send.error ?? act.respond.error ?? act.giveBack.error ?? act.update.error ?? act.renew.error
+    ?? act.detail.error ?? act.options.error;
+  const t = { subtotal: 0, descuento: 0, iva: 0, ivaPct: 0, preciosConIva: true, venceEn: null, vencida: false, mostrarDetalle: false, version: 0, ...cot };
   const devuelto = act.giveBack.data;
   const movPorRepuesto = new Map((movidos.data ?? []).map((m) => [m.repuestoId, m]));
 
@@ -568,7 +661,17 @@ export function QuotePanel({ orden }: { orden: Orden }) {
             return (
               <tr key={l.id} className="border-t border-line align-top">
                 <td className="py-2">
+                  {l.tipo === 'partida' ? <span className="mr-1.5 rounded-full bg-kpi-lilac px-2 py-0.5 text-xs font-bold text-[#3E2E8C]">Partida</span> : null}
                   {l.descripcion}
+                  {l.tipo === 'partida' ? (
+                    <PartidaDetail
+                      nombre={l.descripcion}
+                      items={l.detalle ?? []}
+                      editable={editable}
+                      busy={act.detail.isPending}
+                      onSave={(items) => act.detail.mutate({ lineId: l.id, version: t.version ?? 0, detalle: items.map((it) => ({ descripcion: it.descripcion, cantidad: it.cantidad ?? 1 })) })}
+                    />
+                  ) : null}
                   {l.horas != null ? <span className="ml-2 text-ink-2">({l.horas} h)</span> : null}
                   {l.sinStock ? <span className="ml-2 font-bold text-warn-ink">sin existencia</span> : null}
                   {/* HU-30: el cliente aprobó solo algunos ítems; los demás no se hacen ni suman. */}
@@ -598,7 +701,9 @@ export function QuotePanel({ orden }: { orden: Orden }) {
                   ) : null}
                 </td>
                 <td>
-                  {editable ? (
+                  {l.tipo === 'partida' ? (
+                    1
+                  ) : editable ? (
                     <span className="inline-flex items-center gap-1">
                       <button
                         type="button"
@@ -675,7 +780,7 @@ export function QuotePanel({ orden }: { orden: Orden }) {
           ) : null}
           <tr className="border-t-2 border-ink font-extrabold">
             <td className="py-2" colSpan={2}>
-              Total
+              Total{t.preciosConIva && t.iva ? ' con IVA incluido' : ''}
             </td>
             <td className="text-right font-mono">{formatoCOP(cot.total)}</td>
             <td />
@@ -698,8 +803,22 @@ export function QuotePanel({ orden }: { orden: Orden }) {
         </p>
       ) : null}
 
+      {cot.lineas.some((l) => l.tipo === 'partida') ? (
+        <label className="flex min-h-[44px] items-center gap-2 text-sm font-bold">
+          <input
+            type="checkbox"
+            role="switch"
+            aria-checked={t.mostrarDetalle === true}
+            checked={t.mostrarDetalle === true}
+            disabled={!editable || act.options.isPending}
+            onChange={(e) => act.options.mutate({ mostrarDetalle: e.target.checked, version: t.version ?? 0 })}
+          />
+          Mostrar detalle al cliente
+        </label>
+      ) : null}
       {editable ? (
         <>
+          <PartidaForm busy={act.add.isPending} onAdd={(v) => act.add.mutate({ tipo: 'partida', cantidad: 1, ...v })} />
           <Field label={externo ? 'Buscar servicio' : 'Buscar servicio o repuesto'} value={buscar} onChange={(e) => setBuscar(e.target.value)} />
           <ul className="flex max-h-80 flex-col gap-1 overflow-auto">
             {cat.data?.servicios.map((s) => (
