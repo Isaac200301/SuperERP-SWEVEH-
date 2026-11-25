@@ -1594,6 +1594,26 @@ _Módulo del MVP: Preparativos. Que la demo corra dos veces seguidas sin tocar c
 
 **Trazabilidad:** Depende de: HU-20, HU-27
 
+### HU-104 · Entrar con mi celular y un PIN
+
+**Épica:** E01 · **Roles:** Dueño del taller, Mecánico, Recepción · **Superficies:** Panel, Piso · **Prioridad:** Must · **Origen:** Pablo (24-nov-2026, entrega del viernes, V-03 y V-04), por revisar con Isaac · **Aplica a motos:** no aplica
+
+**Como** persona del taller, **quiero** entrar con mi celular y un PIN de 4 números que yo escojo, **para** no depender de un código que puede no llegar.
+
+**Criterios de aceptación**
+
+- **Dado** que no tengo cuenta, **cuando** escribo mi celular, el nombre del taller, un PIN de 4 números dos veces y marco la autorización de datos (que aparece sin marcar), **entonces** se crea mi cuenta de dueño con su taller, queda la prueba de la autorización (HU-02) y paso a escoger qué vehículos atiendo.
+- **Dado** un PIN fácil (0000, 1111, 1234, 4321…), **cuando** intento usarlo, **entonces** el sistema no lo acepta y me pide otros 4 números.
+- **Dado** mi celular y mi PIN, **cuando** entro, **entonces** abro mi taller y la sesión dura unos 30 días.
+- **Dado** un celular que no tiene cuenta o un PIN equivocado, **cuando** intento entrar, **entonces** el mensaje es el mismo en los dos casos y dice cuántos intentos me quedan.
+- **Dado** 4 intentos fallidos, **cuando** fallo el 5.º, **entonces** el celular queda bloqueado 15 minutos, ni con el PIN bueno se entra, y queda en la bitácora del taller sin el PIN.
+- **Dado** que el dueño me agregó al equipo con un PIN temporal, **cuando** entro con él, **entonces** debo escoger un PIN propio antes de seguir.
+- **Dado** que olvidé mi PIN, **cuando** el dueño me lo restablece desde Equipo, **entonces** entro con el PIN temporal que me dice, el celular se desbloquea y mis sesiones abiertas se cierran. Solo quien administra el equipo puede hacerlo.
+
+**Notas:** El celular no se verifica (riesgo aceptado para el piloto, Q-40). Si el dueño olvida su PIN, lo restablece un administrador con `make pin-reset` (sin recuperación por SMS en la entrega). Hash argon2id con pepper (ADR-0037). El código por WhatsApp (HU-01) queda detrás de `AUTH_MODE=otp`. El nombre del dueño no se pide en el registro (queda "Dueño", Q-43).
+
+**Trazabilidad:** Depende de: HU-02 · Cambia: HU-01, HU-03, HU-04, HU-05, HU-80 · ADR-0037
+
 ## Referencias citadas en las historias
 
 1. Meta for Developers, "Get started", WhatsApp Cloud API (número de prueba, 5 destinatarios, plantillas preaprobadas). <https://developers.facebook.com/docs/whatsapp/cloud-api/get-started/> (Oficial)

@@ -37,6 +37,11 @@ type Service struct {
 	pepper    []byte // secreto del servidor para el HMAC del código
 	log       *slog.Logger
 	members   Members
+	// Entrada con PIN (HU-104, ADR-0037).
+	hasher     ports.PINHasher
+	lockPolicy domain.LockPolicy
+	refreshTTL time.Duration
+	pinMode    bool // AUTH_MODE=pin: alguien nuevo del equipo entra con un PIN temporal
 }
 
 type Deps struct {
@@ -50,11 +55,24 @@ type Deps struct {
 	Clock     ports.Clock
 	Pepper    []byte
 	Log       *slog.Logger
+	// PIN (HU-104). LockPolicy y RefreshTTL vacíos = los de HU-01 y docs/06 §6.3.
+	PINHasher  ports.PINHasher
+	LockPolicy domain.LockPolicy
+	RefreshTTL time.Duration
+	PINMode    bool
 }
 
 func NewService(d Deps) *Service {
-	return &Service{tx: d.Tx, store: d.Store, sender: d.Sender, tokens: d.Tokens, workshops: d.Workshops,
-		audit: d.Audit, events: d.Events, clock: d.Clock, pepper: d.Pepper, log: d.Log}
+	s := &Service{tx: d.Tx, store: d.Store, sender: d.Sender, tokens: d.Tokens, workshops: d.Workshops,
+		audit: d.Audit, events: d.Events, clock: d.Clock, pepper: d.Pepper, log: d.Log,
+		hasher: d.PINHasher, lockPolicy: d.LockPolicy, refreshTTL: d.RefreshTTL, pinMode: d.PINMode}
+	if s.lockPolicy.MaxFailures <= 0 || s.lockPolicy.Duration <= 0 {
+		s.lockPolicy = domain.DefaultLockPolicy
+	}
+	if s.refreshTTL <= 0 {
+		s.refreshTTL = domain.RefreshTTL
+	}
+	return s
 }
 
 // RequestCode genera y envía un código. La respuesta es la misma exista o no la cuenta.
@@ -122,6 +140,8 @@ type Session struct {
 	Workshop       ports.Workshop
 	Roles          []string
 	NewAccount     bool
+	// MustChangePIN: entró con un PIN temporal que puso el dueño (HU-104).
+	MustChangePIN bool
 }
 
 // Verify comprueba el código y, según el caso, crea la cuenta o inicia sesión (HU-01).
@@ -201,24 +221,35 @@ func (s *Service) Verify(ctx context.Context, in VerifyInput) (Session, error) {
 		return Session{}, outcome
 	}
 	if existing != nil {
-		return s.login(ctx, *existing, now)
+		return s.loginVia(ctx, *existing, now, "")
 	}
-	return s.register(ctx, phone, name, now)
+	return s.register(ctx, newAccount{phone: phone, name: name, workshop: domain.DefaultWorkshopName(name)}, now)
 }
 
-func (s *Service) register(ctx context.Context, phone, name string, now time.Time) (Session, error) {
+// newAccount es lo que se crea al registrar un dueño. pinHash vacío = cuenta por código (OTP).
+type newAccount struct {
+	phone, name, workshop, pinHash string
+}
+
+func (s *Service) register(ctx context.Context, a newAccount, now time.Time) (Session, error) {
+	phone, name := a.phone, a.name
 	tallerID, userID := shared.NewID(), shared.NewID()
 	actor := shared.Actor{Type: shared.ActorUser, ID: userID}
 	var out Session
 	settings := map[string]string{settingTaller: tallerID.String(), settingUsuario: userID.String()}
 	err := s.tx.DoWithSettings(ctx, settings, func(ctx context.Context) error {
-		ws, err := s.workshops.Create(ctx, tallerID, domain.DefaultWorkshopName(name), actor, now)
+		ws, err := s.workshops.Create(ctx, tallerID, a.workshop, actor, now)
 		if err != nil {
 			return err
 		}
 		user := ports.User{ID: userID, Phone: phone, Name: name, Active: true}
 		if err := s.store.InsertUser(ctx, user, now); err != nil {
 			return err
+		}
+		if a.pinHash != "" {
+			if err := s.store.SetPIN(ctx, userID, a.pinHash, false, now); err != nil {
+				return err
+			}
 		}
 		if err := s.store.InsertMembership(ctx, ports.Membership{TallerID: tallerID, Role: string(domain.RoleOwner)}, userID, now); err != nil {
 			return err
@@ -231,7 +262,7 @@ func (s *Service) register(ctx context.Context, phone, name string, now time.Tim
 		}
 		if err := s.audit.Record(ctx, audit.Entry{
 			TallerID: tallerID, Actor: actor, Action: "usuario.registrar", Entity: "usuario", EntityID: userID,
-			After:      map[string]any{"nombre": name, "rol": string(domain.RoleOwner), "politica": domain.PolicyVersionDraft},
+			After:      map[string]any{"nombre": name, "rol": string(domain.RoleOwner), "politica": domain.PolicyVersionDraft, "conPin": a.pinHash != ""},
 			OccurredAt: now,
 		}); err != nil {
 			return err
@@ -251,7 +282,8 @@ func (s *Service) register(ctx context.Context, phone, name string, now time.Tim
 	return out, nil
 }
 
-func (s *Service) login(ctx context.Context, user ports.User, now time.Time) (Session, error) {
+// loginVia abre la sesión de alguien que ya probó quién es. via = "pin" deja "cuenta.ingreso" en la bitácora.
+func (s *Service) loginVia(ctx context.Context, user ports.User, now time.Time, via string) (Session, error) {
 	if !user.Active {
 		return Session{}, domain.ErrNoMembership
 	}
@@ -273,8 +305,14 @@ func (s *Service) login(ctx context.Context, user ports.User, now time.Time) (Se
 		if err != nil {
 			return err
 		}
-		out, err = s.openSession(ctx, user, ws, []string{m.Role}, now)
-		return err
+		if out, err = s.openSession(ctx, user, ws, []string{m.Role}, now); err != nil {
+			return err
+		}
+		if via == "" {
+			return nil
+		}
+		return s.audit.Record(ctx, audit.Entry{TallerID: m.TallerID, Actor: shared.Actor{Type: shared.ActorUser, ID: user.ID},
+			Action: "cuenta.ingreso", Entity: "usuario", EntityID: user.ID, After: map[string]any{"via": via}, OccurredAt: now})
 	})
 	return out, err
 }
@@ -288,7 +326,7 @@ func (s *Service) openSession(ctx context.Context, user ports.User, ws ports.Wor
 	if err != nil {
 		return Session{}, err
 	}
-	refreshExp := minTime(now.Add(domain.RefreshTTL), sess.ExpiresAbs)
+	refreshExp := minTime(now.Add(s.refreshTTL), sess.ExpiresAbs)
 	if err := s.store.InsertRefresh(ctx, hash, sess.ID, refreshExp, now); err != nil {
 		return Session{}, err
 	}
@@ -297,7 +335,7 @@ func (s *Service) openSession(ctx context.Context, user ports.User, ws ports.Wor
 		return Session{}, err
 	}
 	return Session{AccessToken: at, AccessExpires: atExp, RefreshToken: raw, RefreshExpires: refreshExp,
-		User: user, Workshop: ws, Roles: roles}, nil
+		User: user, Workshop: ws, Roles: roles, MustChangePIN: user.MustChangePIN}, nil
 }
 
 // Refresh rota el refresh token. Si llega uno ya usado, revoca la sesión completa (posible robo).
@@ -356,7 +394,7 @@ func (s *Service) Refresh(ctx context.Context, raw string) (Session, error) {
 		if err != nil {
 			return err
 		}
-		exp := minTime(now.Add(domain.RefreshTTL), rec.SessionAbs)
+		exp := minTime(now.Add(s.refreshTTL), rec.SessionAbs)
 		if err := s.store.InsertRefresh(ctx, newHash, rec.SessionID, exp, now); err != nil {
 			return err
 		}
@@ -373,7 +411,7 @@ func (s *Service) Refresh(ctx context.Context, raw string) (Session, error) {
 			return err
 		}
 		out = Session{AccessToken: at, AccessExpires: atExp, RefreshToken: newRaw, RefreshExpires: exp,
-			User: user, Workshop: ws, Roles: []string{role}}
+			User: user, Workshop: ws, Roles: []string{role}, MustChangePIN: user.MustChangePIN}
 		return nil
 	})
 	if err != nil {

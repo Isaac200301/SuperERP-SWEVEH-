@@ -18,6 +18,10 @@ func (h *Handler) UserRoutes(r chi.Router, guard *authn.Guard) {
 	r.With(guard.Require("user:manage")).Get("/users", httpx.JSON(h.log, h.listUsers))
 	r.With(guard.Require("user:manage")).Post("/users", httpx.JSON(h.log, h.addUser))
 	r.With(guard.Require("user:manage")).Patch("/users/{id}", httpx.JSON(h.log, h.setUserActive))
+	if h.pinMode {
+		r.With(guard.Require("user:manage")).Post("/users/{id}/pin-reset", httpx.JSON(h.log, h.resetPIN))
+		r.Post("/auth/pin", httpx.JSON(h.log, h.changePIN))
+	}
 	r.Get("/me/workshops", httpx.JSON(h.log, h.myWorkshops))
 	r.Post("/auth/switch", h.switchWorkshop)
 }
@@ -49,11 +53,12 @@ func (h *Handler) addUser(r *http.Request, p reqctx.Principal) (int, any, error)
 		Celular string `json:"celular"`
 		Nombre  string `json:"nombre"`
 		Rol     string `json:"rol"`
+		PIN     string `json:"pin"` // PIN temporal (HU-104); obligatorio con AUTH_MODE=pin
 	}
 	if err := httpx.Decode(r, &q); err != nil {
 		return 0, nil, err
 	}
-	m, err := h.svc.AddMember(r.Context(), p.TallerID, p.Actor(), q.Celular, q.Nombre, q.Rol)
+	m, err := h.svc.AddMember(r.Context(), p.TallerID, p.Actor(), q.Celular, q.Nombre, q.Rol, q.PIN)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -104,4 +109,31 @@ func (h *Handler) switchWorkshop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.writeSession(w, s, http.StatusOK)
+}
+
+// resetPIN pone un PIN temporal a alguien del equipo (HU-104). Responde 204: el PIN no vuelve en la respuesta.
+func (h *Handler) resetPIN(r *http.Request, p reqctx.Principal) (int, any, error) {
+	id, err := httpx.PathID(r, "id", app.ErrMemberNF)
+	if err != nil {
+		return 0, nil, err
+	}
+	var q struct {
+		PIN string `json:"pin"`
+	}
+	if err := httpx.Decode(r, &q); err != nil {
+		return 0, nil, err
+	}
+	return http.StatusNoContent, nil, h.svc.ResetPIN(r.Context(), p.TallerID, p.Actor(), id, q.PIN)
+}
+
+// changePIN cambia el PIN propio (HU-104): pide el actual, salvo si entró con uno temporal.
+func (h *Handler) changePIN(r *http.Request, p reqctx.Principal) (int, any, error) {
+	var q struct {
+		Actual string `json:"pinActual"`
+		Nuevo  string `json:"pin"`
+	}
+	if err := httpx.Decode(r, &q); err != nil {
+		return 0, nil, err
+	}
+	return http.StatusNoContent, nil, h.svc.ChangePIN(r.Context(), p.UserID, p.TallerID, q.Actual, q.Nuevo)
 }

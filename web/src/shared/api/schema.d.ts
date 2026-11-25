@@ -38,6 +38,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Paso 1 del registro con PIN (HU-104, V-04): crea la cuenta, el taller y la autorización de datos (HU-02). Solo con AUTH_MODE=pin */
+        post: operations["registerWithPin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Entrar con celular y PIN (HU-104). Error igual exista o no el celular; 5 fallos bloquean 15 minutos (429). Solo con AUTH_MODE=pin */
+        post: operations["loginWithPin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cambiar el PIN propio (HU-104). Pide el actual, salvo si se entró con un PIN temporal (cambiarPin) */
+        post: operations["changePin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/refresh": {
         parameters: {
             query?: never;
@@ -967,6 +1018,23 @@ export interface paths {
         patch: operations["setUserActive"];
         trace?: never;
     };
+    "/users/{id}/pin-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Poner un PIN temporal a alguien del equipo (HU-104). Desbloquea su celular y cierra sus sesiones. Permiso user:manage */
+        post: operations["resetUserPin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/workshops": {
         parameters: {
             query?: never;
@@ -1865,6 +1933,8 @@ export interface components {
             cuentaNueva: boolean;
             /** @description Es administrador del ERP: ve el medidor de todos los talleres (HU-74, ADR-0030) */
             adminPlataforma?: boolean;
+            /** @description Entró con un PIN temporal que puso el dueño: debe escoger uno propio (HU-104) */
+            cambiarPin?: boolean;
             /** @description Lo encendido en este servidor (FEATURE_WHATSAPP, FEATURE_PLATFORM; V-01 y V-02). Las rutas con x-feature apagada no existen (404) */
             funciones?: {
                 whatsapp: boolean;
@@ -2196,6 +2266,105 @@ export interface operations {
             };
             400: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+        };
+    };
+    registerWithPin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    celular: string;
+                    nombreTaller: string;
+                    /** @description Nombre del dueño (opcional; sin él queda Dueño y se cambia en Equipo) */
+                    nombre?: string;
+                    /** @description 4 dígitos; no se aceptan los fáciles (0000, 1234…) */
+                    pin: string;
+                    autorizacion: {
+                        /** @description Versión de la política que vio la persona */
+                        version?: string;
+                        /** @description Casilla sin marcar por defecto (HU-02) */
+                        aceptada: boolean;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Cuenta creada y sesión iniciada. Pone las cookies de sesión. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sesion"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+        };
+    };
+    loginWithPin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    celular: string;
+                    pin: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Sesión iniciada. Pone las cookies de sesión. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sesion"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+        };
+    };
+    changePin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    pinActual?: string;
+                    pin: string;
+                };
+            };
+        };
+        responses: {
+            /** @description PIN cambiado */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             422: components["responses"]["Problem"];
             429: components["responses"]["Problem"];
         };
@@ -4054,6 +4223,8 @@ export interface operations {
                     nombre: string;
                     /** @enum {string} */
                     rol: "dueno" | "recepcion" | "mecanico";
+                    /** @description PIN temporal que el dueño le dice de palabra (HU-104); obligatorio con AUTH_MODE=pin para alguien nuevo */
+                    pin?: string;
                 };
             };
         };
@@ -4097,6 +4268,35 @@ export interface operations {
                     "application/json": components["schemas"]["Miembro"];
                 };
             };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    resetUserPin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    pin: string;
+                };
+            };
+        };
+        responses: {
+            /** @description PIN temporal puesto (no vuelve en la respuesta) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };

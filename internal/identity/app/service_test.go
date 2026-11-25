@@ -118,6 +118,16 @@ func (f *fakeStore) UserByID(_ context.Context, id shared.ID) (ports.User, error
 	return ports.User{}, domain.ErrSessionInvalid
 }
 
+func (f *fakeStore) SetPIN(_ context.Context, id shared.ID, hash string, mustChange bool, _ time.Time) error {
+	for k, u := range f.users {
+		if u.ID == id {
+			u.PINHash, u.MustChangePIN = hash, mustChange
+			f.users[k] = u
+		}
+	}
+	return f.fail("SetPIN")
+}
+
 func (f *fakeStore) InsertUser(_ context.Context, u ports.User, _ time.Time) error {
 	if err := f.fail("InsertUser"); err != nil {
 		return err

@@ -32,6 +32,7 @@ func TestOTPSenderWAHA(t *testing.T) {
 			}
 			t.Setenv("APP_ENV", tc.env)
 			t.Setenv("WHATSAPP_PROVIDER", "local")
+			t.Setenv("AUTH_MODE", "otp") // el código por WhatsApp es el modo de antes (HU-01)
 			_, err := LoadAPI()
 			got := ""
 			if err != nil {

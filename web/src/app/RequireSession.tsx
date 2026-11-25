@@ -47,6 +47,10 @@ function Panel({ session }: { session: Sesion }) {
   const mobile = useIsMobile();
   const dueno = can(session, 'workshop:manage');
   const t = useQuery({ queryKey: ['taller'], queryFn: async () => unwrap(await api.GET('/workshop')), enabled: dueno });
+  // HU-104: con el PIN temporal que puso el dueño, primero se escoge uno propio.
+  if (session.cambiarPin && loc.pathname !== '/panel/cambiar-pin') {
+    return <Navigate to="/panel/cambiar-pin" replace />;
+  }
   if (dueno && t.data && !t.data.onboardingCompleto && loc.pathname !== '/panel/arranque') {
     return <Navigate to="/panel/arranque" replace />;
   }

@@ -32,11 +32,17 @@ describe('TeamPage (HU-80, HU-84)', () => {
     expect(screen.getByText('El celular debe tener 10 dígitos.')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Celular'), ' 2233');
     await userEvent.selectOptions(screen.getByLabelText('Rol'), 'recepcion');
+    // HU-104: sin PIN temporal (o con uno fácil) no deja agregar.
+    expect(screen.getByText('Escoge un PIN temporal de 4 números.')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('PIN temporal: número 1 de 4'), '1234');
+    expect(screen.getByText('Ese PIN es muy fácil de adivinar. Escoge otros 4 números.')).toBeInTheDocument();
+    // Se escribe encima desde la primera casilla: cada una reemplaza su número.
+    await userEvent.type(screen.getByLabelText('PIN temporal: número 1 de 4'), '4826');
     await userEvent.click(screen.getByRole('button', { name: 'Agregar al equipo' }));
     expect(await screen.findByText('Ese celular ya está en el equipo.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
     await waitFor(() => expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({ activo: false }));
-    expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ celular: '3001112233', nombre: 'Luis', rol: 'recepcion' });
+    expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ celular: '3001112233', nombre: 'Luis', rol: 'recepcion', pin: '4826' });
   });
 });
 

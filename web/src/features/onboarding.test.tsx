@@ -46,13 +46,15 @@ describe('Arranque del taller (HU-03, HU-04)', () => {
     });
     renderPage(<OnboardingPage />);
 
-    expect(await screen.findByText('PASO 2 DE 3')).toBeInTheDocument();
+    expect(await screen.findByText('PASO 2 DE 2')).toBeInTheDocument(); // V-04: el registro tiene 2 pasos
     expect(screen.getByText('Escoge qué vehículos atiendes.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: 'Carros' }));
     await userEvent.click(screen.getByLabelText(/Acepto el contrato/));
     await userEvent.click(screen.getByRole('button', { name: 'Armar mi taller' }));
 
-    expect(await screen.findByText('Tu taller ya está armado')).toBeInTheDocument();
+    expect(await screen.findByText('Te dejamos listos estos servicios')).toBeInTheDocument();
+    expect(screen.queryByText(/Hacer mi primera orden/)).not.toBeInTheDocument(); // V-04: sin la orden de ejemplo en el alta
+    expect(screen.getByRole('button', { name: 'Listo, ir a mi taller' })).toBeInTheDocument();
     expect(await screen.findByText(/checklist de recepción de carro/)).toBeInTheDocument();
     const nombre = await screen.findByLabelText('Nombre de Cambio de aceite');
     await userEvent.clear(nombre);

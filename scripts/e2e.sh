@@ -1,8 +1,8 @@
 #!/bin/sh
 # Recorrido en navegador real (Playwright) contra el api sirviendo la SPA en el mismo origen, como se despliega,
 # y el worker (webhooks de WhatsApp y outbox) con el canal de prueba. Lo usan `make e2e` y el job e2e del CI.
-# Necesita la base migrada y las variables de .env.example (DATABASE_URL, WORKER_DATABASE_URL). Solo APP_ENV=local:
-# el código de entrada sale en el log del api (OTP_SENDER=consola).
+# Necesita la base migrada y las variables de .env.example (DATABASE_URL, WORKER_DATABASE_URL). Solo APP_ENV=local.
+# Se entra con celular y PIN (AUTH_MODE=pin, HU-104); el log del api queda para revisar fallos.
 set -eu
 # Entrega del 27-nov (V-01): por defecto sin WhatsApp, como el piloto. E2E_WHATSAPP=true corre también whatsapp.spec.ts.
 E2E_WHATSAPP="${E2E_WHATSAPP:-false}"

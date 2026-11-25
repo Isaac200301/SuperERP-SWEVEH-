@@ -24,6 +24,8 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"sweveh/internal/identity/adapters/out/otp"
+	"sweveh/internal/identity/adapters/out/pinhash"
+	identitydomain "sweveh/internal/identity/domain"
 	"sweveh/internal/outbox"
 	"sweveh/internal/platform/authn"
 	"sweveh/internal/platform/clock"
@@ -45,7 +47,30 @@ type env struct {
 	clk *clock.Fake
 	mux *chi.Mux
 	st  storage.Store
+	// logs guarda todo lo que escribió el servidor, para probar que no hay datos prohibidos (PIN, celular completo).
+	logs *syncBuffer
 }
+
+// syncBuffer es un bytes.Buffer que se puede escribir desde varias solicitudes a la vez.
+type syncBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
+}
+
+// testPINParams: argon2id barato para que las pruebas no tarden; el formato y la comparación son los de verdad.
+var testPINParams = pinhash.Params{MemoryKiB: 64, Time: 1, Threads: 1}
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
@@ -76,7 +101,8 @@ func newEnvRaw(t *testing.T, cfg config.API) *env {
 	}
 	clk := clock.NewFake(time.Now())
 	mem := otp.NewMemory()
-	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logs := &syncBuffer{}
+	log := slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	st, err := storage.NewLocal(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -84,6 +110,10 @@ func newEnvRaw(t *testing.T, cfg config.API) *env {
 	// El origen permitido se conoce antes de arrancar: se arma el router y luego se inicia TLS.
 	srv := httptest.NewUnstartedServer(nil)
 	origin := "https://" + srv.Listener.Addr().String()
+	hasher, err := pinhash.New([]byte("pepper-de-pruebas-de-32-caracteres!!"), testPINParams)
+	if err != nil {
+		t.Fatal(err)
+	}
 	mux := server.New(server.Deps{
 		Pool: d.API, Log: log, Clock: clk,
 		Signer:    authn.NewSigner(key, "test-1", clk),
@@ -92,11 +122,13 @@ func newEnvRaw(t *testing.T, cfg config.API) *env {
 		AllowedOrigins: []string{origin}, LoginPerMinute: 100000, Storage: st,
 		Extra: wire.Extra(cfg), Public: wire.Public(d.API, cfg, log), PlatformAdmins: cfg.Platform.Admins,
 		Features: server.Features(cfg.Features),
+		AuthPIN:  cfg.Auth.PIN(), PINHasher: hasher, RefreshTTL: cfg.Auth.RefreshTTL,
+		LockPolicy: identitydomain.LockPolicy{MaxFailures: cfg.Auth.MaxFailures, Duration: cfg.Auth.Lock},
 	})
 	srv.Config.Handler = mux
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
-	return &env{t: t, srv: srv, otp: mem, db: d, log: log, clk: clk, mux: mux, st: st}
+	return &env{t: t, srv: srv, otp: mem, db: d, log: log, clk: clk, mux: mux, st: st, logs: logs}
 }
 
 type client struct {

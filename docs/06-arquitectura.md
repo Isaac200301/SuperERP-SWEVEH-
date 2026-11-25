@@ -401,6 +401,10 @@ Como Go corre en un servidor persistente (no serverless), la recomendación es *
 - **Canal de entrega del OTP:** por decidir (SMS vs. plantilla de autenticación de WhatsApp); ver AQ-03. No hay un precio verificado en este documento.
 - Alternativa propuesta para recepción y mecánicos con celular compartido: PIN local de 4–6 dígitos sobre un dispositivo ya vinculado (solo si el equipo lo pide; no entra en el primer corte).
 
+### 6.2.1 Entrada con celular + PIN (entrega del 27-nov, ADR-0037)
+
+Con `AUTH_MODE=pin` (por defecto) no hay código: `POST /auth/register` (celular, nombre del taller, PIN y autorización) y `POST /auth/login` (celular y PIN). El PIN se guarda con argon2id, sal y pepper (`PIN_PEPPER`); 5 fallos por celular, exista o no la cuenta, bloquean 15 minutos, con el mismo error en los dos casos. El dueño pone PIN temporal a su equipo y lo restablece (`/users/{id}/pin-reset`); al entrar con uno temporal, la persona escoge el suyo (`/auth/pin`). El flujo de 6.2 sigue con `AUTH_MODE=otp`. El refresh dura `SESSION_REFRESH_TTL` (720 h). El celular no se verifica: pendiente antes de producción (Q-40).
+
 ### 6.3 Tokens y cookies
 
 | Elemento | Propuesta | Motivo |

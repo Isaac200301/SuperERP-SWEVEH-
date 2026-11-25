@@ -9,7 +9,7 @@ GITLEAKS_IMAGE  := zricethezav/gitleaks:v8.30.1
 -include .env
 export
 
-.PHONY: help up down waha dev dev-api dev-worker dev-web agent-eval agent-eval-conv migrate migrate-down gen gen-check lint test test-go test-web cover vuln secrets ci build image e2e seed-demo reset-demo
+.PHONY: help up down waha dev dev-api dev-worker dev-web agent-eval agent-eval-conv migrate migrate-down gen gen-check lint test test-go test-web cover vuln secrets ci build image e2e seed-demo reset-demo pin-reset
 
 help: ## Lista los comandos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -98,3 +98,7 @@ seed-demo: ## Carga el taller ficticio Servitaller El Pistón (HU-97, HU-98; nun
 
 reset-demo: ## Archiva la demo anterior y carga el taller ficticio de nuevo, entre dos demos (HU-97)
 	go run ./cmd/demo reset
+
+pin-reset: ## PIN temporal para quien no puede entrar, p. ej. el dueño (HU-104): make pin-reset CELULAR=300... PIN_NUEVO=4826
+	@test -n "$(CELULAR)" -a -n "$(PIN_NUEVO)" || { echo "Uso: make pin-reset CELULAR=3001234567 PIN_NUEVO=4826"; exit 1; }
+	CELULAR="$(CELULAR)" PIN_NUEVO="$(PIN_NUEVO)" go run ./cmd/pin-reset

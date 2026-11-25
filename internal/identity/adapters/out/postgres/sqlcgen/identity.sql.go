@@ -159,14 +159,16 @@ func (q *Queries) GetRefreshTokenForUpdate(ctx context.Context, hash []byte) (Ge
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, celular, nombre, activo FROM identity.usuario WHERE id = $1
+SELECT id, celular, nombre, activo, pin_hash, pin_cambiar FROM identity.usuario WHERE id = $1
 `
 
 type GetUserByIDRow struct {
-	ID      uuid.UUID
-	Celular string
-	Nombre  string
-	Activo  bool
+	ID         uuid.UUID
+	Celular    string
+	Nombre     string
+	Activo     bool
+	PinHash    *string
+	PinCambiar bool
 }
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error) {
@@ -177,19 +179,23 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow
 		&i.Celular,
 		&i.Nombre,
 		&i.Activo,
+		&i.PinHash,
+		&i.PinCambiar,
 	)
 	return i, err
 }
 
 const getUserByPhone = `-- name: GetUserByPhone :one
-SELECT id, celular, nombre, activo FROM identity.usuario WHERE celular = $1
+SELECT id, celular, nombre, activo, pin_hash, pin_cambiar FROM identity.usuario WHERE celular = $1
 `
 
 type GetUserByPhoneRow struct {
-	ID      uuid.UUID
-	Celular string
-	Nombre  string
-	Activo  bool
+	ID         uuid.UUID
+	Celular    string
+	Nombre     string
+	Activo     bool
+	PinHash    *string
+	PinCambiar bool
 }
 
 func (q *Queries) GetUserByPhone(ctx context.Context, celular string) (GetUserByPhoneRow, error) {
@@ -200,6 +206,8 @@ func (q *Queries) GetUserByPhone(ctx context.Context, celular string) (GetUserBy
 		&i.Celular,
 		&i.Nombre,
 		&i.Activo,
+		&i.PinHash,
+		&i.PinCambiar,
 	)
 	return i, err
 }
@@ -403,6 +411,28 @@ type RevokeSessionParams struct {
 
 func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) error {
 	_, err := q.db.Exec(ctx, revokeSession, arg.ID, arg.RevocadaEn, arg.MotivoRevocacion)
+	return err
+}
+
+const setUserPIN = `-- name: SetUserPIN :exec
+UPDATE identity.usuario SET pin_hash = $2, pin_cambiar = $3, updated_at = $4 WHERE id = $1
+`
+
+type SetUserPINParams struct {
+	ID         uuid.UUID
+	PinHash    *string
+	PinCambiar bool
+	UpdatedAt  time.Time
+}
+
+// HU-104: solo el hash del PIN. pin_cambiar = true cuando lo puso el dueño (PIN temporal).
+func (q *Queries) SetUserPIN(ctx context.Context, arg SetUserPINParams) error {
+	_, err := q.db.Exec(ctx, setUserPIN,
+		arg.ID,
+		arg.PinHash,
+		arg.PinCambiar,
+		arg.UpdatedAt,
+	)
 	return err
 }
 

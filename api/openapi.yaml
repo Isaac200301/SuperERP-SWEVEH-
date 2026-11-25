@@ -15,6 +15,7 @@ security:
 
 paths:
   /auth/otp:
+    x-feature: auth-otp
     post:
       operationId: requestCode
       summary: Pedir un código de un solo uso (HU-01)
@@ -43,6 +44,7 @@ paths:
         '429': { $ref: '#/components/responses/Problem' }
 
   /auth/otp/verify:
+    x-feature: auth-otp
     post:
       operationId: verifyCode
       summary: Verificar el código; crea la cuenta (con nombre y autorización, HU-02) o inicia sesión
@@ -68,6 +70,92 @@ paths:
               schema: { $ref: '#/components/schemas/Sesion' }
         '400': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+
+  /auth/register:
+    x-feature: auth-pin
+    post:
+      operationId: registerWithPin
+      summary: 'Paso 1 del registro con PIN (HU-104, V-04): crea la cuenta, el taller y la autorización de datos (HU-02). Solo con AUTH_MODE=pin'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [celular, nombreTaller, pin, autorizacion]
+              properties:
+                celular: { type: string }
+                nombreTaller: { type: string, maxLength: 120 }
+                nombre: { type: string, maxLength: 120, description: 'Nombre del dueño (opcional; sin él queda Dueño y se cambia en Equipo)' }
+                pin: { type: string, pattern: '^[0-9]{4}$', description: '4 dígitos; no se aceptan los fáciles (0000, 1234…)' }
+                autorizacion:
+                  type: object
+                  additionalProperties: false
+                  required: [aceptada]
+                  properties:
+                    version: { type: string, description: 'Versión de la política que vio la persona' }
+                    aceptada: { type: boolean, description: 'Casilla sin marcar por defecto (HU-02)' }
+      responses:
+        '201':
+          description: Cuenta creada y sesión iniciada. Pone las cookies de sesión.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sesion' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+
+  /auth/login:
+    x-feature: auth-pin
+    post:
+      operationId: loginWithPin
+      summary: 'Entrar con celular y PIN (HU-104). Error igual exista o no el celular; 5 fallos bloquean 15 minutos (429). Solo con AUTH_MODE=pin'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [celular, pin]
+              properties:
+                celular: { type: string }
+                pin: { type: string }
+      responses:
+        '200':
+          description: Sesión iniciada. Pone las cookies de sesión.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sesion' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+
+  /auth/pin:
+    x-feature: auth-pin
+    post:
+      operationId: changePin
+      summary: 'Cambiar el PIN propio (HU-104). Pide el actual, salvo si se entró con un PIN temporal (cambiarPin)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [pin]
+              properties:
+                pinActual: { type: string }
+                pin: { type: string, pattern: '^[0-9]{4}$' }
+      responses:
+        '204': { description: PIN cambiado }
         '422': { $ref: '#/components/responses/Problem' }
         '429': { $ref: '#/components/responses/Problem' }
 
@@ -1347,6 +1435,7 @@ paths:
                 celular: { type: string }
                 nombre: { type: string }
                 rol: { type: string, enum: [dueno, recepcion, mecanico] }
+                pin: { type: string, pattern: '^[0-9]{4}$', description: 'PIN temporal que el dueño le dice de palabra (HU-104); obligatorio con AUTH_MODE=pin para alguien nuevo' }
       responses:
         '201':
           description: Creado
@@ -1376,6 +1465,28 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Miembro' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /users/{id}/pin-reset:
+    x-feature: auth-pin
+    post:
+      operationId: resetUserPin
+      summary: 'Poner un PIN temporal a alguien del equipo (HU-104). Desbloquea su celular y cierra sus sesiones. Permiso user:manage'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [pin]
+              properties:
+                pin: { type: string, pattern: '^[0-9]{4}$' }
+      responses:
+        '204': { description: PIN temporal puesto (no vuelve en la respuesta) }
+        '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
 
@@ -2506,6 +2617,7 @@ components:
           description: 'Permisos recurso:acción del rol; la UI los usa solo para ocultar, el servidor siempre verifica (R-05)'
         cuentaNueva: { type: boolean }
         adminPlataforma: { type: boolean, description: 'Es administrador del ERP: ve el medidor de todos los talleres (HU-74, ADR-0030)' }
+        cambiarPin: { type: boolean, description: 'Entró con un PIN temporal que puso el dueño: debe escoger uno propio (HU-104)' }
         funciones:
           type: object
           description: 'Lo encendido en este servidor (FEATURE_WHATSAPP, FEATURE_PLATFORM; V-01 y V-02). Las rutas con x-feature apagada no existen (404)'

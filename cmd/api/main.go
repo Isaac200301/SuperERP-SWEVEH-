@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"sweveh/internal/identity/adapters/out/otp"
+	"sweveh/internal/identity/adapters/out/pinhash"
+	identitydomain "sweveh/internal/identity/domain"
 	identityports "sweveh/internal/identity/ports"
 	"sweveh/internal/platform/authn"
 	"sweveh/internal/platform/clock"
@@ -57,14 +59,15 @@ func run() error {
 	signer := authn.NewSigner(key, cfg.JWTKeyID, clk)
 	verifier := authn.NewVerifier(map[string]*ecdsa.PublicKey{cfg.JWTKeyID: &key.PublicKey}, clk)
 
+	// Con PIN (AUTH_MODE=pin, HU-104) no se manda ningún código: no se arma el canal del OTP.
 	var sender identityports.OTPSender
-	switch cfg.OTPSender {
-	case "consola":
-		sender = otp.NewConsole(os.Stderr)
-	case "memoria":
-		sender = otp.NewMemory()
-	case "waha": // código por el WhatsApp de prueba (ADR-0034, solo demo)
-		sender = wire.NewWAHAOTP(cfg.WhatsApp.WAHA)
+	if !cfg.Auth.PIN() {
+		sender = otpSender(cfg)
+	}
+	hasher, err := pinhash.New([]byte(cfg.Auth.PINPepper), pinhash.Params{
+		MemoryKiB: uint32(cfg.Auth.ArgonMemoryKiB), Time: uint32(cfg.Auth.ArgonTime), Threads: uint8(cfg.Auth.ArgonThreads)})
+	if err != nil {
+		return err
 	}
 
 	store, err := storage.NewLocal(cfg.StorageDir)
@@ -84,6 +87,8 @@ func run() error {
 		OTPPepper: []byte(cfg.OTPPepper), AllowedOrigins: cfg.AllowedOrigins, TrustProxy: cfg.TrustProxy,
 		HSTS: cfg.Env != config.EnvLocal, WebDir: cfg.WebDir, LoginPerMinute: cfg.LoginPerMinute,
 		PlatformAdmins: cfg.Platform.Admins, Features: server.Features(cfg.Features),
+		AuthPIN: cfg.Auth.PIN(), PINHasher: hasher, RefreshTTL: cfg.Auth.RefreshTTL,
+		LockPolicy: identitydomain.LockPolicy{MaxFailures: cfg.Auth.MaxFailures, Duration: cfg.Auth.Lock},
 	})
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -150,4 +155,16 @@ func parseLevel(s string) slog.Level {
 		return slog.LevelInfo
 	}
 	return l
+}
+
+// otpSender es el canal del código de entrada (AUTH_MODE=otp, HU-01).
+func otpSender(cfg config.API) identityports.OTPSender {
+	switch cfg.OTPSender {
+	case "memoria":
+		return otp.NewMemory()
+	case "waha": // código por el WhatsApp de prueba (ADR-0034, solo demo)
+		return wire.NewWAHAOTP(cfg.WhatsApp.WAHA)
+	default:
+		return otp.NewConsole(os.Stderr)
+	}
 }

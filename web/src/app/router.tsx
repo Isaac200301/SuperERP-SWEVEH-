@@ -29,6 +29,7 @@ const TeamPage = page(() => import('../features/team/TeamPage'), 'TeamPage');
 const WorkshopPage = page(() => import('../features/workshop/WorkshopPage'), 'WorkshopPage');
 const OnboardingPage = page(() => import('../features/workshop/OnboardingPage'), 'OnboardingPage');
 const MorePage = page(() => import('../features/panel/MorePage'), 'MorePage');
+const ChangePinPage = page(() => import('../features/auth/ChangePinPage'), 'ChangePinPage');
 const AssistantPage = page(() => import('../features/assistant/AssistantPage'), 'AssistantPage');
 const ReceivePage = page(() => import('../features/orders/FloorMobile'), 'ReceivePage');
 
@@ -84,6 +85,8 @@ export const router = createBrowserRouter([
       { path: 'equipo', element: <Lazy Page={TeamPage} /> },
       { path: 'taller', element: <Lazy Page={WorkshopPage} /> },
       { path: 'whatsapp-prueba', element: <Gated funcion="whatsapp" Page={SimulatorPage} /> },
+      // HU-104: escoger el PIN propio (obligatorio si se entró con un PIN temporal).
+      { path: 'cambiar-pin', element: <Lazy Page={ChangePinPage} /> },
       // V-11: el asistente del piso (R8); por ahora el chat vacío.
       { path: 'asistente', element: <Lazy Page={AssistantPage} /> },
       { path: 'arranque', element: <Lazy Page={OnboardingPage} /> },

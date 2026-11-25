@@ -66,15 +66,7 @@ func (l Lock) Locked(now time.Time) bool {
 // RegisterFailure suma un fallo; al llegar a MaxFailures bloquea y reinicia la cuenta.
 // Devuelve el nuevo estado y los intentos que quedan (0 si quedó bloqueado).
 func (l Lock) RegisterFailure(now time.Time) (Lock, int) {
-	if l.LockedUntil != nil && !now.Before(*l.LockedUntil) {
-		l = Lock{} // el bloqueo anterior ya venció: se empieza de cero
-	}
-	l.Failures++
-	if l.Failures >= MaxFailures {
-		until := now.Add(LockDuration)
-		return Lock{Failures: 0, LockedUntil: &until}, 0
-	}
-	return l, MaxFailures - l.Failures
+	return l.RegisterFailureWith(now, DefaultLockPolicy)
 }
 
 // ValidCodeFormat revisa que el código sean exactamente 6 dígitos.

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"sweveh/internal/demo"
+	"sweveh/internal/identity/adapters/out/pinhash"
 	"sweveh/internal/platform/db"
 	"sweveh/internal/platform/storage"
 	"sweveh/internal/platform/testdb"
@@ -39,11 +40,35 @@ func TestSeedAndReset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deps := demo.Deps{API: d.API, Bootstrap: d.Migrator, Storage: st, Phones: demo.DefaultPhones}
+	hasher, err := pinhash.New([]byte("pepper-de-pruebas-de-32-caracteres!!"), pinhash.Params{MemoryKiB: 64, Time: 1, Threads: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps := demo.Deps{API: d.API, Bootstrap: d.Migrator, Storage: st, Phones: demo.DefaultPhones, PINHasher: hasher, PIN: "2580"}
 	start := time.Now()
 	res, err := demo.Seed(context.Background(), deps, false)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// HU-104: el dueño, el mecánico y la recepción de la demo entran con el PIN de la demo; nadie más tiene PIN.
+	var conPIN []string
+	if err := d.Tx.DoWithSettings(context.Background(), nil, func(ctx context.Context) error {
+		rows, err := db.Many[struct {
+			Celular string `db:"celular"`
+			Hash    string `db:"pin_hash"`
+		}](ctx, `SELECT celular, pin_hash FROM identity.usuario WHERE pin_hash IS NOT NULL ORDER BY celular`)
+		for _, r := range rows {
+			if !hasher.Verify("2580", r.Hash) {
+				t.Errorf("el PIN de %s no es el de la demo", r.Celular)
+			}
+			conPIN = append(conPIN, r.Celular)
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(conPIN) != 3 {
+		t.Fatalf("con PIN: %v", conPIN)
 	}
 	if took := time.Since(start); took > 2*time.Minute {
 		t.Fatalf("la carga tardó %v", took)

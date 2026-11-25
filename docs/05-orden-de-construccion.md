@@ -114,6 +114,8 @@ La cuenta de Meta y el número de prueba (plantillas propias y duración del tok
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (solo backend) | Storage privado y URLs firmadas | staging, prod |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | Exportación de trazas, métricas y logs | staging, prod |
 | `SONAR_TOKEN`, `SNYK_TOKEN` | Solo como secretos de GitHub Actions | CI |
+| `AUTH_MODE`, `PIN_PEPPER`, `PIN_MAX_INTENTOS`, `PIN_BLOQUEO`, `SESSION_REFRESH_TTL`, `PIN_ARGON_MEMORY_KIB`, `PIN_ARGON_TIME`, `PIN_ARGON_THREADS` | Entrada con celular + PIN (HU-104, ADR-0037). `AUTH_MODE=pin` por defecto (`otp` = el código de antes). `PIN_PEPPER` (si falta, `OTP_PEPPER`) es secreto, ≥ 32 caracteres fuera de local. 5 intentos, 15 minutos, refresh de 720 h; argon2id m = 19456 KiB, t = 2, p = 1 | local, staging, prod |
+| `DEMO_PIN` | PIN del dueño, el mecánico y la recepción del taller ficticio (`make seed-demo`); obligatorio fuera de local | local, staging |
 | `FEATURE_WHATSAPP`, `FEATURE_PLATFORM` | Banderas de la entrega del 27-nov (V-01, V-02; `false` por defecto): con `false` no se montan las rutas de WhatsApp (mensajería, automatizaciones, bandeja, asesor, lista por foto, simulador, webhooks) ni las de Plataforma, `/me` lo dice en `funciones` y el worker deja esos eventos `omitido: whatsapp_apagado` | local, staging, prod |
 
 `.env.example` con **valores ficticios** sí va al repositorio; `.env` real, no (en `.gitignore`).
@@ -130,6 +132,7 @@ La cuenta de Meta y el número de prueba (plantillas propias y duración del tok
 | `make e2e` | Playwright contra el entorno local o de staging |
 | `make ci` | Todo lo anterior + govulncheck y gitleaks, igual que el pipeline |
 | `make seed-demo` | Carga el taller ficticio Servitaller El Pistón (datos **Ficticio**) |
+| `make pin-reset CELULAR=… PIN_NUEVO=…` | PIN temporal para quien no puede entrar, p. ej. el dueño (HU-104); con el rol de migraciones y en la bitácora |
 | `make reset-demo` | Reinicia el taller ficticio para correr la demo dos veces seguidas (HU-99) |
 
 > Los nombres de los comandos son una **Propuesta**; si el equipo prefiere otros, se cambian aquí y en `CLAUDE.md`.

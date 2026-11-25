@@ -1,9 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Recorrido en navegador real. `make e2e` (y el job e2e del CI) compila la web, levanta el api sirviendo la SPA con
- * OTP_SENDER=consola y define SWEVEH_WEB_URL y SWEVEH_API_LOG (scripts/e2e.sh). Contra `make dev` también sirve:
- * Vite en :5173 y SWEVEH_API_LOG apuntando al log de `go run ./cmd/api`.
+ * Recorrido en navegador real. `make e2e` (y el job e2e del CI) compila la web, levanta el api sirviendo la SPA (se entra
+ * con celular y PIN, HU-104) y define SWEVEH_WEB_URL y SWEVEH_API_LOG (scripts/e2e.sh). Contra `make dev` también sirve:
+ * Vite en :5173.
  */
 export default defineConfig({
   testDir: './e2e',

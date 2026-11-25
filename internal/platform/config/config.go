@@ -33,6 +33,7 @@ type API struct {
 	JWTKeyID         string
 	OTPPepper        string
 	OTPSender        string // "consola" (solo local) | "memoria" (solo pruebas) | "waha" (WhatsApp de prueba, solo demo)
+	Auth             Auth
 	AllowedOrigins   []string
 	TrustProxy       bool
 	WebDir           string
@@ -49,6 +50,57 @@ type API struct {
 	WorkerDatabaseURL string
 	PollInterval      time.Duration
 	BatchSize         int32
+}
+
+// LocalPepper es el pepper de desarrollo cuando no hay OTP_PEPPER ni PIN_PEPPER (solo APP_ENV=local). cmd/demo lo usa
+// para que el PIN del taller ficticio sirva en el api local.
+const LocalPepper = "solo-desarrollo-local-no-usar-en-otro-entorno"
+
+// PINPepperFromEnv es el pepper del PIN tal como lo arma el api: PIN_PEPPER, si no OTP_PEPPER, si no (solo con
+// APP_ENV=local o vacío) LocalPepper. Fuera de local exige al menos 32 caracteres: un hash con el pepper local no
+// serviría en el api de staging y el dueño seguiría sin poder entrar.
+func PINPepperFromEnv() (string, error) {
+	env := Env(get("APP_ENV", "local"))
+	p := get("PIN_PEPPER", os.Getenv("OTP_PEPPER"))
+	if env == EnvLocal && p == "" {
+		return LocalPepper, nil
+	}
+	if len(p) < 32 {
+		return "", errors.New("PIN_PEPPER (u OTP_PEPPER) debe ser el mismo del api y tener al menos 32 caracteres fuera de local")
+	}
+	return p, nil
+}
+
+// Auth es cómo se entra (HU-104, ADR-0037). Mode "pin" (por defecto): celular + PIN de 4 dígitos; "otp": el código
+// de antes (HU-01), que queda vivo pero apagado.
+type Auth struct {
+	Mode        string        // AUTH_MODE: pin | otp
+	PINPepper   string        // PIN_PEPPER (si falta, OTP_PEPPER): secreto para el hash del PIN, ≥ 32 fuera de local
+	MaxFailures int           // PIN_MAX_INTENTOS (5)
+	Lock        time.Duration // PIN_BLOQUEO (15m)
+	RefreshTTL  time.Duration // SESSION_REFRESH_TTL (720h, unos 30 días)
+	// Argon2id (OWASP: 19 MiB, 2 pasadas, 1 hilo): PIN_ARGON_MEMORY_KIB, PIN_ARGON_TIME, PIN_ARGON_THREADS.
+	ArgonMemoryKiB, ArgonTime, ArgonThreads int
+}
+
+// PIN dice si se entra con PIN.
+func (a Auth) PIN() bool { return a.Mode == "pin" }
+
+func loadAuth(env Env, otpPepper string, errs *[]error) Auth {
+	a := Auth{Mode: get("AUTH_MODE", "pin"), PINPepper: get("PIN_PEPPER", otpPepper),
+		MaxFailures: getInt("PIN_MAX_INTENTOS", 5, errs), Lock: getDuration("PIN_BLOQUEO", 15*time.Minute, errs),
+		RefreshTTL:     getDuration("SESSION_REFRESH_TTL", 720*time.Hour, errs),
+		ArgonMemoryKiB: getInt("PIN_ARGON_MEMORY_KIB", 19456, errs), ArgonTime: getInt("PIN_ARGON_TIME", 2, errs),
+		ArgonThreads: getInt("PIN_ARGON_THREADS", 1, errs)}
+	switch {
+	case a.Mode != "pin" && a.Mode != "otp":
+		*errs = append(*errs, fmt.Errorf("AUTH_MODE=%q no es válido (pin, otp)", a.Mode))
+	case a.PIN() && env != EnvLocal && len(a.PINPepper) < 32:
+		*errs = append(*errs, errors.New("PIN_PEPPER (u OTP_PEPPER) debe tener al menos 32 caracteres fuera de local"))
+	case a.ArgonThreads > 255:
+		*errs = append(*errs, errors.New("PIN_ARGON_THREADS debe ser como mucho 255"))
+	}
+	return a
 }
 
 // Features son las banderas de la entrega del 27-nov (docs/plan-entrega-viernes.md, V-01 y V-02): lo apagado
@@ -235,11 +287,15 @@ func LoadAPI() (API, error) {
 		if len(c.OTPPepper) < 32 {
 			errs = append(errs, errors.New("OTP_PEPPER debe tener al menos 32 caracteres fuera de local"))
 		}
-		if c.OTPSender == "consola" || c.OTPSender == "memoria" {
+		if !pinMode() && (c.OTPSender == "consola" || c.OTPSender == "memoria") {
 			errs = append(errs, fmt.Errorf("OTP_SENDER=%s solo se permite en local; falta el proveedor real (Q-13/AQ-03)", c.OTPSender))
 		}
 	} else if c.OTPPepper == "" {
-		c.OTPPepper = "solo-desarrollo-local-no-usar-en-otro-entorno"
+		c.OTPPepper = LocalPepper
+	}
+	c.Auth = loadAuth(c.Env, c.OTPPepper, &errs)
+	if c.Auth.PIN() { // con PIN no se manda ningún código: OTP_SENDER no se usa ni se valida (pendiente de R1)
+		return c, errors.Join(errs...)
 	}
 	switch c.OTPSender {
 	case "consola", "memoria":
@@ -273,6 +329,9 @@ func LoadWorker() (Worker, error) {
 	}
 	return c, errors.Join(errs...)
 }
+
+// pinMode lee AUTH_MODE antes de validar el resto: con PIN, OTP_SENDER no se exige fuera de local.
+func pinMode() bool { return get("AUTH_MODE", "pin") == "pin" }
 
 func (e Env) validate() error {
 	switch e {

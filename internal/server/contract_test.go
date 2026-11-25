@@ -70,13 +70,13 @@ func contractOperations(t *testing.T) map[string]string {
 }
 
 func TestRouterMatchesOpenAPIContract(t *testing.T) {
-	routerMatches(t, newEnv(t), map[string]bool{"whatsapp": true, "platform": true})
+	routerMatches(t, newEnv(t), map[string]bool{"whatsapp": true, "platform": true, "auth-otp": true})
 }
 
-// Entrega del 27-nov (V-01, V-02): con FEATURE_WHATSAPP y FEATURE_PLATFORM apagadas, el router tiene exactamente las
-// operaciones del contrato sin x-feature; lo de WhatsApp y Plataforma no existe.
+// Entrega del 27-nov (V-01, V-02, V-03): con FEATURE_WHATSAPP y FEATURE_PLATFORM apagadas y AUTH_MODE=pin, el router
+// tiene las operaciones del contrato sin x-feature más las del PIN: ni WhatsApp, ni Plataforma, ni el código.
 func TestRouterHidesFeaturesThatAreOff(t *testing.T) {
-	routerMatches(t, newEnvRaw(t, config.API{Env: config.EnvLocal}), map[string]bool{})
+	routerMatches(t, newEnvRaw(t, config.API{Env: config.EnvLocal, Auth: pinAuth}), map[string]bool{"auth-pin": true})
 }
 
 func routerMatches(t *testing.T, e *env, on map[string]bool) {

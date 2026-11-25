@@ -26,6 +26,7 @@ import (
 	"sweveh/internal/identity/adapters/out/token"
 	identityws "sweveh/internal/identity/adapters/out/workshops"
 	identityapp "sweveh/internal/identity/app"
+	identitydomain "sweveh/internal/identity/domain"
 	identityports "sweveh/internal/identity/ports"
 	inventoryhttp "sweveh/internal/inventory/adapters/in/http"
 	ordershttp "sweveh/internal/orders/adapters/in/http"
@@ -61,6 +62,11 @@ type Deps struct {
 	Extra func(m *Modules, g *authn.Guard) []func(chi.Router)
 	// Public monta rutas sin sesión de usuario (webhook de WhatsApp). Puede ser nil.
 	Public func(r chi.Router)
+	// Auth: entrada con PIN (HU-104, ADR-0037). AuthPIN false = el código de antes (OTP).
+	AuthPIN    bool
+	PINHasher  identityports.PINHasher
+	LockPolicy identitydomain.LockPolicy
+	RefreshTTL time.Duration
 	// Features son las banderas de la entrega del 27-nov (V-01, V-02). Misma forma que config.Features.
 	Features Features
 	// PlatformAdmins son los celulares (E.164) de los administradores del ERP (HU-74, ADR-0030).
@@ -83,6 +89,7 @@ func New(d Deps) *chi.Mux {
 		Tx: tx, Store: identitypg.NewStore(), Sender: d.OTPSender, Tokens: token.NewIssuer(d.Signer),
 		Workshops: identityws.New(m.Workshops), Audit: m.Audit, Events: m.Events, Clock: d.Clock,
 		Pepper: d.OTPPepper, Log: d.Log,
+		PINHasher: d.PINHasher, LockPolicy: d.LockPolicy, RefreshTTL: d.RefreshTTL, PINMode: d.AuthPIN,
 	})
 	identitySvc.SetMembers(identitypg.Members{})
 
@@ -100,6 +107,7 @@ func New(d Deps) *chi.Mux {
 	identityH := identityhttp.NewHandler(identitySvc, d.Log, httpx.NewRateLimiter(d.LoginPerMinute, 5), d.TrustProxy)
 	identityH.SetPlatformAdmins(d.PlatformAdmins)
 	identityH.SetFeatures(d.Features.WhatsApp, d.Features.Platform)
+	identityH.SetPINMode(d.AuthPIN)
 	customersH := customershttp.NewHandler(m.Customers, guard, d.Log)
 	vehiclesH := vehicleshttp.NewHandler(m.Vehicles, guard, d.Log)
 	ordersH := ordershttp.NewHandler(m.Orders, m.Flow, guard, d.Log)

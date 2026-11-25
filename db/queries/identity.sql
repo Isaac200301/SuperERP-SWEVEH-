@@ -1,8 +1,12 @@
 -- name: GetUserByPhone :one
-SELECT id, celular, nombre, activo FROM identity.usuario WHERE celular = $1;
+SELECT id, celular, nombre, activo, pin_hash, pin_cambiar FROM identity.usuario WHERE celular = $1;
 
 -- name: GetUserByID :one
-SELECT id, celular, nombre, activo FROM identity.usuario WHERE id = $1;
+SELECT id, celular, nombre, activo, pin_hash, pin_cambiar FROM identity.usuario WHERE id = $1;
+
+-- name: SetUserPIN :exec
+-- HU-104: solo el hash del PIN. pin_cambiar = true cuando lo puso el dueño (PIN temporal).
+UPDATE identity.usuario SET pin_hash = $2, pin_cambiar = $3, updated_at = $4 WHERE id = $1;
 
 -- name: InsertUser :exec
 INSERT INTO identity.usuario (id, celular, nombre, created_at, updated_at)

@@ -6,6 +6,7 @@
 // Lee DATABASE_URL (rol sweveh_api), MIGRATIONS_DATABASE_URL (rol sweveh_migrator), STORAGE_DIR y los celulares de la
 // demo (DEMO_CELULAR_DUENO, DEMO_CELULAR_MECANICO, DEMO_CELULAR_RECEPCION, DEMO_CELULAR_B, DEMO_CELULAR_D y, opcionales,
 // DEMO_CELULAR_DIEGO, DEMO_CELULAR_MARTA, DEMO_CELULAR_CARLOS). Sin ellos usa números de prueba. Nunca en producción.
+// DEMO_PIN es el PIN del dueño, el mecánico y la recepción (HU-104; 2580 en local), con el pepper del api.
 package main
 
 import (
@@ -16,6 +17,8 @@ import (
 	"time"
 
 	"sweveh/internal/demo"
+	"sweveh/internal/identity/adapters/out/pinhash"
+	"sweveh/internal/platform/config"
 	"sweveh/internal/platform/db"
 	"sweveh/internal/platform/storage"
 )
@@ -66,15 +69,31 @@ func run() error {
 			*dst = v
 		}
 	}
+	// HU-104: el equipo de la demo entra con DEMO_PIN (Ficticio). El hash usa el mismo pepper que el api.
+	pin := os.Getenv("DEMO_PIN")
+	if pin == "" && os.Getenv("APP_ENV") != "" && os.Getenv("APP_ENV") != "local" {
+		return errors.New("DEMO_PIN es obligatoria fuera de local (4 números que no sean fáciles)")
+	}
+	if pin == "" {
+		pin = "2580"
+	}
+	pepper, err := config.PINPepperFromEnv()
+	if err != nil {
+		return err
+	}
+	hasher, err := pinhash.New([]byte(pepper), pinhash.OWASP)
+	if err != nil {
+		return err
+	}
 	start := time.Now()
-	res, err := demo.Seed(ctx, demo.Deps{API: api, Bootstrap: boot, Storage: st, Phones: phones}, os.Args[1] == "reset")
+	res, err := demo.Seed(ctx, demo.Deps{API: api, Bootstrap: boot, Storage: st, Phones: phones, PINHasher: hasher, PIN: pin}, os.Args[1] == "reset")
 	if err != nil {
 		return err
 	}
 	for _, id := range res.Archived {
 		fmt.Println("Demo anterior archivada:", id)
 	}
-	fmt.Printf("%s listo (%s) en %.1f s. Entra con el celular %s (dueño), %s (mecánico) o %s (recepción).\n",
+	fmt.Printf("%s listo (%s) en %.1f s. Entra con el celular %s (dueño), %s (mecánico) o %s (recepción), con el PIN de DEMO_PIN.\n",
 		demo.Name, res.TallerID, time.Since(start).Seconds(), phones.Owner, phones.Mechanic, phones.Reception)
 	return nil
 }

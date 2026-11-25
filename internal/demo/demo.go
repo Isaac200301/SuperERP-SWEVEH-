@@ -68,6 +68,9 @@ type Deps struct {
 	Phones    Phones
 	Now       time.Time // "hoy" de la demo; vacío = ahora
 	Log       *slog.Logger
+	// HU-104: con PINHasher, el dueño, el mecánico y la recepción de la demo entran con PIN (DEMO_PIN). Ficticio.
+	PINHasher ports.PINHasher
+	PIN       string
 }
 
 // Result dice qué quedó cargado.
@@ -133,6 +136,9 @@ func Seed(ctx context.Context, d Deps, reset bool) (Result, error) {
 		return res, err
 	}
 	if err := l.load(today, res.Orders); err != nil {
+		return res, err
+	}
+	if err := setDemoPIN(ctx, boot, d); err != nil {
 		return res, err
 	}
 	// Nada de lo cargado debe salir por WhatsApp: los eventos de la historia quedan procesados.
@@ -264,6 +270,34 @@ func newLoader(d Deps, clk *clock.Fake) *loader {
 	})
 	return &loader{h: h, clk: clk, otp: mem, cookies: map[string]*http.Cookie{}, phones: d.Phones, ids: map[string]string{}, photo: samplePhoto(),
 		now: d.Now}
+}
+
+// setDemoPIN deja al equipo de la demo entrando con el mismo PIN (AUTH_MODE=pin). Lo hace con el rol de migraciones,
+// igual que el arranque del taller: identity.usuario no es de un taller (Q-29).
+func setDemoPIN(ctx context.Context, boot *db.TxManager, d Deps) error {
+	if d.PINHasher == nil {
+		return nil
+	}
+	pin, err := identitydomain.ParsePIN(d.PIN)
+	if err != nil {
+		return fmt.Errorf("DEMO_PIN: %w", err)
+	}
+	hash, err := d.PINHasher.Hash(pin)
+	if err != nil {
+		return err
+	}
+	var phones []string
+	for _, raw := range []string{d.Phones.Owner, d.Phones.Mechanic, d.Phones.Reception} {
+		p, err := shared.ParseColombianMobile(raw)
+		if err != nil {
+			return err
+		}
+		phones = append(phones, p)
+	}
+	return boot.DoWithSettings(ctx, nil, func(ctx context.Context) error {
+		_, err := db.Exec(ctx, `UPDATE identity.usuario SET pin_hash = $1, pin_cambiar = false, updated_at = now() WHERE celular = ANY($2)`, hash, phones)
+		return err
+	})
 }
 
 // at mueve el reloj de la carga a t (nunca hacia atrás) y vuelve a entrar si pasó más de lo que dura la sesión.

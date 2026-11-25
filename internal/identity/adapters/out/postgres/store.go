@@ -131,7 +131,7 @@ func (Store) UserByPhone(ctx context.Context, phone string) (ports.User, bool, e
 	if err != nil {
 		return ports.User{}, false, err
 	}
-	return ports.User{ID: r.ID, Phone: r.Celular, Name: r.Nombre, Active: r.Activo}, true, nil
+	return ports.User{ID: r.ID, Phone: r.Celular, Name: r.Nombre, Active: r.Activo, PINHash: deref(r.PinHash), MustChangePIN: r.PinCambiar}, true, nil
 }
 
 func (Store) UserByID(ctx context.Context, id shared.ID) (ports.User, error) {
@@ -143,7 +143,23 @@ func (Store) UserByID(ctx context.Context, id shared.ID) (ports.User, error) {
 	if err != nil {
 		return ports.User{}, db.NotFoundIfNoRows(err, domain.ErrSessionInvalid)
 	}
-	return ports.User{ID: r.ID, Phone: r.Celular, Name: r.Nombre, Active: r.Activo}, nil
+	return ports.User{ID: r.ID, Phone: r.Celular, Name: r.Nombre, Active: r.Activo, PINHash: deref(r.PinHash), MustChangePIN: r.PinCambiar}, nil
+}
+
+// SetPIN guarda el hash del PIN (HU-104). El PIN nunca llega aquí, solo su hash.
+func (Store) SetPIN(ctx context.Context, userID shared.ID, hash string, mustChange bool, at time.Time) error {
+	qs, err := q(ctx)
+	if err != nil {
+		return err
+	}
+	return qs.SetUserPIN(ctx, sqlcgen.SetUserPINParams{ID: userID, PinHash: &hash, PinCambiar: mustChange, UpdatedAt: at})
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 func (Store) InsertUser(ctx context.Context, u ports.User, at time.Time) error {

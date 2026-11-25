@@ -16,6 +16,10 @@ type User struct {
 	Phone  string
 	Name   string
 	Active bool
+	// PINHash es el hash argon2id del PIN (HU-104); vacío si nunca puso PIN.
+	PINHash string
+	// MustChangePIN: el PIN lo puso el dueño (temporal) y hay que cambiarlo al entrar.
+	MustChangePIN bool
 }
 
 // Membership es el rol del usuario en un taller.
@@ -50,6 +54,7 @@ type Store interface {
 	UserByPhone(ctx context.Context, phone string) (User, bool, error)
 	UserByID(ctx context.Context, id shared.ID) (User, error)
 	InsertUser(ctx context.Context, u User, at time.Time) error
+	SetPIN(ctx context.Context, userID shared.ID, hash string, mustChange bool, at time.Time) error
 	InsertMembership(ctx context.Context, m Membership, userID shared.ID, at time.Time) error
 	// ActiveMemberships requiere app.usuario_id fijado.
 	ActiveMemberships(ctx context.Context, userID shared.ID) ([]Membership, error)
@@ -72,6 +77,14 @@ type TxRunner interface {
 // OTPSender entrega el código. Canal por decidir (Q-13/AQ-03): SMS o plantilla de WhatsApp.
 type OTPSender interface {
 	Send(ctx context.Context, phone, code string) error
+}
+
+// PINHasher deriva y compara el hash del PIN (argon2id con sal y pepper del servidor, ADR-0037). Hash es lento a
+// propósito: se llama fuera de las transacciones. Verify compara en tiempo constante; con encoded vacío hace el mismo
+// trabajo y devuelve false, para que un celular sin cuenta tarde lo mismo que uno con PIN equivocado.
+type PINHasher interface {
+	Hash(pin string) (string, error)
+	Verify(pin, encoded string) bool
 }
 
 // TokenIssuer firma el token de acceso de 10 minutos.

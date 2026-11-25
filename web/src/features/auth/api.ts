@@ -60,6 +60,38 @@ export function useVerifyCode() {
   });
 }
 
+// Entrada con PIN (HU-104, ADR-0037). El código por WhatsApp (useRequestCode / useVerifyCode) queda para AUTH_MODE=otp.
+
+export type RegistroVars = { celular: string; nombreTaller: string; pin: string; autorizacion: { version: string; aceptada: boolean } };
+
+export function useRegisterPIN() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: RegistroVars) => unwrap(await api.POST('/auth/register', { body: { ...v, celular: soloCelular(v.celular) } })),
+    onSuccess: (s) => qc.setQueryData(sessionKey, s),
+  });
+}
+
+export function useLoginPIN() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { celular: string; pin: string }) => unwrap(await api.POST('/auth/login', { body: { ...v, celular: soloCelular(v.celular) } })),
+    onSuccess: (s) => qc.setQueryData(sessionKey, s),
+  });
+}
+
+/** Cambiar el PIN propio. Con un PIN temporal (cambiarPin) no se pide el actual. */
+export function useChangePIN() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { pinActual?: string; pin: string }) => {
+      const r = await api.POST('/auth/pin', { body: v });
+      if (!r.response.ok) throw new ApiError(r.response.status, r.error as never);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: sessionKey }),
+  });
+}
+
 export function useLogout() {
   const qc = useQueryClient();
   return useMutation({

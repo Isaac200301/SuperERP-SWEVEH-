@@ -7,7 +7,6 @@ import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { Field } from '../../shared/ui/Field';
 import { card, ProfileForm, type Taller } from './ProfileForm';
-import { Schedule } from './WorkshopPage';
 
 const tipos = { ambos: 'Carro y moto', carro: 'Carro', moto: 'Moto' } as const;
 
@@ -57,7 +56,7 @@ function PreloadedServices({ t }: { t: Taller }) {
         Tus servicios ({list.data?.length ?? 0})
       </h2>
       <p className="text-sm text-ink-2">
-        Van sin precio; lo pones cuando quieras en Servicios y repuestos. También quedaron listas las 7 etapas de la orden y el checklist
+        Van sin precio: cada taller cobra distinto. Pones tu valor la primera vez que lo cotices y queda guardado. También quedaron listas las 7 etapas de la orden y el checklist
         de recepción de {t.atiende === 'moto' ? 'moto' : t.atiende === 'carro' ? 'carro' : 'carro y de moto'}.
       </p>
       {list.isPending ? <p role="status">Cargando…</p> : null}
@@ -106,18 +105,18 @@ export function OnboardingPage() {
   if (!t.onboardingCompleto || editando) {
     return (
       <>
-        <Paso n={2} de={3} titulo="Cuéntanos de tu taller" detalle="Con esto te armamos los servicios, el checklist y las etapas de la orden." />
+        <Paso n={2} de={2} titulo="¿Qué vehículos atiendes?" detalle="Con esto te armamos los servicios, el checklist y las etapas de la orden." />
         <ProfileForm t={t} onSaved={() => setEditando(false)} />
       </>
     );
   }
   return (
     <>
-      <Paso n={3} de={3} titulo="Tu taller ya está armado" detalle="Revisa lo que te dejamos listo y abre tu primera orden." />
+      <Paso n={2} de={2} titulo="Te dejamos listos estos servicios" detalle="Renómbralos, quítalos o agrega los tuyos. El horario lo pones después en Mi taller." />
       <PreloadedServices t={t} />
-      <Schedule t={t} />
+      {/* V-04: el horario sale del registro (va en Mi taller) y la primera orden de ejemplo (HU-05) queda en Hoy. */}
       <div className="flex flex-wrap gap-3">
-        <Button onClick={() => navigate('/panel/ordenes/nueva?primera=1')}>Hacer mi primera orden</Button>
+        <Button onClick={() => navigate('/panel', { replace: true })}>Listo, ir a mi taller</Button>
         <Button variant="secondary" onClick={() => setEditando(true)}>
           Cambiar tipo de taller
         </Button>

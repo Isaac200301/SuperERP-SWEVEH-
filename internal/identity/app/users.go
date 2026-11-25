@@ -51,8 +51,9 @@ func (s *Service) ListMembers(ctx context.Context, tallerID shared.ID) ([]Member
 }
 
 // AddMember agrega un mecánico o recepción por celular (HU-80, HU-82). Si ya es usuario de otro taller,
-// queda en los dos y escoge en cuál trabaja al entrar.
-func (s *Service) AddMember(ctx context.Context, tallerID shared.ID, actor shared.Actor, rawPhone, rawName, role string) (Member, error) {
+// queda en los dos y escoge en cuál trabaja al entrar. Con AUTH_MODE=pin (HU-104) una persona nueva entra con el PIN
+// temporal que le pone el dueño (se lo dice de palabra) y lo cambia al entrar; quien ya tenía PIN conserva el suyo.
+func (s *Service) AddMember(ctx context.Context, tallerID shared.ID, actor shared.Actor, rawPhone, rawName, role, tempPIN string) (Member, error) {
 	if role != string(domain.RoleMechanic) && role != string(domain.RoleReception) {
 		return Member{}, ErrRole
 	}
@@ -64,6 +65,16 @@ func (s *Service) AddMember(ctx context.Context, tallerID shared.ID, actor share
 	if err != nil {
 		return Member{}, err
 	}
+	var pinHash string
+	if tempPIN != "" || s.pinMode {
+		pin, err := domain.ParsePIN(tempPIN)
+		if err != nil {
+			return Member{}, err
+		}
+		if pinHash, err = s.hasher.Hash(pin); err != nil { // lento a propósito: fuera de la transacción
+			return Member{}, err
+		}
+	}
 	now := s.clock.Now()
 	var out Member
 	err = s.tx.DoWithSettings(ctx, map[string]string{settingTaller: tallerID.String()}, func(ctx context.Context) error {
@@ -74,6 +85,13 @@ func (s *Service) AddMember(ctx context.Context, tallerID shared.ID, actor share
 		if !found {
 			u = ports.User{ID: shared.NewID(), Phone: phone, Name: name, Active: true}
 			if err := s.store.InsertUser(ctx, u, now); err != nil {
+				return err
+			}
+		}
+		// El PIN temporal solo se le pone a alguien nuevo. A quien ya tenía cuenta (en este u otro taller) no se le toca:
+		// el PIN es de la persona y sirve en todos sus talleres (R-05, R-06; hallazgo del revisor en R2).
+		if pinHash != "" && !found {
+			if err := s.store.SetPIN(ctx, u.ID, pinHash, true, now); err != nil {
 				return err
 			}
 		}

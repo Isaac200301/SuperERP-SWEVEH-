@@ -26,16 +26,25 @@ type Handler struct {
 	trustProxy bool
 	admins     []string // HU-74: celulares de los administradores del ERP
 	features   featuresDTO
+	pinMode    bool // AUTH_MODE=pin (HU-104): se entra con celular y PIN; sin código por WhatsApp
 }
+
+// SetPINMode monta la entrada con PIN (AUTH_MODE=pin) en vez de la del código (otp).
+func (h *Handler) SetPINMode(on bool) { h.pinMode = on }
 
 func NewHandler(svc *app.Service, log *slog.Logger, limiter *httpx.RateLimiter, trustProxy bool) *Handler {
 	return &Handler{svc: svc, log: log, limiter: limiter, trustProxy: trustProxy}
 }
 
-// PublicRoutes no exigen sesión.
+// PublicRoutes no exigen sesión. Según AUTH_MODE se monta el código (otp) o el PIN (pin, HU-104), no los dos.
 func (h *Handler) PublicRoutes(r chi.Router) {
-	r.With(h.limit).Post("/auth/otp", h.requestCode)
-	r.With(h.limit).Post("/auth/otp/verify", h.verify)
+	if h.pinMode {
+		r.With(h.limit).Post("/auth/register", h.registerPIN)
+		r.With(h.limit).Post("/auth/login", h.loginPIN)
+	} else {
+		r.With(h.limit).Post("/auth/otp", h.requestCode)
+		r.With(h.limit).Post("/auth/otp/verify", h.verify)
+	}
 	r.Post("/auth/refresh", h.refresh)
 	r.Post("/auth/logout", h.logout)
 }
@@ -96,6 +105,8 @@ type sessionResp struct {
 	AdminPlataforma bool `json:"adminPlataforma"`
 	// Funciones: lo encendido en este servidor (V-01, V-02). La pantalla oculta lo apagado; el servidor ya no lo monta.
 	Funciones featuresDTO `json:"funciones"`
+	// CambiarPin: entró con un PIN temporal que puso el dueño; la pantalla le pide uno propio (HU-104).
+	CambiarPin bool `json:"cambiarPin"`
 }
 
 type featuresDTO struct {
@@ -131,6 +142,53 @@ func (h *Handler) verify(w http.ResponseWriter, r *http.Request) {
 	s, err := h.svc.Verify(r.Context(), app.VerifyInput{
 		Phone: req.Celular, Code: req.Codigo, Name: req.Nombre, ConsentAccepted: req.Autorizacion,
 	})
+	if err != nil {
+		httpx.WriteError(w, r, h.log, err)
+		return
+	}
+	h.writeSession(w, s, http.StatusOK)
+}
+
+type registerPINReq struct {
+	Celular      string `json:"celular"`
+	NombreTaller string `json:"nombreTaller"`
+	Nombre       string `json:"nombre"`
+	PIN          string `json:"pin"`
+	Autorizacion struct {
+		Version  string `json:"version"`
+		Aceptada bool   `json:"aceptada"`
+	} `json:"autorizacion"`
+}
+
+// registerPIN: paso 1 del registro (HU-104, V-04). Crea la cuenta, el taller y la autorización (HU-02).
+func (h *Handler) registerPIN(w http.ResponseWriter, r *http.Request) {
+	var req registerPINReq
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		httpx.WriteError(w, r, h.log, err)
+		return
+	}
+	s, err := h.svc.RegisterWithPIN(r.Context(), app.RegisterPINInput{Phone: req.Celular, WorkshopName: req.NombreTaller,
+		PersonName: req.Nombre, PIN: req.PIN, Consent: req.Autorizacion.Aceptada, PolicyVer: req.Autorizacion.Version})
+	if err != nil {
+		httpx.WriteError(w, r, h.log, err)
+		return
+	}
+	h.writeSession(w, s, http.StatusCreated)
+}
+
+type loginPINReq struct {
+	Celular string `json:"celular"`
+	PIN     string `json:"pin"`
+}
+
+// loginPIN: entrar con celular y PIN (HU-104). El error es el mismo exista o no el celular.
+func (h *Handler) loginPIN(w http.ResponseWriter, r *http.Request) {
+	var req loginPINReq
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		httpx.WriteError(w, r, h.log, err)
+		return
+	}
+	s, err := h.svc.LoginWithPIN(r.Context(), req.Celular, req.PIN)
 	if err != nil {
 		httpx.WriteError(w, r, h.log, err)
 		return
@@ -178,7 +236,7 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 		Usuario: userDTO{ID: u.ID.String(), Nombre: u.Name, Celular: shared.NationalNumber(u.Phone)},
 		Taller:  workshopDTO{ID: ws.ID.String(), Nombre: ws.Name},
 		Roles:   p.Roles, Permisos: domain.Permissions(p.Roles), AdminPlataforma: slices.Contains(h.admins, u.Phone),
-		Funciones: h.features,
+		Funciones: h.features, CambiarPin: u.MustChangePIN,
 	})
 }
 
@@ -189,6 +247,6 @@ func (h *Handler) writeSession(w http.ResponseWriter, s app.Session, status int)
 		Usuario: userDTO{ID: s.User.ID.String(), Nombre: s.User.Name, Celular: shared.NationalNumber(s.User.Phone)},
 		Taller:  workshopDTO{ID: s.Workshop.ID.String(), Nombre: s.Workshop.Name},
 		Roles:   s.Roles, Permisos: domain.Permissions(s.Roles),
-		CuentaNueva: s.NewAccount, Funciones: h.features,
+		CuentaNueva: s.NewAccount, Funciones: h.features, CambiarPin: s.MustChangePIN,
 	})
 }

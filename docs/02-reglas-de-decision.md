@@ -249,9 +249,12 @@ Preferir la biblioteca estándar de Go; librerías con licencia permisiva (MIT, 
 | 1-nov-2026 | Todas las HU vigentes pasan a Must (101) | Backlog completo |
 | 1-nov-2026 | Backend Go, Supabase, React + TS + Vite + Tailwind, JWT, RBAC, cookies seguras, GitHub Actions + SonarQube + Snyk | `docs/06-arquitectura.md` |
 | 1-nov-2026 | Arquitectura: monolito modular con capas hexagonales | `docs/06-arquitectura.md` |
+| 24-nov-2026 | Entrada con **celular + PIN** de 4 dígitos sin verificar el número, en vez de celular + OTP (Pablo, V-03; ADR-0037). El código sigue con `AUTH_MODE=otp` | HU-01, HU-104, `docs/06` §6 |
+| 24-nov-2026 | Funciones nuevas pedidas por Pablo para la entrega del 27-nov: **HU-104** (PIN); HU-105 a HU-110 llegan con sus rebanadas. Isaac debe revisarlas | `docs/04`, `docs/data/historias.json` |
 
 ## 12. Registro de cambios de este documento
 
 | Fecha | Cambio | Quién lo pidió |
 |---|---|---|
 | 1-nov-2026 | Versión inicial | Isaac / Pablo |
+| 25-nov-2026 | §11: entrada con celular + PIN (V-03) y HU-104 nueva (R-12: alcance pedido por Pablo, rango 1) | Pablo |

@@ -199,12 +199,14 @@ type IdentitySesion struct {
 }
 
 type IdentityUsuario struct {
-	ID        uuid.UUID
-	Celular   string
-	Nombre    string
-	Activo    bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID         uuid.UUID
+	Celular    string
+	Nombre     string
+	Activo     bool
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	PinHash    *string
+	PinCambiar bool
 }
 
 type InventoryArticulo struct {
