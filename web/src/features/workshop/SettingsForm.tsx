@@ -16,6 +16,11 @@ export function useSettings() {
   return useQuery({ queryKey: settingsKey, queryFn: async () => unwrap(await api.GET('/workshop/settings')), staleTime: 60_000 });
 }
 
+/** V-06 (ADR-0039): el taller lleva el inventario en otro programa. Sin el dato (cargando o error), como antes. */
+export function useInventarioExterno(): boolean {
+  return useSettings().data?.inventarioExterno === true;
+}
+
 function Check({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex min-h-[44px] items-start gap-3">
@@ -116,6 +121,15 @@ function Form({ p }: { p: Parametros }) {
           <Field label="Descuento máximo (%)" inputMode="numeric" value={String(f.descuentoMaxPct)} onChange={n('descuentoMaxPct')} />
           {/* V-05: todo el equipo descuenta hasta el tope; la casilla de recepción ya no aplica (el dato queda guardado). */}
         </div>
+      </Group>
+      {/* V-06 (ADR-0039, Figma "12 Taller" → Avanzado). */}
+      <Group title="Avanzado">
+        <Check
+          label="Llevo el inventario en otro programa"
+          hint="Los repuestos se escriben a mano en la cotización y no se descuentan existencias. Repuestos sale del menú."
+          checked={f.inventarioExterno}
+          onChange={set('inventarioExterno')}
+        />
       </Group>
       <div>
         <Button type="submit" busy={guardar.isPending}>

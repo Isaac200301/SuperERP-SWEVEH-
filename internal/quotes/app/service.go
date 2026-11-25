@@ -200,6 +200,12 @@ func (s *Quotes) AddLine(ctx context.Context, tallerID, orderID shared.ID, actor
 				return ErrPriceNeeded
 			}
 		case in.Kind == "repuesto" && in.RefID != nil:
+			if r, err := s.rulesIn(ctx, tallerID); err != nil || r.ExternalInventory {
+				if err != nil {
+					return err
+				}
+				return domain.ErrExternalInventory
+			}
 			parts, err := s.inv.Parts(ctx, tallerID, []shared.ID{*in.RefID})
 			if err != nil {
 				return err
@@ -221,6 +227,9 @@ func (s *Quotes) AddLine(ctx context.Context, tallerID, orderID shared.ID, actor
 		default:
 			if in.UnitPrice == nil {
 				return ErrPriceNeeded
+			}
+			if in.Kind == "repuesto" && *in.UnitPrice <= 0 { // repuesto a mano (V-06): el valor lo pone el taller
+				return domain.ErrPartPrice
 			}
 			l.UnitPrice, l.FreePrice = *in.UnitPrice, true
 		}
@@ -423,11 +432,16 @@ func (s *Quotes) Respond(ctx context.Context, c RespondCmd) (domain.Quote, error
 					return err
 				}
 			}
+			// V-06: con el inventario en otro programa no se descuentan existencias (ni de repuestos viejos con referencia).
+			rules, err := s.rulesIn(ctx, c.TallerID)
+			if err != nil {
+				return err
+			}
 			var lines []DiscountLine
 			for _, l := range q.ApprovedParts() {
 				lines = append(lines, DiscountLine{LineID: l.ID, PartID: *l.RefID, Qty: l.Qty})
 			}
-			if len(lines) > 0 {
+			if len(lines) > 0 && !rules.ExternalInventory {
 				if _, err := s.inv.Discount(ctx, c.TallerID, c.OrderID, lines, c.Actor); err != nil {
 					return err
 				}

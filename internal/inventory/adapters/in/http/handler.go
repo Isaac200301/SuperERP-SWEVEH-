@@ -2,6 +2,7 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -19,9 +20,35 @@ import (
 )
 
 type Handler struct {
-	svc   *app.Service
-	guard *authn.Guard
-	log   *slog.Logger
+	svc      *app.Service
+	guard    *authn.Guard
+	log      *slog.Logger
+	external External // V-06: inventario en otro programa
+}
+
+// External dice si el taller lleva el inventario en otro programa (V-06). nil = nunca.
+type External func(ctx context.Context, tallerID shared.ID) (bool, error)
+
+// ErrExternal: con el inventario en otro programa no se escribe en el de SWEVEH; la lectura sigue (datos viejos).
+var ErrExternal = shared.Conflict("inventario_externo", "Tu taller lleva el inventario en otro programa: aquí no se cambian repuestos.")
+
+// WithExternal conecta la consulta del interruptor "Llevo el inventario en otro programa".
+func (h *Handler) WithExternal(fn External) *Handler { h.external = fn; return h }
+
+// writable responde 409 si el taller lleva el inventario en otro programa.
+func (h *Handler) writable(next httpx.Func) httpx.Func {
+	return func(r *http.Request, p reqctx.Principal) (int, any, error) {
+		if h.external != nil {
+			ext, err := h.external(r.Context(), p.TallerID)
+			if err != nil {
+				return 0, nil, err
+			}
+			if ext {
+				return 0, nil, ErrExternal
+			}
+		}
+		return next(r, p)
+	}
 }
 
 func NewHandler(svc *app.Service, g *authn.Guard, log *slog.Logger) *Handler {
@@ -31,14 +58,14 @@ func NewHandler(svc *app.Service, g *authn.Guard, log *slog.Logger) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.With(h.guard.Require("part:read")).Get("/parts", httpx.JSON(h.log, h.search))
 	r.With(h.guard.Require("part:read")).Get("/parts/low", httpx.JSON(h.log, h.low))
-	r.With(h.guard.Require("part:manage")).Post("/parts", httpx.JSON(h.log, h.create))
-	r.With(h.guard.Require("part:manage")).Patch("/parts/{id}", httpx.JSON(h.log, h.update))
-	r.With(h.guard.Require("part:manage")).Post("/parts/{id}/entries", httpx.JSON(h.log, h.entry))
-	r.With(h.guard.Require("part:return")).Post("/parts/{id}/returns", httpx.JSON(h.log, h.ret))
+	r.With(h.guard.Require("part:manage")).Post("/parts", httpx.JSON(h.log, h.writable(h.create)))
+	r.With(h.guard.Require("part:manage")).Patch("/parts/{id}", httpx.JSON(h.log, h.writable(h.update)))
+	r.With(h.guard.Require("part:manage")).Post("/parts/{id}/entries", httpx.JSON(h.log, h.writable(h.entry)))
+	r.With(h.guard.Require("part:return")).Post("/parts/{id}/returns", httpx.JSON(h.log, h.writable(h.ret)))
 	r.With(h.guard.Require("part:read")).Get("/parts/{id}/movements", httpx.JSON(h.log, h.movements))
 	r.With(h.guard.Require("part:read")).Get("/orders/{id}/part-movements", httpx.JSON(h.log, h.orderParts))
-	r.With(h.guard.Require("import:run")).Post("/parts/import", httpx.JSON(h.log, h.importCSV))
-	r.With(h.guard.Require("part:manage")).Put("/parts/{id}/photo", httpx.JSON(h.log, h.setPhoto))
+	r.With(h.guard.Require("import:run")).Post("/parts/import", httpx.JSON(h.log, h.writable(h.importCSV)))
+	r.With(h.guard.Require("part:manage")).Put("/parts/{id}/photo", httpx.JSON(h.log, h.writable(h.setPhoto)))
 	r.With(h.guard.Require("part:read")).Get("/parts/{id}/photo", h.photo)
 }
 

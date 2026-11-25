@@ -199,6 +199,15 @@ func (f *Flow) Cancel(ctx context.Context, tallerID, orderID shared.ID, actor sh
 		if f.parts == nil {
 			return nil
 		}
+		if f.settings != nil {
+			st, err := f.settings.Settings(ctx, tallerID)
+			if err != nil {
+				return err
+			}
+			if st.ExternalInventory { // V-06: no hay bodega de SWEVEH a la que devolver
+				return nil
+			}
+		}
 		// HU-26: si ya se había aprobado y descontado, los repuestos vuelven a bodega con su movimiento.
 		_, err = f.parts.ReturnAll(ctx, tallerID, orderID, actor)
 		return err

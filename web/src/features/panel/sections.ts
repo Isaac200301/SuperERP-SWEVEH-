@@ -39,12 +39,16 @@ export const sections: Section[] = [
   { to: '/panel/plataforma', label: 'Plataforma', icon: IconCheck, perm: '', admin: true, funcion: 'plataforma' },
 ];
 
-/** soloYo: el taller dijo "solo yo" en el registro y no ve la gestión de usuarios (HU-83). */
-export function sectionsFor(session: Sesion, soloYo: boolean): Section[] {
+/**
+ * soloYo: el taller dijo "solo yo" en el registro y no ve la gestión de usuarios (HU-83).
+ * sinInventario: lleva el inventario en otro programa y Repuestos sale del menú (V-06).
+ */
+export function sectionsFor(session: Sesion, soloYo: boolean, sinInventario = false): Section[] {
   return sections.filter(
     (n) =>
       (n.admin ? session.adminPlataforma === true : can(session, n.perm)) &&
       (!n.funcion || feature(session, n.funcion)) &&
-      !(soloYo && n.to === '/panel/equipo'),
+      !(soloYo && n.to === '/panel/equipo') &&
+      !(sinInventario && n.to === '/panel/repuestos'),
   );
 }

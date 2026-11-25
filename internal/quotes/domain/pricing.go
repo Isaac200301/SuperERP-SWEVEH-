@@ -14,13 +14,20 @@ type Rules struct {
 	HourlyRate       *int64
 	MaxDiscountPct   int
 	ValidityDays     int
+	// ExternalInventory: el taller lleva el inventario en otro programa (V-06, ADR-0039): los repuestos van a mano y
+	// al aprobar no se descuentan existencias.
+	ExternalInventory bool
 }
 
 // DefaultRules: sin IVA ni vigencia, como antes de los parámetros (pruebas de unidad y cotizaciones viejas).
 var DefaultRules = Rules{PricesIncludeVAT: true, MaxDiscountPct: 100, ValidityDays: 15}
 
 var (
-	ErrDiscount        = shared.Validation("descuento_invalido", "El descuento va de 0 % hasta el máximo de tu taller.").WithField("descuentoPct")
+	ErrDiscount = shared.Validation("descuento_invalido", "El descuento va de 0 % hasta el máximo de tu taller.").WithField("descuentoPct")
+	// ErrExternalInventory: con el inventario en otro programa no se cotiza un repuesto del inventario de SWEVEH.
+	ErrExternalInventory = shared.Conflict("inventario_externo", "Tu taller lleva el inventario en otro programa: escribe el repuesto a mano.")
+	// ErrPartPrice: un repuesto escrito a mano lleva el valor que pone el taller (nunca se sugiere, RF-17).
+	ErrPartPrice       = shared.Validation("precio_repuesto", "Escribe el valor del repuesto (mayor que cero).").WithField("precioUnitario")
 	ErrDiscountDenied  = shared.Forbidden("descuento_no_permitido", "Tu rol no puede dar descuentos.")
 	ErrNoRate          = shared.Validation("tarifa_sin_definir", "Define la tarifa por hora en Mi taller → Parámetros, o cotiza la mano de obra con valor.").WithField("horas")
 	ErrHours           = shared.Validation("horas_invalidas", "Las horas van de 0,25 a 200, en cuartos de hora.").WithField("horas")

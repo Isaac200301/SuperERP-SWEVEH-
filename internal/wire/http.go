@@ -576,6 +576,11 @@ func (e extra) PendingDrafts(ctx context.Context, tallerID shared.ID) (int, erro
 }
 
 func (e extra) LowStock(ctx context.Context, tallerID shared.ID) ([]inventory.Part, error) {
+	// V-06: con el inventario en otro programa no hay alerta de stock bajo (HU-36) en "Hoy tienes pendiente". Si leer
+	// los parámetros falla, el error sube (no se traga) y el pendiente no se arma.
+	if p, err := e.s.M.Admin.ParametrosIn(ctx, tallerID); err != nil || p.ExternalInventory {
+		return nil, err
+	}
 	low, err := e.s.M.Inventory.Low(ctx, tallerID)
 	out := make([]inventory.Part, 0, len(low))
 	for _, p := range low {

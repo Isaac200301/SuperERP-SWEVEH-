@@ -1616,6 +1616,23 @@ _Módulo del MVP: Preparativos. Que la demo corra dos veces seguidas sin tocar c
 
 **Trazabilidad:** Depende de: HU-02 · Cambia: HU-01, HU-03, HU-04, HU-05, HU-80 · ADR-0037
 
+### HU-110 · Trabajar con mi propio programa de inventario
+
+**Épica:** E05 · **Roles:** Dueño del taller · **Superficies:** Panel · **Prioridad:** Must · **Origen:** Pablo (24-nov-2026, entrega del viernes, V-06), por revisar con Isaac · **Aplica a motos:** sí
+
+**Como** dueño que ya lleva su inventario en otro programa, **quiero** apagar el inventario de SWEVEH y escribir los repuestos a mano en la cotización, **para** no llevar dos inventarios.
+
+**Criterios de aceptación**
+
+- **Dado** que marco "Llevo el inventario en otro programa" en Mi taller (o en el registro, donde viene marcada), **cuando** cotizo un repuesto, **entonces** lo escribo a mano con nombre, cantidad y el valor que yo pongo; sin valor no se agrega.
+- **Dado** el inventario apagado, **cuando** el cliente aprueba la cotización o se cancela la orden, **entonces** no se mueve ninguna existencia.
+- **Dado** el inventario apagado, **cuando** abro el menú, **entonces** Repuestos no aparece, ni "Devolver al inventario", ni la alerta de stock bajo; y el servidor no deja crear ni cambiar repuestos.
+- **Dado** que otro taller tiene el inventario encendido, **cuando** yo apago el mío, **entonces** el suyo no cambia.
+
+**Notas:** ADR-0039. Por defecto apagado para los talleres que ya existían (Q-41).
+
+**Trazabilidad:** Cambia: HU-26, HU-27, HU-32 a HU-38 · ADR-0039
+
 ## Referencias citadas en las historias
 
 1. Meta for Developers, "Get started", WhatsApp Cloud API (número de prueba, 5 destinatarios, plantillas preaprobadas). <https://developers.facebook.com/docs/whatsapp/cloud-api/get-started/> (Oficial)

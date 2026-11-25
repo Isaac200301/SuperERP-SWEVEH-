@@ -14,6 +14,8 @@ type Settings struct {
 	MotoItems        []domain.ItemCheck
 	UseAwaitingParts bool
 	UseQualityCheck  bool
+	// ExternalInventory: inventario en otro programa (V-06): cancelar no devuelve repuestos a la bodega de SWEVEH.
+	ExternalInventory bool
 }
 
 // ItemsFor devuelve la lista vigente de ítems a revisar según el tipo de vehículo.

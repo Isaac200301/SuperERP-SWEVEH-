@@ -1560,6 +1560,7 @@ paths:
                 direccion: { type: string, maxLength: 160, description: 'Opcional; sale en el recordatorio de la cita (HU-44)' }
                 tamano: { type: string }
                 contratoAceptado: { type: boolean }
+                inventarioExterno: { type: boolean, description: 'Casilla del paso 2 del registro, marcada por defecto (V-06, Q-41)' }
       responses:
         '200': { $ref: '#/components/responses/Taller' }
         '400': { $ref: '#/components/responses/Problem' }
@@ -2241,7 +2242,7 @@ components:
       type: object
       additionalProperties: false
       required: [usarEsperandoRepuesto, usarControlCalidad, fotosMinimas, kmObligatorio, itemsCarro, itemsMoto, ivaPct, preciosConIva,
-        tarifaHora, descuentoMaxPct, descuentoRecepcion, vigenciaDias, version]
+        tarifaHora, descuentoMaxPct, descuentoRecepcion, vigenciaDias, inventarioExterno, version]
       properties:
         usarEsperandoRepuesto: { type: boolean }
         usarControlCalidad: { type: boolean }
@@ -2255,6 +2256,7 @@ components:
         descuentoMaxPct: { type: integer, minimum: 0, maximum: 100 }
         descuentoRecepcion: { type: boolean, deprecated: true, description: 'Ya no se usa (V-05, ADR-0038): todo el equipo descuenta hasta descuentoMaxPct. Se conserva el dato' }
         vigenciaDias: { type: integer, minimum: 1, maximum: 90 }
+        inventarioExterno: { type: boolean, description: '"Llevo el inventario en otro programa" (V-06, ADR-0039): repuestos a mano en la cotización, sin descontar existencias; /parts no se escribe (409)' }
         version: { type: integer }
     SistemaVehiculo:
       type: string

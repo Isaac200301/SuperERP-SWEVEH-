@@ -11,6 +11,7 @@ import { can, useSession } from '../auth/api';
 import { KpiCards } from '../dashboard/KpiCards';
 import { useParts } from '../inventory/api';
 import { useSettings } from '../workshop/SettingsForm';
+import { useInventarioExterno } from '../workshop/SettingsForm';
 
 /** HU-68 a HU-75 en el celular: los números con "¿Qué significa?" y las órdenes abiertas por estado, en barras. */
 function Numeros() {
@@ -111,7 +112,9 @@ function Inventario() {
 /** Mockup Taller: Números e Inventario del dueño, arriba de las demás secciones. */
 export function TallerOverview() {
   const session = useSession().data;
-  const inventario = can(session, 'part:manage');
+  // V-06: con el inventario en otro programa no hay pestaña Inventario.
+  const externo = useInventarioExterno();
+  const inventario = can(session, 'part:manage') && !externo;
   const [tab, setTab] = useState<'numeros' | 'inventario'>('numeros');
   if (!inventario) return <Numeros />;
   return (

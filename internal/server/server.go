@@ -116,7 +116,10 @@ func New(d Deps) *chi.Mux {
 		func(r chi.Router) { identityH.UserRoutes(r, guard) },
 		tenancyhttp.NewHandler(m.Admin, guard, d.Log).Routes,
 		cataloghttp.NewHandler(m.Catalog, guard, d.Log).WithPriceListPhoto(d.Features.WhatsApp).Routes, // HU-93 va con V-01
-		inventoryhttp.NewHandler(m.Inventory, guard, d.Log).Routes,
+		inventoryhttp.NewHandler(m.Inventory, guard, d.Log).WithExternal(func(ctx context.Context, id shared.ID) (bool, error) {
+			p, err := m.Admin.Parametros(ctx, id) // V-06: "Llevo el inventario en otro programa"
+			return p.ExternalInventory, err
+		}).Routes,
 		quoteshttp.NewHandler(m.Quotes, guard, d.Log).Routes,
 		ordershttp.NewFindingsHandler(m.Findings, guard, d.Log).Routes,
 		search.NewHandler(tx, m.VehDir, m.CustDir, m.OrdersF, guard, d.Log).Routes,

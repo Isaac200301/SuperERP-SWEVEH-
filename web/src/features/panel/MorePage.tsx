@@ -7,6 +7,7 @@ import { IconChevron, IconLogout } from '../../shared/ui/icons';
 import { Logo } from '../../shared/ui/Logo';
 import { useIsMobile } from '../../shared/ui/useIsMobile';
 import { can, useLogout, useSession } from '../auth/api';
+import { useInventarioExterno } from '../workshop/SettingsForm';
 import { sectionsFor } from './sections';
 import { TallerOverview } from './TallerOverview';
 
@@ -24,9 +25,10 @@ export function MorePage() {
   const logout = useLogout();
   const dueno = can(session, 'workshop:manage');
   const taller = useQuery({ queryKey: ['taller'], queryFn: async () => unwrap(await api.GET('/workshop')), enabled: dueno });
+  const sinInventario = useInventarioExterno();
   if (!mobile) return <Navigate to="/panel/ordenes" replace />;
   if (!session) return null;
-  const lista = sectionsFor(session, taller.data?.tamano === 'solo').filter((s) => !enLaBarra.includes(s.to));
+  const lista = sectionsFor(session, taller.data?.tamano === 'solo', sinInventario).filter((s) => !enLaBarra.includes(s.to));
   return (
     <>
       <header className="-mx-4 -mt-4 flex items-center gap-3 rounded-b-[28px] bg-primary px-[18px] pt-5 pb-5 text-white">

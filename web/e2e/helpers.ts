@@ -22,7 +22,7 @@ export async function fillPin(page: Page, label: string, pin: string) {
  * Registra un taller de carros nuevo con celular y PIN y lo deja armado (paso 1 y 2 del alta, V-04). Ya no lee el
  * código del log del api: con AUTH_MODE=pin no hay código.
  */
-export async function registerWorkshop(page: Page, celular: string, taller = 'Taller Prueba E2E') {
+export async function registerWorkshop(page: Page, celular: string, taller = 'Taller Prueba E2E', inventarioPropio = true) {
   await page.goto('/registro');
   await page.getByLabel('Tu celular').fill(celular);
   await page.getByLabel('Nombre del taller').fill(taller);
@@ -33,6 +33,9 @@ export async function registerWorkshop(page: Page, celular: string, taller = 'Ta
   await expect(page.getByText('PASO 2 DE 2')).toBeVisible();
   await page.getByRole('radio', { name: 'Carros' }).click();
   await page.getByLabel(/Frenos y suspensión/).check();
+  // Estos recorridos usan el inventario de SWEVEH: se desmarca "Llevo el inventario en otro programa", que en el
+  // registro viene marcado (V-06, Q-41). El recorrido de la entrega (R12) lo deja marcado.
+  if (inventarioPropio) await page.getByLabel(/Llevo el inventario en otro programa/).uncheck();
   await page.getByLabel(/Acepto el contrato/).check();
   await page.getByRole('button', { name: 'Armar mi taller' }).click();
   await expect(page.getByText('Te dejamos listos estos servicios')).toBeVisible();

@@ -30,7 +30,7 @@ type Atiende = 'carro' | 'moto' | 'ambos' | '';
 export function ProfileForm({ t, onSaved }: { t: Taller; onSaved?: () => void }) {
   const qc = useQueryClient();
   const guardar = useMutation({
-    mutationFn: async (b: { nombre: string; atiende: string; especialidades: string[]; ciudad: string; direccion: string; tamano: string; contratoAceptado: boolean }) =>
+    mutationFn: async (b: { nombre: string; atiende: string; especialidades: string[]; ciudad: string; direccion: string; tamano: string; contratoAceptado: boolean; inventarioExterno?: boolean }) =>
       unwrap(await api.POST('/workshop/onboarding', { body: b })),
     onSuccess: async () => {
       await qc.invalidateQueries();
@@ -40,6 +40,8 @@ export function ProfileForm({ t, onSaved }: { t: Taller; onSaved?: () => void })
   const [f, setF] = useState({
     nombre: t.nombre, atiende: (t.atiende || '') as Atiende, ciudad: t.ciudad, direccion: t.direccion ?? '', tamano: t.tamano || 'solo', esp: t.especialidades,
     contrato: t.contratoAceptadoEn != null,
+    // V-06, Q-41: en el registro nuevo la casilla viene marcada; después se cambia en Mi taller → Avanzado.
+    externo: true,
   });
   // HU-03 criterio 2: el tipo de vehículo es obligatorio antes de seguir.
   let missing: string | undefined;
@@ -48,7 +50,8 @@ export function ProfileForm({ t, onSaved }: { t: Taller; onSaved?: () => void })
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (missing) return;
-    guardar.mutate({ nombre: f.nombre, atiende: f.atiende, especialidades: f.esp, ciudad: f.ciudad, direccion: f.direccion, tamano: f.tamano, contratoAceptado: f.contrato });
+    guardar.mutate({ nombre: f.nombre, atiende: f.atiende, especialidades: f.esp, ciudad: f.ciudad, direccion: f.direccion, tamano: f.tamano, contratoAceptado: f.contrato,
+      ...(t.onboardingCompleto ? {} : { inventarioExterno: f.externo }) });
   };
   return (
     <section className={card} aria-labelledby="perfil">
@@ -97,6 +100,13 @@ export function ProfileForm({ t, onSaved }: { t: Taller; onSaved?: () => void })
             </label>
           ))}
         </fieldset>
+        {/* V-06, Q-41: en el registro; en Mi taller se cambia en Parámetros → Avanzado. */}
+        {!t.onboardingCompleto && (
+          <label className="flex min-h-[44px] items-center gap-2 sm:col-span-2">
+            <input type="checkbox" checked={f.externo} onChange={(e) => setF({ ...f, externo: e.target.checked })} />
+            Llevo el inventario en otro programa (los repuestos se escriben a mano en la cotización)
+          </label>
+        )}
         <label className="flex min-h-[44px] items-center gap-2 sm:col-span-2">
           <input type="checkbox" checked={f.contrato} onChange={(e) => setF({ ...f, contrato: e.target.checked })} />
           Acepto el contrato de transmisión de datos con SWEVEH (borrador, pendiente de revisión jurídica)

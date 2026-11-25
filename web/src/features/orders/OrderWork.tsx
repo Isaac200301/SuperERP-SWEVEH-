@@ -477,6 +477,47 @@ function FreeItem({ busy, tarifa, onAdd }: {
   );
 }
 
+/**
+ * Repuesto escrito a mano (V-06, ADR-0039): el taller lleva el inventario en otro programa. Nombre, cantidad y el valor
+ * que pone el taller (nunca se sugiere, RF-17); no descuenta existencias.
+ */
+function ManualPart({ busy, onAdd }: { busy: boolean; onAdd: (v: { descripcion: string; cantidad: number; precioUnitario: number }) => void }) {
+  const [nombre, setNombre] = useState('');
+  const [cant, setCant] = useState('1');
+  const [valor, setValor] = useState('');
+  const v = pesos(valor);
+  const n = pesos(cant) ?? 0;
+  let falta: string | undefined;
+  if (!nombre.trim()) falta = 'Escribe el repuesto.';
+  else if (n < 1) falta = 'Escribe la cantidad.';
+  else if (v === undefined || v <= 0) falta = 'Escribe el valor del repuesto.';
+  return (
+    <form
+      aria-label="Repuesto escrito a mano"
+      className="grid gap-3 rounded-2xl bg-surface p-3 sm:grid-cols-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (falta || v === undefined) return;
+        onAdd({ descripcion: nombre.trim(), cantidad: n, precioUnitario: v });
+        setNombre('');
+        setCant('1');
+        setValor('');
+      }}
+    >
+      <div className="sm:col-span-2">
+        <Field label="Repuesto" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+      </div>
+      <Field label="Cantidad del repuesto" inputMode="numeric" value={cant} onChange={(e) => setCant(e.target.value)} />
+      <Field label="Valor del repuesto (COP)" inputMode="numeric" value={valor} onChange={(e) => setValor(e.target.value)} />
+      <div className="sm:col-span-4">
+        <Button type="submit" variant="secondary" busy={busy} missing={falta}>
+          Agregar repuesto
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 /** HU-27, HU-29, HU-34 y HU-38: cotización con servicios, repuestos y mano de obra; precios de la lista o puestos por la persona. */
 export function QuotePanel({ orden }: { orden: Orden }) {
   const q = useQuote(orden.id);
@@ -486,6 +527,7 @@ export function QuotePanel({ orden }: { orden: Orden }) {
   const puedeDescontar = usePermission('quote:discount');
   const puedeEnviar = usePermission('quote:send');
   const params = useSettings().data;
+  const externo = params?.inventarioExterno === true; // V-06: repuestos a mano, sin bodega
   const [buscar, setBuscar] = useState('');
   const cat = useCatalog(buscar);
   const aprobada = q.data?.estado === 'aprobada';
@@ -588,7 +630,7 @@ export function QuotePanel({ orden }: { orden: Orden }) {
                       Quitar
                     </button>
                   ) : null}
-                  {permisoDevolver && aprobada && l.tipo === 'repuesto' && l.refId && mov && mov.porDevolver > 0 ? (
+                  {permisoDevolver && !externo && aprobada && l.tipo === 'repuesto' && l.refId && mov && mov.porDevolver > 0 ? (
                     <button
                       type="button"
                       className="min-h-[44px] px-2 font-bold text-primary"
@@ -658,7 +700,7 @@ export function QuotePanel({ orden }: { orden: Orden }) {
 
       {editable ? (
         <>
-          <Field label="Buscar servicio o repuesto" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
+          <Field label={externo ? 'Buscar servicio' : 'Buscar servicio o repuesto'} value={buscar} onChange={(e) => setBuscar(e.target.value)} />
           <ul className="flex max-h-80 flex-col gap-1 overflow-auto">
             {cat.data?.servicios.map((s) => (
               <CatalogItem
@@ -671,7 +713,7 @@ export function QuotePanel({ orden }: { orden: Orden }) {
                 onAdd={(v) => act.add.mutate({ tipo: 'servicio', refId: s.id, ...v })}
               />
             ))}
-            {cat.data?.repuestos.map((p) => (
+            {(externo ? [] : (cat.data?.repuestos ?? [])).map((p) => (
               <CatalogItem
                 key={p.id}
                 label={`Repuesto · ${p.nombre}`}
@@ -684,6 +726,7 @@ export function QuotePanel({ orden }: { orden: Orden }) {
               />
             ))}
           </ul>
+          {externo ? <ManualPart busy={act.add.isPending} onAdd={(v) => act.add.mutate({ tipo: 'repuesto', ...v })} /> : null}
           <FreeItem busy={act.add.isPending} tarifa={params?.tarifaHora} onAdd={(v) => act.add.mutate({ tipo: 'servicio', ...v })} />
           <Button
             missing={cot.lineas.length === 0 ? 'Agrega al menos un ítem para enviarla.' : undefined}

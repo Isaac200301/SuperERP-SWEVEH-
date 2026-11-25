@@ -29,6 +29,9 @@ type Parametros struct {
 	MaxDiscountPct    int
 	ReceptionDiscount bool // ya no se usa: desde V-05 todo el equipo descuenta hasta MaxDiscountPct (el dato queda guardado)
 	ValidityDays      int
+	// ExternalInventory: el taller lleva el inventario en otro programa (V-06, ADR-0039). Los repuestos van escritos a
+	// mano en la cotización y no se descuentan existencias.
+	ExternalInventory bool
 	Version           int
 }
 

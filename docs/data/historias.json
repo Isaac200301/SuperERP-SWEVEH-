@@ -4923,6 +4923,57 @@
      "entonces": "entro con el temporal, el celular se desbloquea y mis sesiones se cierran; solo quien administra el equipo puede hacerlo"
     }
    ]
+  },
+  {
+   "id": "HU-110",
+   "epic": "E05",
+   "roles": [
+    "DU"
+   ],
+   "surf": [
+    "P"
+   ],
+   "titulo": "Trabajar con mi propio programa de inventario",
+   "como": "dueño que ya lleva su inventario en otro programa",
+   "quiero": "apagar el inventario de SWEVEH y escribir los repuestos a mano en la cotización",
+   "para": "no llevar dos inventarios",
+   "prio": "M",
+   "antes": "",
+   "src": "pablo-2026-11-24",
+   "moto": true,
+   "veh": "",
+   "dep": [
+    "HU-27"
+   ],
+   "rf": [],
+   "au": [],
+   "esc": [],
+   "ca": [],
+   "notas": "Entrega del 27-nov (V-06, ADR-0039). Por defecto apagado para talleres que ya existían (Q-41). Por revisar con Isaac.",
+   "refs": [],
+   "canc": "",
+   "ac": [
+    {
+     "dado": "el inventario en otro programa",
+     "cuando": "cotizo un repuesto",
+     "entonces": "lo escribo a mano con nombre, cantidad y valor; sin valor no se agrega"
+    },
+    {
+     "dado": "el inventario apagado",
+     "cuando": "se aprueba o se cancela",
+     "entonces": "no se mueve ninguna existencia"
+    },
+    {
+     "dado": "el inventario apagado",
+     "cuando": "abro el menú",
+     "entonces": "Repuestos, Devolver al inventario y la alerta de stock bajo no aparecen, y el servidor no deja escribir repuestos"
+    },
+    {
+     "dado": "otro taller con el inventario encendido",
+     "cuando": "apago el mío",
+     "entonces": "el suyo no cambia"
+    }
+   ]
   }
  ]
 }

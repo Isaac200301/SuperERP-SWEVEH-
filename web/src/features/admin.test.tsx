@@ -80,6 +80,7 @@ describe('WorkshopPage (HU-03, HU-08, HU-89)', () => {
     expect(calls.find((c) => c.method === 'POST')?.body).toEqual({
       nombre: 'El Pistón', atiende: 'moto', especialidades: ['frenos_suspension'], ciudad: 'Medellín', direccion: '', tamano: '2a5',
       contratoAceptado: true,
+      inventarioExterno: true, // V-06, Q-41: la casilla del registro viene marcada
     });
     const h = (calls.find((c) => c.method === 'PUT')?.body as { horario: Record<string, unknown> }).horario;
     expect(h.lun).toBeNull();

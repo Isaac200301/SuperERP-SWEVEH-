@@ -19,7 +19,7 @@ func (r Reader) Settings(ctx context.Context, tallerID shared.ID) (ports.Setting
 		return ports.Settings{}, err
 	}
 	out := ports.Settings{Reception: domain.ReceptionRules{MinPhotos: p.MinPhotos, MileageRequired: p.MileageRequired},
-		UseAwaitingParts: p.UseAwaitingParts, UseQualityCheck: p.UseQualityCheck}
+		UseAwaitingParts: p.UseAwaitingParts, UseQualityCheck: p.UseQualityCheck, ExternalInventory: p.ExternalInventory}
 	for _, it := range p.CarItems {
 		out.CarItems = append(out.CarItems, domain.ItemCheck{Key: it.Key, Name: it.Name})
 	}

@@ -52,6 +52,7 @@ type settingsDTO struct {
 	DescuentoMaxPct       int       `json:"descuentoMaxPct"`
 	DescuentoRecepcion    bool      `json:"descuentoRecepcion"`
 	VigenciaDias          int       `json:"vigenciaDias"`
+	InventarioExterno     bool      `json:"inventarioExterno"`
 	Version               int       `json:"version"`
 }
 
@@ -75,7 +76,7 @@ func settingsOut(p domain.Parametros) settingsDTO {
 	return settingsDTO{UsarEsperandoRepuesto: p.UseAwaitingParts, UsarControlCalidad: p.UseQualityCheck, FotosMinimas: p.MinPhotos,
 		KmObligatorio: p.MileageRequired, ItemsCarro: items(p.CarItems), ItemsMoto: items(p.MotoItems), IvaPct: p.VATPct,
 		PreciosConIva: p.PricesIncludeVAT, TarifaHora: p.HourlyRate, DescuentoMaxPct: p.MaxDiscountPct,
-		DescuentoRecepcion: p.ReceptionDiscount, VigenciaDias: p.ValidityDays, Version: p.Version}
+		DescuentoRecepcion: p.ReceptionDiscount, VigenciaDias: p.ValidityDays, InventarioExterno: p.ExternalInventory, Version: p.Version}
 }
 
 func (h *Handler) settings(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -91,7 +92,7 @@ func (h *Handler) saveSettings(r *http.Request, p reqctx.Principal) (int, any, e
 	in := domain.Parametros{UseAwaitingParts: q.UsarEsperandoRepuesto, UseQualityCheck: q.UsarControlCalidad, MinPhotos: q.FotosMinimas,
 		MileageRequired: q.KmObligatorio, CarItems: itemsIn(q.ItemsCarro), MotoItems: itemsIn(q.ItemsMoto), VATPct: q.IvaPct,
 		PricesIncludeVAT: q.PreciosConIva, HourlyRate: q.TarifaHora, MaxDiscountPct: q.DescuentoMaxPct,
-		ReceptionDiscount: q.DescuentoRecepcion, ValidityDays: q.VigenciaDias}
+		ReceptionDiscount: q.DescuentoRecepcion, ValidityDays: q.VigenciaDias, ExternalInventory: q.InventarioExterno}
 	s, err := h.admin.SetParametros(r.Context(), p.TallerID, p.Actor(), in, q.Version)
 	return http.StatusOK, settingsOut(s), err
 }
@@ -136,6 +137,8 @@ type onboardReq struct {
 	Direccion        string   `json:"direccion"`
 	Tamano           string   `json:"tamano"`
 	ContratoAceptado bool     `json:"contratoAceptado"`
+	// InventarioExterno: la casilla "Llevo el inventario en otro programa" del paso 2 del registro (V-06, Q-41).
+	InventarioExterno *bool `json:"inventarioExterno"`
 }
 
 func (h *Handler) onboard(r *http.Request, p reqctx.Principal) (int, any, error) {
@@ -146,7 +149,15 @@ func (h *Handler) onboard(r *http.Request, p reqctx.Principal) (int, any, error)
 	s, err := h.admin.Onboard(r.Context(), p.TallerID, p.Actor(), tenancy.OnboardInput{Name: q.Nombre, ContractAccepted: q.ContratoAceptado,
 		Profile: domain.Profile{Attends: q.Atiende, Specialties: q.Especialidades, City: q.Ciudad, Size: q.Tamano,
 			Address: q.Direccion}})
-	return http.StatusOK, toDTO(s), err
+	if err != nil {
+		return 0, nil, err
+	}
+	if q.InventarioExterno != nil {
+		if _, err := h.admin.SetExternalInventory(r.Context(), p.TallerID, p.Actor(), *q.InventarioExterno); err != nil {
+			return 0, nil, err
+		}
+	}
+	return http.StatusOK, toDTO(s), nil
 }
 
 func (h *Handler) schedule(r *http.Request, p reqctx.Principal) (int, any, error) {

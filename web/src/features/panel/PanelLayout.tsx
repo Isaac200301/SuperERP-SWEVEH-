@@ -7,6 +7,7 @@ import { IconLogout } from '../../shared/ui/icons';
 import { can, feature, useLogout } from '../auth/api';
 import { usePendingCards } from '../inbox/usePendingCards';
 import { WhatsappDown } from '../messaging/WhatsappDown';
+import { useInventarioExterno } from '../workshop/SettingsForm';
 import { sectionsFor } from './sections';
 
 /** soloYo: el taller dijo "solo yo" en el registro y no ve la gestión de usuarios (HU-83). */
@@ -14,6 +15,7 @@ export function PanelLayout({ session, soloYo = false }: { session: Sesion; solo
   const navigate = useNavigate();
   const logout = useLogout();
   // HU-66: contador y sonido cuando llega una tarjeta a Por revisar (dueño y recepción).
+  const sinInventario = useInventarioExterno();
   const pending = usePendingCards(feature(session, 'whatsapp') && can(session, 'inbox:manage'));
   return (
     <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col gap-5 p-4 md:flex-row md:p-5">
@@ -22,7 +24,7 @@ export function PanelLayout({ session, soloYo = false }: { session: Sesion; solo
           <Brand subtitle={session.taller.nombre} />
         </div>
         <nav aria-label="Secciones del panel" className="flex flex-row gap-2 md:flex-col">
-          {sectionsFor(session, soloYo).map(n => (
+          {sectionsFor(session, soloYo, sinInventario).map(n => (
               <NavLink
                 key={n.to}
                 to={n.to}

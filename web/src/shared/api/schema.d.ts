@@ -1541,6 +1541,8 @@ export interface components {
              */
             descuentoRecepcion: boolean;
             vigenciaDias: number;
+            /** @description "Llevo el inventario en otro programa" (V-06, ADR-0039): repuestos a mano en la cotización, sin descontar existencias; /parts no se escribe (409) */
+            inventarioExterno: boolean;
             version: number;
         };
         /** @enum {string} */
@@ -4391,6 +4393,8 @@ export interface operations {
                     direccion?: string;
                     tamano: string;
                     contratoAceptado: boolean;
+                    /** @description Casilla del paso 2 del registro, marcada por defecto (V-06, Q-41) */
+                    inventarioExterno?: boolean;
                 };
             };
         };

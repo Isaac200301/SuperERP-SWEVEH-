@@ -17,7 +17,8 @@ import {
   IconWarn,
 } from '../../shared/ui/icons';
 import { Logo } from '../../shared/ui/Logo';
-import { can, useSession } from '../auth/api';
+import { can, feature, useSession } from '../auth/api';
+import { useInventarioExterno } from '../workshop/SettingsForm';
 import { usePendingCards } from '../inbox/usePendingCards';
 import { useRecentOrders } from '../orders/api';
 import { OrderCard } from '../orders/OrdersMobile';
@@ -72,6 +73,7 @@ function QuickLink({ to, label, icon: Icon, tone, badge }: { to: string; label: 
 /** Hoy en el celular (mockup Main): pendientes del día, números con "¿Qué significa?" y órdenes en curso. */
 export function DashboardMobile() {
   const session = useSession().data;
+  const sinInventario = useInventarioExterno(); // V-06
   const [seg, setSeg] = useState<'todo' | 'clientes' | 'taller'>('todo');
   const kpis = useQuery({ queryKey: ['tablero', ''], queryFn: async () => unwrap(await api.GET('/dashboard', { params: { query: {} } })), refetchInterval: 60_000 });
   const hoy = useQuery({ queryKey: ['hoy'], queryFn: async () => unwrap(await api.GET('/today')).pendientes, refetchInterval: 60_000 });
@@ -108,11 +110,11 @@ export function DashboardMobile() {
         </h2>
         <nav aria-label="Accesos rápidos" className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
           <QuickLink to="/panel/ordenes" label="Órdenes" icon={IconOrders} tone="bg-primary-tint text-primary" badge={abiertas.length || undefined} />
-          {can(session, 'inbox:manage') ? (
+          {feature(session, 'whatsapp') && can(session, 'inbox:manage') ? (
             <QuickLink to="/panel/por-revisar" label="Por revisar" icon={IconInbox} tone="bg-kpi-lilac text-[#3E2E8C]" badge={pending || undefined} />
           ) : null}
           {can(session, 'customer:read_all') ? <QuickLink to="/panel/clientes" label="Clientes" icon={IconCar} tone="bg-kpi-peach text-[#8A3E00]" /> : null}
-          {can(session, 'part:manage') ? <QuickLink to="/panel/repuestos" label="Inventario" icon={IconBox} tone="bg-kpi-aqua text-primary" /> : null}
+          {can(session, 'part:manage') && !sinInventario ? <QuickLink to="/panel/repuestos" label="Inventario" icon={IconBox} tone="bg-kpi-aqua text-primary" /> : null}
           {can(session, 'automation:manage') ? (
             <QuickLink to="/panel/automatizaciones" label="Automati­zaciones" icon={IconBolt} tone="bg-primary-tint text-primary" />
           ) : null}

@@ -23,11 +23,12 @@ type paramRow struct {
 	DescMax    int             `db:"descuento_max_pct"`
 	DescRecep  bool            `db:"descuento_recepcion"`
 	Vigencia   int             `db:"vigencia_dias"`
+	Externo    bool            `db:"inventario_externo"`
 	Version    int             `db:"version"`
 }
 
 const paramCols = `usar_esperando_repuesto, usar_control_calidad, fotos_minimas, km_obligatorio, items_carro, items_moto, iva_pct,
-	precios_con_iva, tarifa_hora, descuento_max_pct, descuento_recepcion, vigencia_dias, version`
+	precios_con_iva, tarifa_hora, descuento_max_pct, descuento_recepcion, vigencia_dias, inventario_externo, version`
 
 // ErrParamVersion: otra persona cambió los parámetros mientras se editaban.
 var ErrParamVersion = shared.ErrVersionConflict
@@ -43,7 +44,7 @@ func (a *Admin) loadParams(ctx context.Context, id shared.ID) (domain.Parametros
 	r := rows[0]
 	p := domain.Parametros{UseAwaitingParts: r.Esperando, UseQualityCheck: r.Calidad, MinPhotos: r.Fotos, MileageRequired: r.Km,
 		VATPct: r.IVA, PricesIncludeVAT: r.ConIVA, HourlyRate: r.Tarifa, MaxDiscountPct: r.DescMax, ReceptionDiscount: r.DescRecep,
-		ValidityDays: r.Vigencia, Version: r.Version}
+		ValidityDays: r.Vigencia, ExternalInventory: r.Externo, Version: r.Version}
 	if err := json.Unmarshal(r.ItemsCarro, &p.CarItems); err != nil {
 		return p, err
 	}
@@ -92,14 +93,14 @@ func (a *Admin) SetParametros(ctx context.Context, id shared.ID, actor shared.Ac
 			return ErrParamVersion
 		}
 		n, err := db.Exec(ctx, `INSERT INTO tenancy.parametros (taller_id, `+paramCols+`, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 1, now())
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 1, now())
 			ON CONFLICT (taller_id) DO UPDATE SET usar_esperando_repuesto = $2, usar_control_calidad = $3, fotos_minimas = $4,
 				km_obligatorio = $5, items_carro = $6, items_moto = $7, iva_pct = $8, precios_con_iva = $9, tarifa_hora = $10,
-				descuento_max_pct = $11, descuento_recepcion = $12, vigencia_dias = $13,
+				descuento_max_pct = $11, descuento_recepcion = $12, vigencia_dias = $13, inventario_externo = $14,
 				version = tenancy.parametros.version + 1, updated_at = now()
-			WHERE tenancy.parametros.version = $14`,
+			WHERE tenancy.parametros.version = $15`,
 			id, p.UseAwaitingParts, p.UseQualityCheck, p.MinPhotos, p.MileageRequired, car, moto, p.VATPct, p.PricesIncludeVAT,
-			p.HourlyRate, p.MaxDiscountPct, p.ReceptionDiscount, p.ValidityDays, version)
+			p.HourlyRate, p.MaxDiscountPct, p.ReceptionDiscount, p.ValidityDays, p.ExternalInventory, version)
 		if err != nil {
 			return err
 		}
@@ -119,5 +120,19 @@ func paramView(p domain.Parametros) map[string]any {
 	return map[string]any{"esperando_repuesto": p.UseAwaitingParts, "control_calidad": p.UseQualityCheck, "fotos_minimas": p.MinPhotos,
 		"km_obligatorio": p.MileageRequired, "items_carro": len(p.CarItems), "items_moto": len(p.MotoItems), "iva_pct": p.VATPct,
 		"precios_con_iva": p.PricesIncludeVAT, "tarifa_hora": p.HourlyRate, "descuento_max_pct": p.MaxDiscountPct,
-		"descuento_recepcion": p.ReceptionDiscount, "vigencia_dias": p.ValidityDays}
+		"descuento_recepcion": p.ReceptionDiscount, "vigencia_dias": p.ValidityDays, "inventario_externo": p.ExternalInventory}
+}
+
+// SetExternalInventory cambia solo el interruptor "Llevo el inventario en otro programa" (V-06). Lo usa el paso 2 del
+// registro (Q-41); en Mi taller se cambia con el resto de los parámetros.
+func (a *Admin) SetExternalInventory(ctx context.Context, id shared.ID, actor shared.Actor, on bool) (domain.Parametros, error) {
+	cur, err := a.Parametros(ctx, id)
+	if err != nil {
+		return domain.Parametros{}, err
+	}
+	if cur.ExternalInventory == on {
+		return cur, nil
+	}
+	cur.ExternalInventory = on
+	return a.SetParametros(ctx, id, actor, cur, cur.Version)
 }

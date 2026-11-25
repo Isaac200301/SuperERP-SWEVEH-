@@ -445,6 +445,7 @@ type TenancyParametro struct {
 	VigenciaDias          int32
 	Version               int32
 	UpdatedAt             time.Time
+	InventarioExterno     bool
 }
 
 type TenancyTaller struct {
