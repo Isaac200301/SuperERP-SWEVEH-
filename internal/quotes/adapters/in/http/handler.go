@@ -176,7 +176,7 @@ func (h *Handler) update(r *http.Request, p reqctx.Principal) (int, any, error) 
 		return 0, nil, domain.ErrDiscountDenied
 	}
 	out, err := h.svc.UpdateLine(r.Context(), p.TallerID, id, lid, p.Actor(), app.LineChange{Qty: q.Cantidad, Price: q.Precio,
-		HoursCent: hoursCent(q.Horas), DiscountPct: q.Descuento, IsOwner: h.guard.Can(p, "workshop:manage")})
+		HoursCent: hoursCent(q.Horas), DiscountPct: q.Descuento})
 	return http.StatusOK, toDTO(&out), err
 }
 

@@ -334,7 +334,10 @@ type Pending struct {
 func (h *Handler) today(r *http.Request, p reqctx.Principal) (int, any, error) {
 	now := h.now()
 	out := []Pending{}
-	money := h.guard.Can(p, "money:read")
+	// V-05 (ADR-0038): un solo panel, el mismo "Hoy tienes pendiente" para todo el equipo. Ninguna entrada lleva montos
+	// (sí placas, códigos y horas), así que quien no ve los números del taller (kpi:read) también puede recibirla;
+	// los borradores solo para quien atiende la bandeja.
+	drafts := h.guard.Can(p, "inbox:manage")
 	err := h.uow.Do(r.Context(), func(ctx context.Context) error {
 		ready, err := h.orders.InState(ctx, p.TallerID, "listo")
 		if err != nil {
@@ -357,20 +360,20 @@ func (h *Handler) today(r *http.Request, p reqctx.Principal) (int, any, error) {
 			out = append(out, Pending{Kind: "sin_recoger", Title: fmt.Sprintf("%s %s · %d días sin recoger", o.Vehicle, o.Plate, d),
 				Detail: fmt.Sprintf("%s · %s", o.Code, names[o.CustomerID]), OrderID: &id, Tone: "err"})
 		}
-		if money {
-			pend, err := h.quotes.Pending(ctx, p.TallerID)
+		pend, err := h.quotes.Pending(ctx, p.TallerID)
+		if err != nil {
+			return err
+		}
+		for _, q := range pend {
+			o, err := h.orders.Load(ctx, p.TallerID, q.OrderID)
 			if err != nil {
 				return err
 			}
-			for _, q := range pend {
-				o, err := h.orders.Load(ctx, p.TallerID, q.OrderID)
-				if err != nil {
-					return err
-				}
-				id := o.ID.String()
-				out = append(out, Pending{Kind: "aprobacion", Title: fmt.Sprintf("%s no ha aprobado", o.Plate),
-					Detail: fmt.Sprintf("%s · cotización enviada hace %d h", o.Code, int(now.Sub(q.SentAt).Hours())), OrderID: &id, Tone: "warn"})
-			}
+			id := o.ID.String()
+			out = append(out, Pending{Kind: "aprobacion", Title: fmt.Sprintf("%s no ha aprobado", o.Plate),
+				Detail: fmt.Sprintf("%s · cotización enviada hace %d h", o.Code, int(now.Sub(q.SentAt).Hours())), OrderID: &id, Tone: "warn"})
+		}
+		if drafts {
 			n, err := h.extra.PendingDrafts(ctx, p.TallerID)
 			if err != nil {
 				return err

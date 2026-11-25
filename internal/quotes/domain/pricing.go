@@ -9,12 +9,11 @@ import (
 // Rules son los parámetros del taller que aplican a la cotización. Al crear la cotización se copian el IVA y la
 // vigencia: si el taller los cambia después, lo que ya se cotizó no cambia (decisión de Pablo, 3-nov-2026).
 type Rules struct {
-	VATPct            int
-	PricesIncludeVAT  bool
-	HourlyRate        *int64
-	MaxDiscountPct    int
-	ReceptionDiscount bool
-	ValidityDays      int
+	VATPct           int
+	PricesIncludeVAT bool
+	HourlyRate       *int64
+	MaxDiscountPct   int
+	ValidityDays     int
 }
 
 // DefaultRules: sin IVA ni vigencia, como antes de los parámetros (pruebas de unidad y cotizaciones viejas).
@@ -22,7 +21,7 @@ var DefaultRules = Rules{PricesIncludeVAT: true, MaxDiscountPct: 100, ValidityDa
 
 var (
 	ErrDiscount        = shared.Validation("descuento_invalido", "El descuento va de 0 % hasta el máximo de tu taller.").WithField("descuentoPct")
-	ErrDiscountDenied  = shared.Forbidden("descuento_no_permitido", "En tu taller solo el dueño puede dar descuentos.")
+	ErrDiscountDenied  = shared.Forbidden("descuento_no_permitido", "Tu rol no puede dar descuentos.")
 	ErrNoRate          = shared.Validation("tarifa_sin_definir", "Define la tarifa por hora en Mi taller → Parámetros, o cotiza la mano de obra con valor.").WithField("horas")
 	ErrHours           = shared.Validation("horas_invalidas", "Las horas van de 0,25 a 200, en cuartos de hora.").WithField("horas")
 	ErrExpired         = shared.Rule("cotizacion_vencida", "La cotización venció. Renueva la vigencia para registrar la respuesta.")

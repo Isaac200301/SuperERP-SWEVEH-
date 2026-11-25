@@ -75,8 +75,17 @@ func TestHasPermission_DenyByDefault(t *testing.T) {
 	if !HasPermission([]string{"mecanico"}, PermOrderCreate) {
 		t.Fatal("el mecánico abre órdenes (HU-16)")
 	}
-	if HasPermission([]string{"mecanico"}, PermCustomerRead) {
-		t.Fatal("el mecánico no ve todos los clientes")
+	// V-05 (ADR-0038): un solo panel; el mecánico ve clientes y dinero, pero no los números ni la configuración.
+	if !HasPermission([]string{"mecanico"}, PermCustomerRead) || !HasPermission([]string{"mecanico"}, "money:read") {
+		t.Fatal("el mecánico ve clientes y dinero (V-05)")
+	}
+	for _, p := range []string{"kpi:read", "user:manage", "workshop:manage", "service:manage", "data_request:manage", "customer:merge", "import:run", "audit:read"} {
+		if HasPermission([]string{"mecanico"}, p) {
+			t.Fatalf("el mecánico no tiene %s", p)
+		}
+	}
+	if !HasPermission([]string{"recepcion"}, "kpi:read") || HasPermission([]string{"recepcion"}, "workshop:manage") {
+		t.Fatal("recepción ve los números pero no Mi taller (V-05)")
 	}
 	if HasPermission([]string{"inventado"}, PermOrderRead) || HasPermission(nil, PermOrderRead) {
 		t.Fatal("rol desconocido o vacío no tiene permisos")

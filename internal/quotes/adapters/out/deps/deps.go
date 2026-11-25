@@ -19,7 +19,7 @@ type Rules struct{ A *tenancy.Admin }
 func (r Rules) QuoteRules(ctx context.Context, tallerID shared.ID) (domain.Rules, error) {
 	p, err := r.A.ParametrosIn(ctx, tallerID)
 	return domain.Rules{VATPct: p.VATPct, PricesIncludeVAT: p.PricesIncludeVAT, HourlyRate: p.HourlyRate, MaxDiscountPct: p.MaxDiscountPct,
-		ReceptionDiscount: p.ReceptionDiscount, ValidityDays: p.ValidityDays}, err
+		ValidityDays: p.ValidityDays}, err
 }
 
 type Orders struct{ O orders.Orders }

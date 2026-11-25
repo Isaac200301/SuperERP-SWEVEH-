@@ -207,7 +207,9 @@ func TestReception_Permissions(t *testing.T) {
 	rec.must(http.StatusOK, rec.do("GET", "/api/v1/orders", nil))
 	rec.must(http.StatusOK, rec.do("GET", "/api/v1/inbox", nil))
 
-	for _, path := range []string{"/api/v1/dashboard", "/api/v1/automations/runs"} {
+	// V-05 (ADR-0038): recepción ve los números del taller.
+	rec.must(http.StatusOK, rec.do("GET", "/api/v1/dashboard", nil))
+	for _, path := range []string{"/api/v1/automations/runs", "/api/v1/users"} {
 		if r := rec.do("GET", path, nil); r.status != http.StatusForbidden {
 			t.Errorf("GET %s: %d; quiero 403", path, r.status)
 		}

@@ -5,6 +5,7 @@ package server_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -17,6 +18,8 @@ func (e *env) login(phone10 string) *client {
 	return c
 }
 
+// V-05 (ADR-0038, cambia RF-21 y HU-81): un solo panel. El mecánico ve sus órdenes, precios y dinero de la orden, da
+// descuentos y cancela con motivo; no ve los KPI ni la configuración (Equipo, Mi taller, lista de precios).
 func TestMechanic_SeesOwnOrdersWithoutMoneyOrSettings(t *testing.T) {
 	e := newEnv(t)
 	owner := e.register("3105550170", "Felipe Duque")
@@ -31,8 +34,14 @@ func TestMechanic_SeesOwnOrdersWithoutMoneyOrSettings(t *testing.T) {
 
 	mec := e.login("3005550171")
 	me := mec.must(http.StatusOK, mec.do("GET", "/api/v1/me", nil))
-	if perms, _ := me.body["permisos"].([]any); containsAny(perms, "money:read", "user:manage", "kpi:read") {
+	perms, _ := me.body["permisos"].([]any)
+	if containsAny(perms, "user:manage", "kpi:read", "workshop:manage", "service:manage", "data_request:manage", "customer:merge", "import:run", "audit:read") {
 		t.Fatalf("el mecánico tiene permisos de más: %v", perms)
+	}
+	for _, need := range []string{"money:read", "quote:edit", "quote:discount", "order:cancel", "customer:read_all", "order:create"} {
+		if !containsAny(perms, need) {
+			t.Fatalf("al mecánico le falta %s: %v", need, perms)
+		}
 	}
 
 	// HU-23 criterio 1: con órdenes asignadas ve solo las suyas.
@@ -47,25 +56,67 @@ func TestMechanic_SeesOwnOrdersWithoutMoneyOrSettings(t *testing.T) {
 		t.Fatalf("todas las abiertas (sin asignar %s): %v", otra, r.body)
 	}
 
-	// HU-81 criterio 1: precio de venta sí, costo no.
+	// Precio de venta sí, costo de compra no (part:cost sigue siendo del dueño).
 	r = mec.must(http.StatusOK, mec.do("GET", "/api/v1/parts", nil))
 	p := r.body["repuestos"].([]any)[0].(map[string]any)
 	if _, ok := p["costo"]; ok || p["precioVenta"] != float64(65000) {
 		t.Fatalf("repuesto visto por el mecánico: %v", p)
 	}
 
-	// HU-81 criterio 2: la configuración responde "sin permiso".
+	// La configuración y los números responden "sin permiso" (403 en el servidor).
+	svc := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/services", map[string]any{"nombre": "Alineación", "tipoVehiculo": "carro"})).str("id")
 	for _, c := range []struct{ method, path string }{
 		{"GET", "/api/v1/users"},
+		{"PUT", "/api/v1/workshop/settings"},
 		{"POST", "/api/v1/workshop/onboarding"},
 		{"PUT", "/api/v1/workshop/schedule"},
 		{"POST", "/api/v1/services"},
+		{"PATCH", "/api/v1/services/" + svc},
 		{"POST", "/api/v1/parts"},
-		{"POST", "/api/v1/orders/" + asignada + "/cancel"},
+		{"GET", "/api/v1/dashboard"},
 	} {
 		if r := mec.do(c.method, c.path, map[string]any{}); r.status != http.StatusForbidden {
 			t.Errorf("%s %s: esperaba 403, obtuve %d", c.method, c.path, r.status)
 		}
+	}
+	// Cancelar sí, con motivo obligatorio (V-05).
+	if r := mec.do("POST", "/api/v1/orders/"+asignada+"/cancel", map[string]any{"motivo": ""}); r.status < 400 || r.status == http.StatusForbidden {
+		t.Fatalf("cancelar sin motivo: %d %v", r.status, r.body)
+	}
+	mec.must(http.StatusOK, mec.do("POST", "/api/v1/orders/"+asignada+"/cancel", map[string]any{"motivo": "El cliente no volvió", "version": r2v(mec, asignada)}))
+}
+
+// V-05: un solo panel. El mecánico recibe el mismo "Hoy tienes pendiente" que el dueño (la cotización que espera al
+// cliente incluida) y ninguna entrada trae montos: el servidor no los manda a nadie en esta lista.
+func TestMechanic_PendingTodayWithoutAmounts(t *testing.T) {
+	e := newEnv(t)
+	owner := e.register("3105550175", "Felipe Duque")
+	owner.must(http.StatusCreated, owner.do("POST", "/api/v1/users", map[string]any{"celular": "3005550176", "nombre": "Andrés Mecánico", "rol": "mecanico"}))
+	svc := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/services", map[string]any{"nombre": "Revisión", "tipoVehiculo": "carro", "precio": 85000})).str("id")
+	r := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550177", "nombre": "Ana Ríos"}))
+	owner.must(http.StatusCreated, owner.do("POST", "/api/v1/vehicles", map[string]any{"placa": "PEN177", "clienteId": nested(r.body, "cliente", "id"),
+		"cilindraje": "1400", "turbo": false, "energia": "gasolina", "transmision": "manual"}))
+	id := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/orders", map[string]any{"placa": "PEN177", "sintoma": "Frena mal", "estadoInicial": "recibido"})).str("id")
+	owner.must(http.StatusOK, owner.do("POST", "/api/v1/orders/"+id+"/transition", map[string]any{"estado": "en_diagnostico", "version": r2v(owner, id)}))
+	q := "/api/v1/orders/" + id + "/quote"
+	owner.must(http.StatusOK, owner.do("POST", q+"/lines", map[string]any{"tipo": "servicio", "refId": svc, "cantidad": 1}))
+	owner.must(http.StatusOK, owner.do("POST", q+"/send", nil))
+
+	mec := e.login("3005550176")
+	list := func(c *client) string {
+		var b strings.Builder
+		for _, p := range c.must(http.StatusOK, c.do("GET", "/api/v1/today", nil)).body["pendientes"].([]any) {
+			m := p.(map[string]any)
+			b.WriteString(m["tipo"].(string) + "|" + m["titulo"].(string) + "|" + m["detalle"].(string) + "\n")
+		}
+		return b.String()
+	}
+	own, mine := list(owner), list(mec)
+	if !strings.Contains(mine, "aprobacion|PEN177 no ha aprobado") || own != mine {
+		t.Fatalf("el mecánico debía ver lo mismo que el dueño:\n%s\n---\n%s", own, mine)
+	}
+	if strings.Contains(mine, "$") || strings.Contains(mine, "85.000") || strings.Contains(mine, "85000") {
+		t.Fatalf("la lista no lleva montos: %s", mine)
 	}
 }
 

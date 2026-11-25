@@ -1262,6 +1262,8 @@ _Módulo del MVP: M9. Cada taller aislado; cada rol ve lo suyo._
 
 **Trazabilidad:** RF: RF-21 · Aceptación: CA-10
 
+**Historial:** 24-nov-2026, Pablo (V-05, ADR-0038): un solo panel. El criterio 1 cambia: el mecánico **sí** ve precios y dinero de la orden; sigue sin ver los KPI, los costos de compra de los repuestos ni la configuración. Por revisar con Isaac.
+
 ### HU-80 · Agregar a mi mecánico
 
 **Épica:** E11 · **Roles:** Dueño del taller · **Superficies:** Panel · **Prioridad:** Must · **Origen:** Propuesta

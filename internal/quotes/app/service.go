@@ -248,7 +248,6 @@ type LineChange struct {
 	Price       *int64
 	HoursCent   *int
 	DiscountPct *int
-	IsOwner     bool // el dueño siempre puede dar descuentos; recepción solo si el taller lo permite
 }
 
 // UpdateLine cambia cantidad, precio libre, horas o descuento de un ítem del borrador; recalcula "sin existencia".
@@ -482,9 +481,8 @@ func (s *Quotes) applyChange(ctx context.Context, q *domain.Quote, tallerID, lin
 		}
 	}
 	if ch.DiscountPct != nil {
-		if !ch.IsOwner && !r.ReceptionDiscount {
-			return l, domain.ErrDiscountDenied
-		}
+		// V-05: todos los que tienen quote:discount (los 3 roles) descuentan hasta el tope de Mi taller; el parámetro
+		// "recepción puede dar descuentos" deja de usarse (queda en la base).
 		return q.SetDiscount(lineID, *ch.DiscountPct, r.MaxDiscountPct)
 	}
 	return l, nil

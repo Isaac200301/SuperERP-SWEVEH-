@@ -30,24 +30,29 @@ var common = []string{
 	"quote:read", "quote:edit", "quote:send", // Q-10: por defecto el mecánico envía la cotización
 }
 
-// Front office: recepción y dueño (clientes completos, dinero, bandeja, conversaciones).
-var frontOffice = []string{
+// Un solo panel (V-05, ADR-0038, entrega del 27-nov): todo el equipo atiende clientes, ve precios y dinero de la orden,
+// da descuentos hasta el tope de Mi taller y cancela con motivo. Cambia RF-21 y HU-81 (antes el mecánico no veía dinero).
+var floor = []string{
 	"order:cancel", "order:assign", "customer:read_all", "vehicle:change_owner", "quote:register_response", "quote:discount",
 	"money:read", "inbox:manage", "conversation:read",
 }
 
-// Solo el dueño (configuración, costos, KPIs, usuarios, bitácora).
+// Los números del taller (KPI): dueño y recepción (V-05). Quien no los ve recibe "Hoy tienes pendiente" sin montos.
+var numbers = []string{"kpi:read"}
+
+// Solo el dueño: Equipo, Mi taller, la lista de servicios y precios, costos de repuestos, bitácora, automatizaciones,
+// importaciones y los datos personales de los clientes (copia, borrado, unir repetidos).
 var ownerOnly = []string{
 	"order:override_approval", "service:manage", "part:manage", "part:cost", "workshop:manage", "user:manage",
-	"kpi:read", "audit:read", "automation:manage", "import:run", "data_request:manage", "customer:merge",
+	"audit:read", "automation:manage", "import:run", "data_request:manage", "customer:merge",
 }
 
-// rolePermissions: el mecánico NO ve costos, totales de dinero ni KPIs (RF-21, HU-13, HU-81).
-// Difiere de docs/06 §6.6 en que el mecánico abre órdenes y registra clientes y vehículos (HU-09, HU-16; Q-30).
+// rolePermissions: los 3 roles son universales y cada taller decide quién tiene cuál (V-05).
+// El mecánico abre órdenes y registra clientes y vehículos (HU-09, HU-16; Q-30).
 var rolePermissions = map[Role][]string{
-	RoleOwner:     concat(common, frontOffice, ownerOnly),
-	RoleReception: concat(common, frontOffice),
-	RoleMechanic:  concat(common),
+	RoleOwner:     concat(common, floor, numbers, ownerOnly),
+	RoleReception: concat(common, floor, numbers),
+	RoleMechanic:  concat(common, floor),
 }
 
 func concat(lists ...[]string) []string {

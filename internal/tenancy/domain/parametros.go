@@ -27,7 +27,7 @@ type Parametros struct {
 	PricesIncludeVAT  bool // los precios de lista ya traen IVA
 	HourlyRate        *int64
 	MaxDiscountPct    int
-	ReceptionDiscount bool // recepción puede dar descuentos (el dueño siempre puede)
+	ReceptionDiscount bool // ya no se usa: desde V-05 todo el equipo descuenta hasta MaxDiscountPct (el dato queda guardado)
 	ValidityDays      int
 	Version           int
 }

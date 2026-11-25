@@ -1535,6 +1535,10 @@ export interface components {
             /** Format: int64 */
             tarifaHora: number | null;
             descuentoMaxPct: number;
+            /**
+             * @deprecated
+             * @description Ya no se usa (V-05, ADR-0038): todo el equipo descuenta hasta descuentoMaxPct. Se conserva el dato
+             */
             descuentoRecepcion: boolean;
             vigenciaDias: number;
             version: number;

@@ -114,7 +114,7 @@ function Form({ p }: { p: Parametros }) {
           <Field label="Tarifa por hora de mano de obra (COP)" inputMode="numeric" value={tarifa} onChange={(e) => setTarifa(e.target.value)} hint="Vacío = la mano de obra se cotiza con valor libre." />
           <Field label="Vigencia de la cotización (días)" inputMode="numeric" value={String(f.vigenciaDias)} onChange={n('vigenciaDias')} hint="De 1 a 90." />
           <Field label="Descuento máximo (%)" inputMode="numeric" value={String(f.descuentoMaxPct)} onChange={n('descuentoMaxPct')} />
-          <Check label="Recepción puede dar descuentos" hint="El dueño siempre puede." checked={f.descuentoRecepcion} onChange={set('descuentoRecepcion')} />
+          {/* V-05: todo el equipo descuenta hasta el tope; la casilla de recepción ya no aplica (el dato queda guardado). */}
         </div>
       </Group>
       <div>

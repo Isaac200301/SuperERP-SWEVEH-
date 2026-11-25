@@ -2253,7 +2253,7 @@ components:
         preciosConIva: { type: boolean, description: 'Los precios de lista ya incluyen IVA' }
         tarifaHora: { type: integer, format: int64, nullable: true, minimum: 0 }
         descuentoMaxPct: { type: integer, minimum: 0, maximum: 100 }
-        descuentoRecepcion: { type: boolean }
+        descuentoRecepcion: { type: boolean, deprecated: true, description: 'Ya no se usa (V-05, ADR-0038): todo el equipo descuenta hasta descuentoMaxPct. Se conserva el dato' }
         vigenciaDias: { type: integer, minimum: 1, maximum: 90 }
         version: { type: integer }
     SistemaVehiculo:

@@ -162,15 +162,13 @@ func TestSettings_RealQuoteWithVATHoursDiscountValidity(t *testing.T) {
 		t.Fatalf("desglose: %v", r.body)
 	}
 
-	// Recepción no da descuentos salvo que el taller lo permita; el mecánico nunca.
+	// V-05: recepción y mecánico descuentan hasta el mismo tope de Mi taller, sin otro permiso del taller.
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/users", map[string]any{"celular": "3005550362", "nombre": "Recepción", "rol": "recepcion"}))
-	rec := e.login("3005550362")
-	if r := rec.do("PATCH", q+"/lines/"+part, map[string]any{"descuentoPct": 5}); r.status != http.StatusForbidden {
-		t.Fatalf("recepción sin permiso del taller: %d %v", r.status, r.body)
-	}
-	s = c.must(http.StatusOK, c.do("GET", "/api/v1/workshop/settings", nil)).body
-	s["descuentoRecepcion"] = true
-	c.must(http.StatusOK, c.do("PUT", "/api/v1/workshop/settings", s))
+	c.must(http.StatusCreated, c.do("POST", "/api/v1/users", map[string]any{"celular": "3005550363", "nombre": "Mecánico", "rol": "mecanico"}))
+	rec, mec := e.login("3005550362"), e.login("3005550363")
+	is4xx(t, "recepción sobre el máximo", rec.do("PATCH", q+"/lines/"+part, map[string]any{"descuentoPct": 11}))
+	is4xx(t, "mecánico sobre el máximo", mec.do("PATCH", q+"/lines/"+part, map[string]any{"descuentoPct": 11}))
+	mec.must(http.StatusOK, mec.do("PATCH", q+"/lines/"+part, map[string]any{"descuentoPct": 7}))
 	rec.must(http.StatusOK, rec.do("PATCH", q+"/lines/"+part, map[string]any{"descuentoPct": 5}))
 
 	// Enviar fija la vigencia; renovar la vuelve a contar. El IVA quedó copiado aunque el taller lo cambie.
