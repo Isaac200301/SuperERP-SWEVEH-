@@ -14,34 +14,42 @@ import { Thread } from '../messaging/Thread';
 import { useSettings } from '../workshop/SettingsForm';
 import { useOrder } from './api';
 import { DiagnosisPanel } from './DiagnosisPanel';
+import { OrderAssistantCard } from '../assistant/OrderAssistantCard';
 import { OrderDetailMobile } from './OrderDetailMobile';
 import { OrderActions, QuotePanel, ReceptionPanel } from './OrderWork';
 import { SpendPanel } from './SpendPanel';
 
-/** Stepper de los 7 estados con la hora de cada paso (docs/10 §4.3). */
-export function StateStepper({ orden }: { orden: Orden }) {
+/**
+ * Los estados de la orden como fichas (Figma D2): lo hecho con ✓, el estado actual resaltado (limón con ▲ si es una espera,
+ * lima si no) y lo que falta con borde. La hora de cada paso va en el título y para lectores de pantalla (DR-01).
+ */
+export function StateStepper({ orden }: Readonly<{ orden: Orden }>) {
   const flujo = flujoFor(useSettings().data);
   // Esperando repuesto es un desvío de En reparación: el stepper la muestra en ese paso.
   const actual = flujo.indexOf(orden.estado === 'esperando_repuesto' ? 'en_reparacion' : orden.estado);
   const horas = new Map<EstadoOrden, string>();
   for (const h of orden.historial ?? []) horas.set(h.hacia, h.ocurridoEn);
+  const espera = orden.estado === 'esperando_aprobacion' || orden.estado === 'esperando_repuesto';
   return (
-    <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7" aria-label="Estados de la orden">
+    <ol className="flex flex-wrap gap-2" aria-label="Estados de la orden">
       {flujo.map((e, i) => {
         const hecho = actual >= 0 && i < actual;
         const aqui = i === actual;
         const hora = horas.get(e);
+        let tono = 'border border-line bg-white text-ink-2';
+        if (hecho) tono = 'bg-primary-tint text-primary';
+        else if (aqui) tono = espera ? 'bg-warn-tint text-warn-ink' : 'bg-nav text-ink';
         return (
           <li
             key={e}
             aria-current={aqui ? 'step' : undefined}
-            className={`flex flex-col gap-1 rounded-2xl p-3 text-sm ${aqui ? 'bg-nav font-extrabold' : hecho ? 'bg-primary-tint' : 'bg-surface text-ink-2'}`}
+            className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold ${tono}`}
           >
-            <span className="flex items-center gap-1.5">
-              {hecho ? <IconCheck size={14} /> : null}
-              {estados[e]}
-            </span>
-            <span className="font-mono text-xs">{hora ? formatoHora(hora) : '—'}</span>
+            {hecho ? <IconCheck size={14} strokeWidth={2.4} /> : null}
+            {aqui && espera ? <IconWarn size={14} strokeWidth={2.4} /> : null}
+            {estados[e]}
+            {/* HU-20: la hora de cada paso se ve, aunque Figma no la dibuje en la ficha. */}
+            {hora ? <span className="font-mono text-[11px] font-normal">{formatoHora(hora)}</span> : null}
           </li>
         );
       })}
@@ -124,54 +132,55 @@ export function OrderDetailPage() {
   }
   const o = q.data;
   if (mobile) return <OrderDetailMobile orden={o} />;
+  const vehiculo =
+    [o.vehiculo?.marca, o.vehiculo?.linea, o.vehiculo?.modeloAnio].filter(Boolean).join(' ') || (o.vehiculo?.tipo === 'moto' ? 'Moto' : 'Carro');
+  const avanzada = !['por_recibir', 'recibido', 'cancelada'].includes(o.estado);
+  const cotizacion = avanzada ? <QuotePanel orden={o} /> : null;
+  const diagnostico = !['por_recibir', 'cancelada'].includes(o.estado) ? <DiagnosisPanel orden={o} /> : null;
   return (
     <>
-      <header className="flex flex-col gap-1">
-        <Link to="/panel/ordenes" className="inline-flex min-h-[44px] items-center gap-1 self-start font-bold text-primary">
-          <IconBack size={18} />
-          Órdenes
+      <header className="flex flex-wrap items-center gap-3">
+        <Link to="/panel/ordenes" aria-label="Volver a órdenes" className="inline-flex h-11 w-11 items-center text-ink hover:text-primary">
+          <IconBack size={22} />
         </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-mono text-[28px] font-bold">{o.codigo}</h1>
-          <Plate value={o.placa} size="lg" />
-          <StatePill estado={o.estado} />
-        </div>
-        <p className="text-ink-2">Abierta el {formatoFechaHora(o.creadoEn)}</p>
-        <ReceiptAnswer orden={o} />
+        <h1 className="font-mono text-[17px] font-bold text-ink-2">{o.codigo}</h1>
+        <Plate value={o.placa} />
+        <p className="min-w-0 flex-1 truncate text-[24px] leading-tight font-extrabold tracking-[-.01em]">
+          {vehiculo}
+          {o.cliente ? ` · ${o.cliente.nombre}` : ''}
+        </p>
+        <StatePill estado={o.estado} />
       </header>
+      <ReceiptAnswer orden={o} />
       {/* Vista previa del aviso de WhatsApp (HU-05): sale con V-01. */}
       {whatsapp && params.get('primera') === '1' ? <ReceivedPreview orden={o} /> : null}
-      <section className="rounded-card bg-white p-5">
-        <StateStepper orden={o} />
-      </section>
-      <div className="grid gap-5 lg:grid-cols-2">
-        <section className="flex flex-col gap-2 rounded-card bg-white p-5">
-          <h2 className="text-[17px] font-extrabold">Lo que dice el cliente</h2>
-          <p className="whitespace-pre-wrap">{o.sintoma}</p>
-        </section>
-        <section className="flex flex-col gap-2 rounded-card bg-white p-5">
-          <h2 className="text-[17px] font-extrabold">Vehículo y cliente</h2>
-          <p>
-            {[o.vehiculo?.marca, o.vehiculo?.linea, o.vehiculo?.modeloAnio].filter(Boolean).join(' ') ||
-              (o.vehiculo?.tipo === 'moto' ? 'Moto' : 'Carro')}
-          </p>
-          {o.cliente ? <p className="text-ink-2">{o.cliente.nombre}</p> : null}
-          {o.vehiculo?.motorPendiente ? (
-            <p className="flex items-center gap-2 rounded-xl bg-warn-tint p-3 text-sm font-bold text-warn-ink">
-              <IconWarn size={16} />
-              Ficha pendiente: falta combustible, caja o datos del motor
-            </p>
-          ) : null}
-        </section>
+      <StateStepper orden={o} />
+      {/* Figma D2: la cotización a la izquierda; a la derecha, lo gastado y el asistente de la orden. */}
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <section className="flex flex-col gap-2 rounded-card bg-white p-5">
+            <h2 className="text-[17px] font-extrabold">Lo que dice el cliente</h2>
+            <p className="whitespace-pre-wrap">{o.sintoma}</p>
+            <p className="text-[13px] text-ink-2">Abierta el {formatoFechaHora(o.creadoEn)}</p>
+            {o.vehiculo?.motorPendiente ? (
+              <p className="flex items-center gap-2 rounded-xl bg-warn-tint p-3 text-sm font-bold text-warn-ink">
+                <IconWarn size={16} />
+                Ficha pendiente: falta combustible, caja o datos del motor
+              </p>
+            ) : null}
+          </section>
+          {cotizacion}
+          <OrderActions orden={o} />
+          {diagnostico}
+          <ReceptionPanel orden={o} />
+        </div>
+        <aside className="flex min-w-0 flex-col gap-5">
+          {/* V-08: lo gastado contra lo cotizado, interno del taller. */}
+          {avanzada ? <SpendPanel orden={o} /> : null}
+          <OrderAssistantCard />
+          {whatsapp ? <OrderMessages orden={o} /> : null}
+        </aside>
       </div>
-      <OrderActions orden={o} />
-      <ReceptionPanel orden={o} />
-      {!['por_recibir', 'cancelada'].includes(o.estado) ? <DiagnosisPanel orden={o} /> : null}
-      {/* Se cotiza desde el diagnóstico; en reparación sale la adicional (HU-31). */}
-      {!['por_recibir', 'recibido', 'cancelada'].includes(o.estado) ? <QuotePanel orden={o} /> : null}
-      {/* V-08: lo gastado contra lo cotizado, interno del taller. */}
-      {!['por_recibir', 'recibido', 'cancelada'].includes(o.estado) ? <SpendPanel orden={o} /> : null}
-      {whatsapp ? <OrderMessages orden={o} /> : null}
     </>
   );
 }

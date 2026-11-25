@@ -74,6 +74,38 @@ describe('Pendiente hoy (HU-76)', () => {
   });
 });
 
+describe('Hoy en escritorio (Figma D1)', () => {
+  it('saluda, saca la placa del pendiente para mostrarla como placa y dice la urgencia con palabra', async () => {
+    mockApi({
+      'GET /me': { ...owner, permisos: [...owner.permisos, 'kpi:read'] },
+      'GET /dashboard': tablero('', false),
+      'GET /today': {
+        pendientes: [{ tipo: 'sin_recoger', titulo: 'Mazda 2 JNX907 · 4 días sin recoger', detalle: 'OS-0040 · Marta Ospina', ordenId: 'o40', tono: 'err' }],
+      },
+      'GET /workshop': { atiende: 'carro', nombre: 'Taller' },
+      'GET /workshop/settings': {},
+    });
+    renderPage(<DashboardPage />);
+    expect(await screen.findByText('JNX907')).toBeInTheDocument();
+    expect(screen.getByText('Mazda 2 · 4 días sin recoger')).toBeInTheDocument();
+    expect(screen.getByText('Urgente')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^(Buenos días|Buenas tardes|Buenas noches)/);
+    expect(screen.getByRole('link', { name: 'Abrir asistente' })).toHaveAttribute('href', '/panel/asistente');
+  });
+
+  it('sin pendientes lo dice en vez de esconder la tarjeta', async () => {
+    mockApi({
+      'GET /me': { ...owner, permisos: [...owner.permisos, 'kpi:read'] },
+      'GET /dashboard': tablero('', false),
+      'GET /today': { pendientes: [] },
+      'GET /workshop': { atiende: 'carro', nombre: 'Taller' },
+      'GET /workshop/settings': {},
+    });
+    renderPage(<DashboardPage />);
+    expect(await screen.findByText('No tienes nada pendiente por ahora.')).toBeInTheDocument();
+  });
+});
+
 describe('AutomationsPage (HU-42)', () => {
   it('avisa que en producción el texto de un aviso fuera de la ventana necesita aprobación de Meta', async () => {
     const tarjeta = (codigo: string, fueraDeVentana: boolean) => ({

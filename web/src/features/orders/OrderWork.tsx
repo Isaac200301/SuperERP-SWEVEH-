@@ -4,12 +4,14 @@ import { Link } from 'react-router';
 import { ApiError, type EstadoOrden, type Orden, type Schemas } from '../../shared/api/client';
 import { estados, flujoFor } from '../../shared/i18n/es-CO';
 import { formatoCOP, formatoFechaHora, formatoHora, pesos } from '../../shared/lib/format';
+import { sharePdf } from '../../shared/lib/sharePdf';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { BottomSheet } from '../../shared/ui/BottomSheet';
 import { Field } from '../../shared/ui/Field';
 import { IconMore } from '../../shared/ui/icons';
 import {
+  fetchQuotePdf,
   photoUrl,
   useAddEvidence,
   useCatalog,
@@ -621,8 +623,20 @@ export function QuotePanel({ orden }: { orden: Orden }) {
   const params = useSettings().data;
   const externo = params?.inventarioExterno === true; // V-06: repuestos a mano, sin bodega
   const [buscar, setBuscar] = useState('');
+  const [pdf, setPdf] = useState<{ busy: boolean; error: string }>({ busy: false, error: '' });
   const cat = useCatalog(buscar);
   const aprobada = q.data?.estado === 'aprobada';
+  // V-10 (ADR-0043): el PDF de la cotización por el menú de compartir del sistema, o descargado.
+  const compartirPdf = async () => {
+    setPdf({ busy: true, error: '' });
+    try {
+      const { blob, nombre } = await fetchQuotePdf(orden.id);
+      await sharePdf(blob, nombre, `Cotización ${orden.codigo}`);
+      setPdf({ busy: false, error: '' });
+    } catch (e) {
+      setPdf({ busy: false, error: e instanceof Error ? e.message : 'No se pudo preparar el PDF.' });
+    }
+  };
   const movidos = useOrderParts(orden.id, aprobada);
   // "Cotizar esto" desde un hallazgo del diagnóstico: busca en el catálogo con su texto (DiagnosisPanel).
   useEffect(() => {
@@ -649,11 +663,22 @@ export function QuotePanel({ orden }: { orden: Orden }) {
         </h2>
         {/* V-10 (ADR-0043): la cotización en pantalla completa para mostrársela al cliente o compartirla en PDF. */}
         {cot.lineas.length > 0 ? (
-          <Link to={`/panel/ordenes/${orden.id}/cliente`} className="inline-flex min-h-[44px] items-center rounded-btn border-[1.5px] border-primary px-4 text-sm font-extrabold text-primary hover:bg-primary-tint">
-            Mostrar al cliente
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={pdf.busy}
+              className="inline-flex min-h-[44px] items-center rounded-btn border-[1.5px] border-line bg-white px-4 text-sm font-extrabold hover:border-primary disabled:opacity-60"
+              onClick={() => void compartirPdf()}
+            >
+              {pdf.busy ? 'Un momento…' : 'Compartir PDF'}
+            </button>
+            <Link to={`/panel/ordenes/${orden.id}/cliente`} className="inline-flex min-h-[44px] items-center rounded-btn border-[1.5px] border-primary px-4 text-sm font-extrabold text-primary hover:bg-primary-tint">
+              Mostrar al cliente
+            </Link>
+          </div>
         ) : null}
       </div>
+      {pdf.error ? <Alert>{pdf.error}</Alert> : null}
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="text-ink-2">

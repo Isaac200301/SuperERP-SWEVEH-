@@ -9,18 +9,17 @@ const fondos = ['bg-kpi-peach', 'bg-kpi-lilac', 'bg-kpi-aqua'];
 
 /**
  * Los números del taller en tarjetas pastel; cada uno abre "¿Qué significa?" en una hoja inferior (HU-75, DR-11).
- * scroll: en fila desplazable (Hoy); grid: en dos columnas (Taller).
+ * En fila desplazable, en el celular (Hoy, "Tus números").
  */
-export function KpiCards({ kpis, layout }: { kpis: Kpi[]; layout: 'scroll' | 'grid' }) {
+export function KpiCards({ kpis }: Readonly<{ kpis: Kpi[] }>) {
   const [kpi, setKpi] = useState<Kpi | null>(null);
-  const wrap = layout === 'scroll' ? '-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]' : 'grid grid-cols-2 gap-2.5';
   return (
     <>
-      <div className={wrap}>
+      <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
         {kpis.map((k, i) => (
           <div
             key={k.codigo}
-            className={`flex flex-col gap-1 rounded-[20px] p-3.5 ${layout === 'scroll' ? 'w-[150px] flex-none' : ''} ${fondos[i % fondos.length]}`}
+            className={`flex w-[150px] flex-none flex-col gap-1 rounded-[20px] p-3.5 ${fondos[i % fondos.length]}`}
           >
             <span className={`font-mono font-bold break-words ${k.texto.length > 9 ? 'text-[17px]' : 'text-[22px]'}`}>{k.texto}</span>
             <span className="text-[13px] font-bold text-[#33443F]">

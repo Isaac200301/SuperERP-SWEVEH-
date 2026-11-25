@@ -109,6 +109,25 @@ describe('OrderDetailPage', () => {
     renderPage(ui, '/panel/ordenes/o1');
     expect(await screen.findByText('No encontramos esa orden.')).toBeInTheDocument();
   });
+
+  it('el encabezado lleva el volver, el código, la placa y el estado; las fichas marcan el estado actual y el asistente tiene su lugar (Figma D2)', async () => {
+    mockApi({
+      'GET /me': owner,
+      'GET /orders/{id}': orden({ estado: 'por_recibir' }),
+      'GET /orders/{id}/checklist': { tipo: 'carro', kilometraje: null, combustible: null, accesorios: [], salvedades: [], ladosConFoto: [], ladosPedidos: [], falta: [], completadoEn: null },
+      'GET /orders/{id}/evidence': { evidencias: [] },
+    });
+    renderPage(
+      <Routes>
+        <Route path="/panel/ordenes/:id" element={<OrderDetailPage />} />
+      </Routes>,
+      '/panel/ordenes/o1',
+    );
+    expect(await screen.findByRole('link', { name: 'Volver a órdenes' })).toHaveAttribute('href', '/panel/ordenes');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^OS-/);
+    expect(screen.getByRole('listitem', { current: 'step' })).toHaveTextContent('Por recibir');
+    expect(screen.getByRole('heading', { name: 'Asistente de esta orden' })).toBeInTheDocument();
+  });
 });
 
 describe('PanelLayout (HU-81)', () => {
@@ -136,7 +155,7 @@ describe('PanelLayout (HU-81)', () => {
     for (const name of ['Clientes', 'Órdenes', 'Piso', 'Por revisar', 'Conversaciones']) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument();
     }
-    for (const name of ['Tablero', 'Automatizaciones', 'Servicios', 'Repuestos', 'Equipo', 'Mi taller']) {
+    for (const name of ['Hoy', 'Automatizaciones', 'Servicios', 'Repuestos', 'Equipo', 'Mi taller']) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
     }
   });

@@ -52,3 +52,42 @@ export function formatoCelular(raw: string): string {
 export function pesos(s: string): number | undefined {
   return s.trim() === '' ? undefined : Number(s.replace(/\D/g, ''));
 }
+
+const DIAS = [
+  ['lun', 'lun'],
+  ['mar', 'mar'],
+  ['mie', 'mié'],
+  ['jue', 'jue'],
+  ['vie', 'vie'],
+  ['sab', 'sáb'],
+  ['dom', 'dom'],
+] as const;
+
+/** "08:30" → "8:30 a. m." (docs/08 §4). */
+function hora12(hhmm: string): string {
+  const [h = 0, m = 0] = hhmm.split(':').map(Number);
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'a. m.' : 'p. m.'}`;
+}
+
+/**
+ * El horario semanal en una línea: los días seguidos con las mismas horas se juntan ("Lun a vie 7:30 a. m. – 6:00 p. m. ·
+ * sáb 8:00 a. m. – 1:00 p. m."). Un día sin horas está cerrado y no sale.
+ */
+export function resumenHorario(h: Readonly<Record<string, { abre: string; cierra: string } | null | undefined>>): string {
+  const grupos: { ini: number; fin: number; abre: string; cierra: string }[] = [];
+  DIAS.forEach(([clave], i) => {
+    const s = h[clave];
+    if (!s) return;
+    const ult = grupos.at(-1);
+    if (ult && ult.fin === i - 1 && ult.abre === s.abre && ult.cierra === s.cierra) ult.fin = i;
+    else grupos.push({ ini: i, fin: i, abre: s.abre, cierra: s.cierra });
+  });
+  if (grupos.length === 0) return 'Sin horario cargado';
+  const nombre = (i: number) => DIAS[i]?.[1] ?? '';
+  const rango = (g: { ini: number; fin: number }) => {
+    if (g.ini === g.fin) return nombre(g.ini);
+    return g.fin === g.ini + 1 ? `${nombre(g.ini)} y ${nombre(g.fin)}` : `${nombre(g.ini)} a ${nombre(g.fin)}`;
+  };
+  const linea = grupos.map((g) => `${rango(g)} ${hora12(g.abre)} – ${hora12(g.cierra)}`).join(' · ');
+  return linea.charAt(0).toUpperCase() + linea.slice(1);
+}

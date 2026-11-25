@@ -140,7 +140,7 @@ export function SpendPanel({ orden }: { orden: Orden }) {
           </div>
         </form>
       ) : (
-        <Button variant="secondary" onClick={() => setAbierto(true)}>
+        <Button variant="ghost" className="justify-start! px-0! text-left text-[15px]" onClick={() => setAbierto(true)}>
           + Anotar un gasto (frase o foto de la factura)
         </Button>
       )}

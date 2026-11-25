@@ -176,6 +176,17 @@ Mockups en `docs/mockups/movil/` (390 × 844). Canvas: https://claude.ai/artifac
 
   En cada pantalla verifica que no se desborde de lado (CA-11).
 
+### 4.8 Escritorio y celular de la entrega del 27-nov (R10, V-18)
+Figma "SWEVEH · Mockups entrega viernes": https://www.figma.com/design/eMDENV9jgEp6hXjKJmiHkH (página **Escritorio**: D1, D2, D3; página **Celular**: 12 pantallas). Primero el celular; el escritorio tiene diseño propio solo en tres pantallas.
+- **Menú lateral** (`PanelLayout`): blanco, 240 px, sin íconos; el ítem activo va en lima. Orden: Hoy, Órdenes, Asistente, Clientes, Servicios, Repuestos (si se usa el inventario), Equipo y Mi taller. **Piso** solo lo ve quien no ve Hoy (el mecánico). El usuario y "Cerrar sesión" van abajo.
+- **D1 · Hoy** (`DashboardPage`, `DesktopHeader`): saludo con el nombre y la fecha larga; buscador (HU-14) y "Abrir asistente"; los números en una fila de tarjetas pastel (aqua, durazno, lila), cada uno con "¿Qué significa?" (HU-75); "Hoy tienes pendiente" con la placa en estilo placa (se saca del título del pendiente), la urgencia con ícono y palabra, y su botón; "Órdenes por estado" en barras (limón para las esperas).
+- **D2 · La orden** (`OrderDetailPage`): encabezado con la flecha de volver, el código, la placa, "vehículo · cliente" y el estado; los estados como fichas (✓ lo hecho, ▲ limón si espera, lima si no); a la izquierda lo que dice el cliente, la cotización (con "Compartir PDF" y "Mostrar al cliente"), mover la orden, diagnóstico y recepción; a la derecha, lo gastado en la obra y "Asistente de esta orden". Después de Recibido la cotización pasa arriba y la recepción abajo. El asistente es un aviso "Pronto" hasta R8.
+- **D3 · Servicios y Mi taller** (`ServicesPage`, `MiTallerResumen`): la lista de servicios como tabla (SERVICIO, PARA, PRECIO) con "Sin precio · ponlo", que abre el campo para ponerlo ahí mismo; "+ Agregar servicio" abre el formulario. Al lado, el resumen de Mi taller: el interruptor del inventario en otro programa, el horario en una línea, el checklist y "Avanzado". Se edita todo en Mi taller. La lista por foto (HU-93) solo sale con WhatsApp.
+- **Las demás pantallas** van en una columna centrada de 820 px con los componentes de escritorio y el mismo menú (provisional, `docs/07`).
+- **Celular:** **Taller** (Figma 12) es la lista de secciones con su subtítulo y la tarjeta Mi taller (mismo `MiTallerResumen`); **Órdenes** (05) lleva "Sigue: …" en cada tarjeta; **Hoy** (04) va sin "Accesos rápidos" y con "Tus números · Este mes". Números e Inventario ya no están en Taller.
+- **Pantallas de Figma que todavía no existen** (llegan con su rebanada): 06 y 07 (asistente, R8) y 08 (grabar recepción, R9). 01 a 03, 09 a 11 y 12 vienen de R2, R5 a R7 y R4.
+- **Prueba:** `web/e2e/pantallas.spec.ts` (escritorio, a 1440 y a 1024 de ancho) y `web/e2e/movil.spec.ts` (Pixel 7) verifican que ninguna pantalla se desborde de lado (CA-11).
+
 ---
 
 ## 5. Inventario de mockups

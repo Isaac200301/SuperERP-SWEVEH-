@@ -22,9 +22,11 @@ export type Section = { to: string; label: string; icon: ComponentType<{ size?: 
  * Las usan el menú de escritorio (PanelLayout) y la pantalla "Más" del celular (MorePage).
  */
 export const sections: Section[] = [
-  { to: '/panel/tablero', label: 'Tablero', icon: IconCheck, perm: 'kpi:read' },
+  { to: '/panel/tablero', label: 'Hoy', icon: IconCheck, perm: 'kpi:read' },
   { to: '/panel/piso', label: 'Piso', icon: IconClock, perm: 'order:read' },
   { to: '/panel/ordenes', label: 'Órdenes', icon: IconOrders, perm: 'order:read' },
+  // V-11: el asistente del piso (R8); en el menú de escritorio va después de Órdenes, como en Figma (D1).
+  { to: '/panel/asistente', label: 'Asistente', icon: IconChat, perm: 'order:read' },
   // HU-82: dueño y recepción ven los clientes con sus vehículos.
   { to: '/panel/clientes', label: 'Clientes', icon: IconTeam, perm: 'customer:read_all' },
   { to: '/panel/por-revisar', label: 'Por revisar', icon: IconWarn, perm: 'inbox:manage', funcion: 'whatsapp' },

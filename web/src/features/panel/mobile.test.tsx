@@ -188,8 +188,8 @@ describe('Más (celular)', () => {
     mockMobile();
     mockApi({ 'GET /me': recepcion });
     renderPage(<MorePage />);
-    expect(await screen.findByRole('link', { name: 'Clientes' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Conversaciones' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /^Clientes/ })).toHaveTextContent('Fichas, vehículos e historial');
+    expect(screen.getByRole('link', { name: /^Conversaciones/ })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Órdenes' })).not.toBeInTheDocument());
     expect(screen.queryByRole('link', { name: 'Mi taller' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
@@ -225,24 +225,43 @@ describe('Por revisar en el celular (HU-62, HU-64)', () => {
   });
 });
 
-describe('Taller del dueño en el celular', () => {
-  it('muestra los números con "¿Qué significa?" y las barras llevan a las órdenes filtradas', async () => {
+describe('Taller del dueño en el celular (Figma 12)', () => {
+  const item = (clave: string) => ({ clave, nombre: clave });
+  const parametros = {
+    usarControlCalidad: false, usarEsperandoRepuesto: false, inventarioExterno: false, ivaPct: 19, preciosConIva: true, tarifaHora: 45000,
+    vigenciaDias: 15, descuentoMaxPct: 10, fotosMinimas: 4, kmObligatorio: true, itemsCarro: [item('luces'), item('gato')], itemsMoto: [item('casco')],
+  };
+
+  it('lista Clientes, Servicios y Equipo con su subtítulo y resume Mi taller con el interruptor del inventario', async () => {
     mockMobile();
-    mockApi({
+    const calls = mockApi({
       'GET /me': dueno,
-      'GET /workshop': { tamano: 'pequeno' },
-      'GET /workshop/settings': { usarControlCalidad: false, usarEsperandoRepuesto: false },
-      'GET /dashboard': {
-        ejemplo: false,
-        kpis: [{ codigo: 'abiertas', titulo: 'Órdenes abiertas', valor: 7, texto: '7', detalle: '', queSignifica: 'Son los vehículos que no se han entregado.', ejemplo: false }],
-        porEstado: { esperando_aprobacion: 1, en_reparacion: 2 },
+      'GET /workshop': {
+        tamano: 'pequeno', nombre: 'Servitaller El Pistón', ciudad: 'Medellín', atiende: 'ambos',
+        horario: { lun: { abre: '07:30', cierra: '18:00' }, mar: { abre: '07:30', cierra: '18:00' }, sab: { abre: '08:00', cierra: '13:00' } },
       },
+      'GET /workshop/settings': parametros,
+      'PUT /workshop/settings': { ...parametros, inventarioExterno: true },
     });
     renderPage(<MorePage />);
-    await userEvent.click(await screen.findByRole('button', { name: '¿Qué significa?' }));
-    expect(screen.getByRole('dialog', { name: 'Órdenes abiertas' })).toHaveTextContent('Son los vehículos que no se han entregado.');
-    await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
-    expect(screen.getByRole('link', { name: 'En reparación: 2' })).toHaveAttribute('href', '/panel/ordenes?estado=en_reparacion');
+    expect(await screen.findByRole('link', { name: /^Servicios/ })).toHaveTextContent('Tu lista de precios');
+    expect(screen.getByRole('link', { name: /^Equipo/ })).toHaveTextContent('Personas, roles y PIN');
+    // Mi taller es la tarjeta de abajo, no una fila de la lista.
+    expect(screen.queryByRole('link', { name: /^Mi taller/ })).not.toBeInTheDocument();
+    expect(await screen.findByText('Servitaller El Pistón · Medellín · carros y motos')).toBeInTheDocument();
+    expect(screen.getByText('Lun y mar 7:30 a. m. – 6:00 p. m. · sáb 8:00 a. m. – 1:00 p. m.')).toBeInTheDocument();
+    expect(screen.getByText('2 ítems de carro · 1 de moto')).toBeInTheDocument();
+    const sw = screen.getByRole('switch', { name: /Llevo el inventario en otro programa/ });
+    expect(sw).not.toBeChecked();
+    await userEvent.click(sw);
+    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toMatchObject({ inventarioExterno: true, ivaPct: 19 }));
+  });
+
+  it('un servicio de la lista lleva a su pantalla', async () => {
+    mockMobile();
+    mockApi({ 'GET /me': dueno, 'GET /workshop': { tamano: 'pequeno', nombre: 'T', horario: {} }, 'GET /workshop/settings': parametros });
+    renderPage(<MorePage />);
+    expect(await screen.findByRole('link', { name: /^Servicios/ })).toHaveAttribute('href', '/panel/servicios');
   });
 });
 

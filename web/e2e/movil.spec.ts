@@ -23,6 +23,7 @@ test('el dueño maneja el taller desde el celular', async ({ page }) => {
   // Hoy, con la barra inferior del dueño.
   await barra.getByRole('link', { name: 'Hoy' }).click();
   await expect(page.getByRole('heading', { name: /Buen día|Buenas tardes|Buenas noches/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tus números' })).toBeVisible(); // Figma 04
   for (const tab of ['Hoy', 'Órdenes', 'Asistente', 'Taller']) await expect(barra.getByRole('link', { name: tab })).toBeVisible();
   await sinDesborde(page);
   await shot(page, 'movil-01-hoy');
@@ -66,6 +67,7 @@ test('el dueño maneja el taller desde el celular', async ({ page }) => {
   await page.getByRole('link', { name: 'Volver a órdenes' }).click();
   await expect(page.getByRole('heading', { name: 'Órdenes' })).toBeVisible();
   await expect(page.getByText(placa).first()).toBeVisible();
+  await expect(page.getByText('Sigue: Recibir el vehículo')).toBeVisible(); // Figma 05
   await expect(page.getByRole('table')).toHaveCount(0);
   await sinDesborde(page);
   await shot(page, 'movil-04-ordenes');
@@ -80,17 +82,22 @@ test('el dueño maneja el taller desde el celular', async ({ page }) => {
   // Por revisar es de WhatsApp (V-01): sin la bandera no está en la barra.
   await expect(barra.getByRole('link', { name: 'Revisar' })).toHaveCount(0);
 
-  // Taller: números e inventario del dueño, y las demás secciones.
+  // Taller (Figma 12): las secciones con su subtítulo y el resumen de Mi taller con el interruptor del inventario.
   await barra.getByRole('link', { name: 'Taller' }).click();
-  await expect(page.getByRole('tab', { name: 'Números' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('link', { name: /^Por recibir: 1$/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Mi taller' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /^Servicios/ })).toContainText('Tu lista de precios');
+  await expect(page.getByRole('heading', { name: 'Mi taller' })).toBeVisible();
+  await expect(page.getByRole('switch', { name: /Llevo el inventario en otro programa/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Avanzado' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible();
   await sinDesborde(page);
   await shot(page, 'movil-07-taller');
-  await page.getByRole('tab', { name: 'Inventario' }).click();
-  await expect(page.getByRole('link', { name: 'Registrar entrada de mercancía' })).toBeVisible();
+
+  // Servicios en el celular: la tabla se vuelve lista y no se desborda (CA-11).
+  await page.getByRole('link', { name: /^Servicios/ }).click();
+  await expect(page.getByRole('heading', { name: 'Servicios', exact: true }).first()).toBeVisible();
   await sinDesborde(page);
+  await shot(page, 'movil-06-servicios');
+  await barra.getByRole('link', { name: 'Taller' }).click();
 
   // Clientes: la ficha en una hoja inferior.
   await page.getByRole('link', { name: 'Clientes' }).click();

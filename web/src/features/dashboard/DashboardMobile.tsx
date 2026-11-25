@@ -1,25 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState, type ComponentType } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router';
 
 import { api, unwrap, type Schemas } from '../../shared/api/client';
 import { Alert } from '../../shared/ui/Alert';
 import { Chips } from '../../shared/ui/Chips';
-import {
-  IconBolt,
-  IconBox,
-  IconCar,
-  IconChart,
-  IconChevron,
-  IconInbox,
-  IconOrders,
-  IconStop,
-  IconWarn,
-} from '../../shared/ui/icons';
+import { IconChevron, IconInbox, IconStop, IconWarn } from '../../shared/ui/icons';
 import { Logo } from '../../shared/ui/Logo';
-import { can, feature, useSession } from '../auth/api';
-import { useInventarioExterno } from '../workshop/SettingsForm';
-import { usePendingCards } from '../inbox/usePendingCards';
+import { useSession } from '../auth/api';
 import { useRecentOrders } from '../orders/api';
 import { OrderCard } from '../orders/OrdersMobile';
 import { SearchBox } from '../panel/SearchBox';
@@ -41,7 +29,6 @@ const tonos = {
   warn: { tile: 'bg-warn-tint text-warn-ink', tag: 'Atención', icon: IconWarn },
   info: { tile: 'bg-primary-tint text-primary', tag: 'Para ti', icon: IconInbox },
 } as const;
-const sinSonido = () => undefined;
 
 /** "Buen día" / "Buenas tardes" / "Buenas noches" y la fecha, con la hora de Colombia (R-16). */
 function saludo(now = new Date()): { hola: string; fecha: string } {
@@ -54,31 +41,13 @@ function saludo(now = new Date()): { hola: string; fecha: string } {
   return { hola, fecha };
 }
 
-function QuickLink({ to, label, icon: Icon, tone, badge }: { to: string; label: string; icon: ComponentType<{ size?: number }>; tone: string; badge?: number | undefined }) {
-  return (
-    <Link to={to} className="flex w-[72px] flex-none flex-col items-center gap-1.5 text-center text-xs font-bold text-ink">
-      <span className={`relative grid h-14 w-14 place-items-center rounded-[18px] ${tone}`}>
-        <Icon size={24} />
-        {badge ? (
-          <span className="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full border-2 border-white bg-primary px-1 text-[11px] font-extrabold text-white">
-            {badge}
-          </span>
-        ) : null}
-      </span>
-      {label}
-    </Link>
-  );
-}
-
 /** Hoy en el celular (mockup Main): pendientes del día, números con "¿Qué significa?" y órdenes en curso. */
 export function DashboardMobile() {
   const session = useSession().data;
-  const sinInventario = useInventarioExterno(); // V-06
   const [seg, setSeg] = useState<'todo' | 'clientes' | 'taller'>('todo');
   const kpis = useQuery({ queryKey: ['tablero', ''], queryFn: async () => unwrap(await api.GET('/dashboard', { params: { query: {} } })), refetchInterval: 60_000 });
   const hoy = useQuery({ queryKey: ['hoy'], queryFn: async () => unwrap(await api.GET('/today')).pendientes, refetchInterval: 60_000 });
   const ordenes = useRecentOrders();
-  const pending = usePendingCards(false, sinSonido); // el sonido y el título ya los maneja la barra
   const abiertas = (ordenes.data?.ordenes ?? []).filter((o) => o.estado !== 'entregado' && o.estado !== 'cancelada');
   const todos = hoy.data ?? [];
   const deTaller = (p: Pendiente) => p.tipo === 'inventario';
@@ -103,24 +72,6 @@ export function DashboardMobile() {
         </div>
         <SearchBox />
       </header>
-
-      <section aria-labelledby="h-qa" className="flex flex-col gap-1.5">
-        <h2 id="h-qa" className="text-[17px] font-extrabold">
-          Accesos rápidos
-        </h2>
-        <nav aria-label="Accesos rápidos" className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-          <QuickLink to="/panel/ordenes" label="Órdenes" icon={IconOrders} tone="bg-primary-tint text-primary" badge={abiertas.length || undefined} />
-          {feature(session, 'whatsapp') && can(session, 'inbox:manage') ? (
-            <QuickLink to="/panel/por-revisar" label="Por revisar" icon={IconInbox} tone="bg-kpi-lilac text-[#3E2E8C]" badge={pending || undefined} />
-          ) : null}
-          {can(session, 'customer:read_all') ? <QuickLink to="/panel/clientes" label="Clientes" icon={IconCar} tone="bg-kpi-peach text-[#8A3E00]" /> : null}
-          {can(session, 'part:manage') && !sinInventario ? <QuickLink to="/panel/repuestos" label="Inventario" icon={IconBox} tone="bg-kpi-aqua text-primary" /> : null}
-          {can(session, 'automation:manage') ? (
-            <QuickLink to="/panel/automatizaciones" label="Automati­zaciones" icon={IconBolt} tone="bg-primary-tint text-primary" />
-          ) : null}
-          <QuickLink to="/panel/mas" label="Números" icon={IconChart} tone="bg-kpi-lilac text-[#3E2E8C]" />
-        </nav>
-      </section>
 
       <section aria-labelledby="h-pend" className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between">
@@ -174,14 +125,12 @@ export function DashboardMobile() {
         <section aria-labelledby="h-num" className="flex flex-col gap-2.5">
           <div className="flex items-center justify-between">
             <h2 id="h-num" className="text-[17px] font-extrabold">
-              Taller en números
+              Tus números
             </h2>
-            <Link to="/panel/mas" className="flex min-h-[44px] items-center text-[13px] font-bold text-primary">
-              Ver todo
-            </Link>
+            <span className="text-[13px] font-bold text-ink-2">Este mes</span>
           </div>
           {kpis.data.ejemplo ? <p className="text-xs text-ink-2">Incluye órdenes de ejemplo.</p> : null}
-          <KpiCards kpis={kpis.data.kpis} layout="scroll" />
+          <KpiCards kpis={kpis.data.kpis} />
         </section>
       ) : null}
 

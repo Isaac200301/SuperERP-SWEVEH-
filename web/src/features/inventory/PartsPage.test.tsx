@@ -92,6 +92,7 @@ describe('ServicesPage (HU-07)', () => {
     });
     renderPage(<ServicesPage />);
     expect(await screen.findByText('Garantía 30 días')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '+ Agregar servicio' }));
     await userEvent.type(screen.getByLabelText('Nombre'), 'Cambio de aceite');
     await userEvent.selectOptions(screen.getByLabelText('Categoría'), 'lubricantes');
     await userEvent.type(screen.getByLabelText('Precio (COP)'), '80.000');
@@ -100,6 +101,29 @@ describe('ServicesPage (HU-07)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
     await waitFor(() => expect(calls.some((c) => c.method === 'PATCH')).toBe(true));
     expect(body(calls, 'POST', '/services')).toEqual({ nombre: 'Cambio de aceite', tipoVehiculo: 'ambos', precio: 80000, categoria: 'lubricantes', garantiaDias: 15 });
+  });
+
+  it('un servicio sin precio dice "Sin precio · ponlo" y el precio se pone ahí mismo (Figma D3)', async () => {
+    const calls = mockApi({
+      'GET /services': { servicios: [
+        { id: 's1', nombre: 'Latonería y pintura', tipoVehiculo: 'carro', precio: null, duracionMin: null, activo: true, version: 4 },
+        { id: 's2', nombre: 'Frenos', tipoVehiculo: 'carro', precio: 180000, duracionMin: null, activo: true, version: 1 },
+      ] },
+      'PATCH /services/{id}': {},
+    });
+    renderPage(<ServicesPage />);
+    expect(await screen.findByText('$ 180.000')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Poner el precio de Latonería y pintura' }));
+    await userEvent.type(screen.getByLabelText('Precio de Latonería y pintura'), '2.500.000');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(body(calls, 'PATCH', '/services/')).toEqual({ precio: 2500000, version: 4 }));
+  });
+
+  it('con WhatsApp apagado no ofrece pasar la lista con una foto (V-01)', async () => {
+    mockApi({ 'GET /services': { servicios: [] } });
+    renderPage(<ServicesPage />);
+    expect(await screen.findByText('Servicios y Mi taller')).toBeInTheDocument();
+    expect(screen.queryByText('Pasar mi lista con una foto')).not.toBeInTheDocument();
   });
 
   it('ADR-0029: marca el repuesto para la vitrina de WhatsApp y sube su foto', async () => {

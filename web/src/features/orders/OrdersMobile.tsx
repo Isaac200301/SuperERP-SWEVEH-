@@ -18,6 +18,21 @@ export function vehiculoDe(o: Orden): string {
   return [o.vehiculo?.marca, o.vehiculo?.linea, o.vehiculo?.modeloAnio].filter(Boolean).join(' ') || (o.vehiculo?.tipo === 'moto' ? 'Moto' : 'Carro');
 }
 
+/** Lo que sigue en cada estado, para la tarjeta ("Sigue: Mostrarle la cotización", Figma 05). Entregada y cancelada no tienen. */
+export function siguientePaso(estado: EstadoOrden): string | null {
+  const pasos: Partial<Record<EstadoOrden, string>> = {
+    por_recibir: 'Recibir el vehículo',
+    recibido: 'Diagnosticar',
+    en_diagnostico: 'Armar la cotización',
+    esperando_aprobacion: 'Mostrarle la cotización',
+    en_reparacion: 'Anotar lo gastado',
+    esperando_repuesto: 'Esperar el repuesto',
+    control_calidad: 'Revisar el trabajo',
+    listo: 'Entregar',
+  };
+  return pasos[estado] ?? null;
+}
+
 /** Tarjeta de una orden en el celular. La que espera al cliente va resaltada en limón (DR-01: con su ícono y palabra). */
 export function OrderCard({ orden: o }: { orden: Orden }) {
   const espera = o.estado === 'esperando_aprobacion';
@@ -41,6 +56,7 @@ export function OrderCard({ orden: o }: { orden: Orden }) {
         <span className="flex min-w-0 flex-col">
           <b className="truncate text-[15px]">{vehiculoDe(o)}</b>
           <span className="truncate text-[13px] text-ink-2">{o.cliente?.nombre ?? 'Sin cliente'}</span>
+          {siguientePaso(o.estado) ? <span className="truncate text-[13px] font-bold text-primary">Sigue: {siguientePaso(o.estado)}</span> : null}
         </span>
       </span>
       <span className="flex items-center justify-between text-[13px]">

@@ -9,17 +9,20 @@ export function Segmented<T extends string>({
   options,
   onChange,
   hint,
+  hideLabel = false,
 }: {
   label: string;
   value: T;
   options: Option<T>[];
   onChange: (v: T) => void;
   hint?: string | undefined;
+  /** Deja la etiqueta solo para lectores de pantalla, cuando el título de la sección ya dice qué es. */
+  hideLabel?: boolean;
 }) {
   const id = useId();
   return (
     <div className="flex flex-col gap-1.5">
-      <span id={id} className="text-[15px] font-extrabold">
+      <span id={id} className={hideLabel ? 'sr-only' : 'text-[15px] font-extrabold'}>
         {label}
       </span>
       <div role="radiogroup" aria-labelledby={id} className="flex flex-wrap gap-2.5">
