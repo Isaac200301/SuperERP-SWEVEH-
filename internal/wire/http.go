@@ -589,6 +589,10 @@ func (e extra) LowStock(ctx context.Context, tallerID shared.ID) ([]inventory.Pa
 	return out, err
 }
 
+func (e extra) SpentByOpenOrder(ctx context.Context, tallerID shared.ID) (map[shared.ID]int64, error) {
+	return e.s.M.Expenses.SpentByOpenOrder(ctx, tallerID)
+}
+
 func (e extra) CustomerNames(ctx context.Context, tallerID shared.ID, ids []shared.ID) (map[shared.ID]string, error) {
 	m, err := e.s.M.CustDir.SummariesByIDs(ctx, tallerID, ids)
 	out := map[shared.ID]string{}

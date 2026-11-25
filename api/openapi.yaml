@@ -569,6 +569,74 @@ paths:
         '400': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
 
+  /orders/{id}/expenses:
+    get:
+      operationId: listExpenses
+      summary: 'Lo gastado en la orden y el resumen cotizado / gastado / quedan (V-08, HU-106). Interno del taller. Permiso expense:manage'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [gastos, resumen]
+                properties:
+                  gastos: { type: array, items: { $ref: '#/components/schemas/Gasto' } }
+                  resumen: { $ref: '#/components/schemas/ResumenGasto' }
+        '404': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: addExpense
+      summary: 'Anotar un gasto (V-08). Idempotente por id, que genera la pantalla. Permiso expense:manage'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [id, descripcion, valor]
+              properties:
+                id: { type: string, format: uuid, description: 'Lo genera la pantalla: repetir el envío no anota dos veces' }
+                descripcion: { type: string, maxLength: 200 }
+                valor: { type: integer, format: int64, minimum: 1, description: 'COP sin decimales' }
+                origen: { type: string, enum: [manual, asistente, factura], description: 'Por defecto manual' }
+                fotoId: { type: string, format: uuid, nullable: true, description: 'Evidencia de la orden con la foto de la factura' }
+      responses:
+        '201':
+          description: Anotado (o ya estaba, con el mismo id)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [gasto, resumen]
+                properties:
+                  gasto: { $ref: '#/components/schemas/Gasto' }
+                  resumen: { $ref: '#/components/schemas/ResumenGasto' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /orders/{id}/expenses/{gid}/void:
+    post:
+      operationId: voidExpense
+      summary: 'Anular un gasto (no se borra; queda en la bitácora). Idempotente. Permiso expense:manage'
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: gid, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [resumen]
+                properties:
+                  resumen: { $ref: '#/components/schemas/ResumenGasto' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /orders/{id}/findings:
     get:
       operationId: listFindings
@@ -2523,6 +2591,27 @@ components:
         vencida: { type: boolean }
         mostrarDetalle: { type: boolean, description: 'El cliente ve el detalle de las partidas en la vista y el PDF (V-07)' }
         version: { type: integer, description: 'Concurrencia optimista de las ediciones (R-07)' }
+
+    Gasto:
+      type: object
+      required: [id, descripcion, valor, origen, fotoId, creadoEn, anulado]
+      properties:
+        id: { type: string, format: uuid }
+        descripcion: { type: string }
+        valor: { type: integer, format: int64 }
+        origen: { type: string, enum: [manual, asistente, factura] }
+        fotoId: { type: string, format: uuid, nullable: true }
+        creadoEn: { type: string, format: date-time }
+        anulado: { type: boolean }
+
+    ResumenGasto:
+      type: object
+      description: 'Cotizado = lo aprobado (con las adicionales) o, sin aprobación, la cotización vigente. Quedan negativo = se pasó'
+      required: [cotizado, gastado, quedan]
+      properties:
+        cotizado: { type: integer, format: int64 }
+        gastado: { type: integer, format: int64 }
+        quedan: { type: integer, format: int64 }
 
     DetallePartida:
       type: object

@@ -51,18 +51,19 @@ func TestFeatures_WhatsAppAndPlatformOff(t *testing.T) {
 		}
 	}
 
-	// V-09: salen "clientes que vuelven" (HU-72) y "respuesta en WhatsApp" (HU-73). Quedan 4; el quinto llega en R6.
+	// V-09: salen "clientes que vuelven" (HU-72) y "respuesta en WhatsApp" (HU-73). Quedan 5, con "cotizado contra
+	// gastado" (R6, HU-106).
 	d := c.must(http.StatusOK, c.do("GET", "/api/v1/dashboard", nil))
 	var codes []string
 	for _, k := range d.body["kpis"].([]any) {
 		codes = append(codes, k.(map[string]any)["codigo"].(string))
 	}
-	if strings.Join(codes, ",") != "abiertas,aprobaciones,tiempo,ticket" {
+	if strings.Join(codes, ",") != "abiertas,aprobaciones,tiempo,ticket,gastado" {
 		t.Fatalf("KPI con WhatsApp apagado: %v", codes)
 	}
 }
 
-// Con las banderas encendidas, /me lo dice y el tablero vuelve a tener los 6 KPI de antes.
+// Con las banderas encendidas, /me lo dice y el tablero vuelve a tener los 6 KPI de antes más el de lo gastado.
 func TestFeatures_OnKeepsEverything(t *testing.T) {
 	e := newEnv(t)
 	c := e.register("3105550961", "Rosa Pérez")
@@ -71,7 +72,7 @@ func TestFeatures_OnKeepsEverything(t *testing.T) {
 		t.Fatalf("funciones: %v", f)
 	}
 	d := c.must(http.StatusOK, c.do("GET", "/api/v1/dashboard", nil))
-	if n := len(d.body["kpis"].([]any)); n != 6 {
+	if n := len(d.body["kpis"].([]any)); n != 7 {
 		t.Fatalf("KPI con WhatsApp encendido: %d", n)
 	}
 	c.must(http.StatusOK, c.do("GET", "/api/v1/automations", nil))

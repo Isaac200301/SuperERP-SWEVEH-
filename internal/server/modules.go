@@ -59,6 +59,7 @@ type Modules struct {
 	Orders    *ordersapp.Service
 	Flow      *ordersapp.Flow
 	Findings  *ordersapp.Findings
+	Expenses  *ordersapp.Expenses // V-08
 	OrdersF   orders.Orders
 	Inventory *inventoryapp.Service
 	InvF      inventory.Inventory
@@ -105,5 +106,6 @@ func Build(tx *db.TxManager, st storage.Store, clk clock.Clock, log *slog.Logger
 	m.QuotesF = quotes.New(m.Quotes)
 	m.Quotes.SetRules(quotesdeps.Rules{A: m.Admin})
 	m.Flow.SetQuoteReader(quotesdir.Reader{Q: m.QuotesF})
+	m.Expenses = ordersapp.NewExpenses(tx, flowRepo, orderspg.Expenses{}, quotesdir.Reader{Q: m.QuotesF}, m.Audit, clk)
 	return m
 }

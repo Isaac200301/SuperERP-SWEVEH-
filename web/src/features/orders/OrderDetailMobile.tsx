@@ -16,6 +16,7 @@ import { OrderMessages } from './OrderDetailPage';
 import { OrderActions, QuotePanel, ReceptionPanel } from './OrderWork';
 import { vehiculoDe } from './OrdersMobile';
 import { useFeature } from '../auth/api';
+import { SpendPanel } from './SpendPanel';
 
 type Pestana = 'estado' | 'cotizacion' | 'whatsapp' | 'historial';
 
@@ -176,7 +177,10 @@ export function OrderDetailMobile({ orden: o }: { orden: Orden }) {
         ) : null}
         {tab === 'cotizacion' ? (
           cotizable ? (
-            <QuotePanel orden={o} />
+            <>
+              <QuotePanel orden={o} />
+              <SpendPanel orden={o} />
+            </>
           ) : (
             <p className="rounded-[22px] bg-white p-4 text-sm text-ink-2">La cotización se arma después del diagnóstico.</p>
           )

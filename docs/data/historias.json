@@ -5033,6 +5033,66 @@
      "entonces": "no se permite"
     }
    ]
+  },
+  {
+   "id": "HU-106",
+   "epic": "E04",
+   "roles": [
+    "DU",
+    "RE",
+    "ME"
+   ],
+   "surf": [
+    "P",
+    "F"
+   ],
+   "titulo": "Llevar lo gastado contra lo cotizado",
+   "como": "persona del taller que hace obras largas",
+   "quiero": "anotar lo que voy gastando en la orden con una frase o la foto de la factura",
+   "para": "ver a tiempo cuánto me queda de lo que cotizó el cliente",
+   "prio": "M",
+   "antes": "",
+   "src": "pablo-2026-11-24",
+   "moto": true,
+   "veh": "",
+   "dep": [
+    "HU-27",
+    "HU-105"
+   ],
+   "rf": [],
+   "au": [],
+   "esc": [],
+   "ca": [],
+   "notas": "Entrega del 27-nov (V-08, V-09, ADR-0040). Interno: no sale al cliente. La frase y la foto con IA llegan en R8. Por revisar con Isaac.",
+   "refs": [],
+   "canc": "",
+   "ac": [
+    {
+     "dado": "una orden con cotización",
+     "cuando": "anoto un gasto con su valor",
+     "entonces": "la orden muestra cotizado, gastado y cuánto queda; si me paso, dice Se pasó"
+    },
+    {
+     "dado": "un gasto mal anotado",
+     "cuando": "lo anulo",
+     "entonces": "sale de la suma pero queda en la lista y en la bitácora"
+    },
+    {
+     "dado": "que el envío se repite",
+     "cuando": "llega dos veces",
+     "entonces": "el gasto queda anotado una sola vez"
+    },
+    {
+     "dado": "el tablero",
+     "cuando": "lo abro",
+     "entonces": "veo cuántas órdenes abiertas van por encima de lo aprobado y cuánto se ha gastado contra lo cotizado"
+    },
+    {
+     "dado": "lo gastado",
+     "cuando": "el cliente ve la cotización o el PDF",
+     "entonces": "no aparece nada de los gastos"
+    }
+   ]
   }
  ]
 }

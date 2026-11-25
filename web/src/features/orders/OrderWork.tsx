@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 
 import { ApiError, type EstadoOrden, type Orden, type Schemas } from '../../shared/api/client';
 import { estados, flujoFor } from '../../shared/i18n/es-CO';
-import { formatoCOP, formatoFechaHora, formatoHora } from '../../shared/lib/format';
+import { formatoCOP, formatoFechaHora, formatoHora, pesos } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { BottomSheet } from '../../shared/ui/BottomSheet';
@@ -394,7 +394,6 @@ export function ReceptionPanel({ orden }: { orden: Orden }) {
   );
 }
 
-const pesos = (s: string) => (s.trim() === '' ? undefined : Number(s.replace(/\D/g, '')));
 
 /** Un ítem del catálogo: los servicios sin precio piden el valor y los repuestos la cantidad antes de agregar. */
 function CatalogItem({ label, detalle, precio, pidePrecio, pideCantidad, busy, onAdd }: {

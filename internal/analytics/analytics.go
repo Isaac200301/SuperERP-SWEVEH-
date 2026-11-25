@@ -37,6 +37,8 @@ type Extra interface {
 	FailedNotices(ctx context.Context, tallerID shared.ID, since time.Time) ([]FailedNotice, error)
 	// HumanRequests son las conversaciones en las que el cliente pidió una persona y nadie la ha cerrado (HU-59).
 	HumanRequests(ctx context.Context, tallerID shared.ID) ([]HumanRequest, error)
+	// SpentByOpenOrder es lo gastado en las órdenes abiertas que tienen gastos (V-08, KPI 5).
+	SpentByOpenOrder(ctx context.Context, tallerID shared.ID) (map[shared.ID]int64, error)
 }
 
 // ResponseTime es cuánto tardó la primera respuesta a un mensaje del cliente; Auto = respuesta automática de AU-05.
@@ -233,6 +235,12 @@ func (h *Handler) dashboard(r *http.Request, p reqctx.Principal) (int, any, erro
 				strings.Replace(movers, "Lo mueven", "Lo movieron", 1))
 		}
 		kpis = append(kpis, k)
+
+		spent, err := h.spendKPI(ctx, p.TallerID)
+		if err != nil {
+			return err
+		}
+		kpis = append(kpis, spent)
 
 		if !h.legacyKPIs {
 			return nil
@@ -471,4 +479,44 @@ func (h *Handler) legacy(ctx context.Context, tallerID shared.ID, st returning, 
 	}
 	kpis = append(kpis, k)
 	return kpis, nil
+}
+
+// spendKPI es el KPI 5, "Cotizado contra gastado" (V-08, V-09, HU-106): de las órdenes abiertas con gastos, cuántas van
+// por encima de lo aprobado y cuánto se ha gastado contra lo cotizado. Una orden con gastos y sin cotización aprobada
+// cuenta en lo gastado y se cuenta aparte ("sin aprobar"). Es de quien ve los números (kpi:read).
+func (h *Handler) spendKPI(ctx context.Context, tallerID shared.ID) (KPI, error) {
+	k := KPI{Code: "gastado", Label: "Cotizado contra gastado", Display: "sin gastos",
+		Meaning: "En las órdenes abiertas donde anotaron gastos: cuántas ya gastaron más de lo que el cliente aprobó, y cuánto se ha gastado frente a lo cotizado. Sirve para ver a tiempo cuándo una obra se está pasando."}
+	spent, err := h.extra.SpentByOpenOrder(ctx, tallerID)
+	if err != nil || len(spent) == 0 {
+		return k, err
+	}
+	ids := make([]shared.ID, 0, len(spent))
+	for id := range spent {
+		ids = append(ids, id)
+	}
+	approved, err := h.quotes.ApprovedTotals(ctx, tallerID, ids)
+	if err != nil {
+		return k, err
+	}
+	var over, unapproved int
+	var totalSpent, totalQuoted int64
+	for id, s := range spent {
+		totalSpent += s
+		q := approved[id]
+		totalQuoted += q
+		switch {
+		case q == 0:
+			unapproved++
+		case s > q:
+			over++
+		}
+	}
+	k.Value = f(float64(over))
+	k.Display = fmt.Sprintf("%d de %d por encima", over, len(spent))
+	k.Detail = fmt.Sprintf("%s gastado de %s cotizado", money(totalSpent), money(totalQuoted))
+	if unapproved > 0 {
+		k.Detail += fmt.Sprintf(" · %d sin aprobar", unapproved)
+	}
+	return k, nil
 }

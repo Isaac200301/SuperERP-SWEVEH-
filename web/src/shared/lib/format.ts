@@ -47,3 +47,8 @@ export function formatoCelular(raw: string): string {
   if (d.length !== 10) return raw;
   return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;
 }
+
+/** Lee pesos escritos por la persona ("480.000", "$ 480000"): solo los dígitos. Vacío = undefined. */
+export function pesos(s: string): number | undefined {
+  return s.trim() === '' ? undefined : Number(s.replace(/\D/g, ''));
+}

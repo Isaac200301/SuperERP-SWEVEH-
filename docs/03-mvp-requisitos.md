@@ -21,6 +21,7 @@ El equipo cambió el rumbo después del 30-oct. Donde el texto de abajo contradi
 | 10 | Catálogo de 10 automatizaciones | 1-nov | **9 tarjetas** (sin AU-10) |
 | 11 | 22 funciones Must | 1-nov | Los 22 RF siguen; el backlog son **101 HU** (`docs/04-historias-de-usuario.md`) y cubren los 22 RF y las 10 escenas |
 | 12 | Seguridad e infraestructura "propuesta" genérica | 1-nov | Definidas en `docs/06-arquitectura.md` (JWT, RBAC, cookies, RLS, outbox, observabilidad, CI/CD) |
+| 14 | "6 KPIs" del dueño (clientes que vuelven y respuesta en WhatsApp incluidos) | 24-nov | **5 KPI** (V-09): órdenes por estado, aprobaciones pendientes, tiempo promedio, ticket promedio y **cotizado contra gastado** (HU-106). Clientes que vuelven (HU-72) y respuesta en WhatsApp (HU-73) salen con WhatsApp apagado y vuelven con `FEATURE_WHATSAPP` |
 | 13 | RF-21 "limitar al mecánico a sus funciones" (sin precios, sin dinero, sin KPI) | 24-nov | **Un solo panel** (V-05, ADR-0038): el mecánico ve precios y dinero de la orden, cotiza, descuenta hasta el tope y cancela con motivo. Solo el dueño configura (Equipo, Mi taller, lista de precios); los KPI son de dueño y recepción |
 
 - **Cómo leer el resto:** módulos M1–M11, RF-01 a RF-22, RNF-01 a RNF-14, taller ficticio, guion de 10 escenas, preparativos, riesgos y criterios de aceptación CA-01 a CA-12 **siguen vigentes** salvo las 12 correcciones de arriba. Las decisiones abiertas D-01 a D-13 siguen en `docs/07-preguntas-abiertas.md`.

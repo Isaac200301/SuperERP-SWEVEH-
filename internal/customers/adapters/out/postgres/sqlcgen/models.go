@@ -340,6 +340,21 @@ type OrdersEvidencium struct {
 	HallazgoID     *uuid.UUID
 }
 
+type OrdersGasto struct {
+	ID          uuid.UUID
+	TallerID    uuid.UUID
+	OrdenID     uuid.UUID
+	Descripcion string
+	Valor       int64
+	Origen      string
+	FotoID      *uuid.UUID
+	CreadoPor   *uuid.UUID
+	CreadoEn    time.Time
+	Anulado     bool
+	AnuladoEn   *time.Time
+	AnuladoPor  *uuid.UUID
+}
+
 type OrdersHallazgo struct {
 	ID           uuid.UUID
 	TallerID     uuid.UUID

@@ -16,6 +16,7 @@ import { useOrder } from './api';
 import { DiagnosisPanel } from './DiagnosisPanel';
 import { OrderDetailMobile } from './OrderDetailMobile';
 import { OrderActions, QuotePanel, ReceptionPanel } from './OrderWork';
+import { SpendPanel } from './SpendPanel';
 
 /** Stepper de los 7 estados con la hora de cada paso (docs/10 §4.3). */
 export function StateStepper({ orden }: { orden: Orden }) {
@@ -168,6 +169,8 @@ export function OrderDetailPage() {
       {!['por_recibir', 'cancelada'].includes(o.estado) ? <DiagnosisPanel orden={o} /> : null}
       {/* Se cotiza desde el diagnóstico; en reparación sale la adicional (HU-31). */}
       {!['por_recibir', 'recibido', 'cancelada'].includes(o.estado) ? <QuotePanel orden={o} /> : null}
+      {/* V-08: lo gastado contra lo cotizado, interno del taller. */}
+      {!['por_recibir', 'recibido', 'cancelada'].includes(o.estado) ? <SpendPanel orden={o} /> : null}
       {whatsapp ? <OrderMessages orden={o} /> : null}
     </>
   );

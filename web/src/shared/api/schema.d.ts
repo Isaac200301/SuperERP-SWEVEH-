@@ -398,6 +398,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orders/{id}/expenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lo gastado en la orden y el resumen cotizado / gastado / quedan (V-08, HU-106). Interno del taller. Permiso expense:manage */
+        get: operations["listExpenses"];
+        put?: never;
+        /** Anotar un gasto (V-08). Idempotente por id, que genera la pantalla. Permiso expense:manage */
+        post: operations["addExpense"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{id}/expenses/{gid}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Anular un gasto (no se borra; queda en la bitácora). Idempotente. Permiso expense:manage */
+        post: operations["voidExpense"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/orders/{id}/findings": {
         parameters: {
             query?: never;
@@ -1816,6 +1851,29 @@ export interface components {
             /** @description Concurrencia optimista de las ediciones (R-07) */
             version?: number;
         };
+        Gasto: {
+            /** Format: uuid */
+            id: string;
+            descripcion: string;
+            /** Format: int64 */
+            valor: number;
+            /** @enum {string} */
+            origen: "manual" | "asistente" | "factura";
+            /** Format: uuid */
+            fotoId: string | null;
+            /** Format: date-time */
+            creadoEn: string;
+            anulado: boolean;
+        };
+        /** @description Cotizado = lo aprobado (con las adicionales) o, sin aprobación, la cotización vigente. Quedan negativo = se pasó */
+        ResumenGasto: {
+            /** Format: int64 */
+            cotizado: number;
+            /** Format: int64 */
+            gastado: number;
+            /** Format: int64 */
+            quedan: number;
+        };
         DetallePartida: {
             descripcion: string;
             /** @description Por defecto 1 */
@@ -3050,6 +3108,111 @@ export interface operations {
         responses: {
             200: components["responses"]["Checklist"];
             400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    listExpenses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        gastos: components["schemas"]["Gasto"][];
+                        resumen: components["schemas"]["ResumenGasto"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    addExpense: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Lo genera la pantalla: repetir el envío no anota dos veces
+                     */
+                    id: string;
+                    descripcion: string;
+                    /**
+                     * Format: int64
+                     * @description COP sin decimales
+                     */
+                    valor: number;
+                    /**
+                     * @description Por defecto manual
+                     * @enum {string}
+                     */
+                    origen?: "manual" | "asistente" | "factura";
+                    /**
+                     * Format: uuid
+                     * @description Evidencia de la orden con la foto de la factura
+                     */
+                    fotoId?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Anotado (o ya estaba, con el mismo id) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        gasto: components["schemas"]["Gasto"];
+                        resumen: components["schemas"]["ResumenGasto"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    voidExpense: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                gid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        resumen: components["schemas"]["ResumenGasto"];
+                    };
+                };
+            };
             404: components["responses"]["Problem"];
         };
     };

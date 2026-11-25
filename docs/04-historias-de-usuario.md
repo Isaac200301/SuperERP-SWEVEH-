@@ -1651,6 +1651,24 @@ _Módulo del MVP: Preparativos. Que la demo corra dos veces seguidas sin tocar c
 
 **Trazabilidad:** Depende de: HU-27 · ADR-0040
 
+### HU-106 · Llevar lo gastado contra lo cotizado
+
+**Épica:** E04 · **Roles:** Dueño del taller, Recepción, Mecánico · **Superficies:** Panel, Piso · **Prioridad:** Must · **Origen:** Pablo (24-nov-2026, entrega del viernes, V-08 y V-09), por revisar con Isaac · **Aplica a motos:** sí
+
+**Como** persona del taller que hace obras largas, **quiero** anotar lo que voy gastando en la orden con una frase o la foto de la factura, **para** ver a tiempo cuánto me queda de lo que cotizó el cliente.
+
+**Criterios de aceptación**
+
+- **Dado** una orden con cotización, **cuando** anoto un gasto con su valor, **entonces** la orden muestra cotizado, gastado y cuánto queda; si me paso, dice "Se pasó".
+- **Dado** un gasto mal anotado, **cuando** lo anulo, **entonces** sale de la suma pero queda en la lista y en la bitácora; no se borra.
+- **Dado** que el envío se repite (doble toque, red lenta), **cuando** llega dos veces, **entonces** el gasto queda anotado una sola vez.
+- **Dado** el tablero, **cuando** lo abro, **entonces** veo cuántas órdenes abiertas van por encima de lo aprobado y cuánto se ha gastado contra lo cotizado.
+- **Dado** lo gastado, **cuando** el cliente ve la cotización o el PDF, **entonces** no aparece nada de los gastos.
+
+**Notas:** ADR-0040. La frase y la foto de la factura leídas por el asistente llegan en R8 (HU-107).
+
+**Trazabilidad:** Depende de: HU-27, HU-105 · ADR-0040
+
 ## Referencias citadas en las historias
 
 1. Meta for Developers, "Get started", WhatsApp Cloud API (número de prueba, 5 destinatarios, plantillas preaprobadas). <https://developers.facebook.com/docs/whatsapp/cloud-api/get-started/> (Oficial)

@@ -28,6 +28,7 @@ var common = []string{
 	"customer:create", "vehicle:create", "vehicle:update", "vehicle:read",
 	"service:read", "part:read", "part:return",
 	"quote:read", "quote:edit", "quote:send", // Q-10: por defecto el mecánico envía la cotización
+	"expense:manage", // V-08: lo gastado contra lo cotizado lo anota cualquiera del equipo
 }
 
 // Un solo panel (V-05, ADR-0038, entrega del 27-nov): todo el equipo atiende clientes, ve precios y dinero de la orden,

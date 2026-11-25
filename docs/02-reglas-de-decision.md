@@ -251,7 +251,7 @@ Preferir la biblioteca estándar de Go; librerías con licencia permisiva (MIT, 
 | 1-nov-2026 | Arquitectura: monolito modular con capas hexagonales | `docs/06-arquitectura.md` |
 | 24-nov-2026 | Entrada con **celular + PIN** de 4 dígitos sin verificar el número, en vez de celular + OTP (Pablo, V-03; ADR-0037). El código sigue con `AUTH_MODE=otp` | HU-01, HU-104, `docs/06` §6 |
 | 24-nov-2026 | **Un solo panel** (V-05, ADR-0038): el mecánico ve precios y dinero; cambia RF-21 y HU-81 | `docs/03` errata 13, HU-81, `roles.go` |
-| 24-nov-2026 | Funciones nuevas pedidas por Pablo para la entrega del 27-nov: **HU-104** (PIN), **HU-105** (partidas, V-07, ADR-0040) y **HU-110** (inventario en otro programa, V-06, ADR-0039); HU-106 a HU-109 llegan con sus rebanadas. Isaac debe revisarlas | `docs/04`, `docs/data/historias.json` |
+| 24-nov-2026 | Funciones nuevas pedidas por Pablo para la entrega del 27-nov: **HU-104** (PIN), **HU-105** (partidas, V-07, ADR-0040), **HU-106** (lo gastado contra lo cotizado, V-08, ADR-0040) y **HU-110** (inventario en otro programa, V-06, ADR-0039); HU-107 a HU-109 llegan con sus rebanadas. Isaac debe revisarlas | `docs/04`, `docs/data/historias.json` |
 
 ## 12. Registro de cambios de este documento
 
