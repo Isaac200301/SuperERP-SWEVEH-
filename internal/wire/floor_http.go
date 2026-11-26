@@ -378,10 +378,14 @@ func (h *handler) floorConfirm(r *http.Request, p reqctx.Principal) (int, any, e
 	if err != nil {
 		return 0, nil, err
 	}
+	res := map[string]any{"ordenId": applied.OrderID.String(), "ordenCodigo": applied.OrderCode, "ordenEstado": applied.OrderState,
+		"ordenNueva": applied.Created, "hecho": nonEmpty(applied.Done), "fotos": applied.Photos}
+	if len(applied.Held) > 0 {
+		res["hallazgosPendientes"] = applied.Held
+	}
 	return http.StatusOK, map[string]any{
-		"resultado": map[string]any{"ordenId": applied.OrderID.String(), "ordenCodigo": applied.OrderCode, "ordenEstado": applied.OrderState,
-			"ordenNueva": applied.Created, "hecho": nonEmpty(applied.Done), "fotos": applied.Photos},
-		"chat": h.floorChatOut(v.Chat, v.Messages, v.Progress, h.s.Floor.HasModel()),
+		"resultado": res,
+		"chat":      h.floorChatOut(v.Chat, v.Messages, v.Progress, h.s.Floor.HasModel()),
 	}, nil
 }
 

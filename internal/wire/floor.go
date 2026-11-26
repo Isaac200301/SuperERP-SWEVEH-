@@ -194,14 +194,8 @@ func (f floorShop) Apply(ctx context.Context, tallerID shared.ID, actor shared.A
 		}
 		out.Done = append(out.Done, "el cambio de estado")
 	}
-	for _, fd := range p.Findings {
-		if _, err := f.m.Findings.Add(ctx, ordersapp.FindingInput{TallerID: tallerID, OrderID: orderID, Actor: actor, System: fd.System,
-			Description: fd.Description, Severity: fd.Severity}); err != nil {
-			return out, err
-		}
-	}
-	if n := len(p.Findings); n > 0 {
-		out.Done = append(out.Done, plural(n, "hallazgo", "hallazgos"))
+	if err := f.findings(ctx, tallerID, actor, orderID, p, &out); err != nil {
+		return out, err
 	}
 	if err := f.quote(ctx, tallerID, actor, orderID, p.Quote, &out); err != nil {
 		return out, err
@@ -229,6 +223,36 @@ func (f floorShop) Apply(ctx context.Context, tallerID shared.ID, actor shared.A
 	}
 	out.OrderID, out.OrderCode, out.OrderState = o.ID, o.Code(), string(o.State)
 	return out, nil
+}
+
+// findings guarda los hallazgos si la orden ya los admite (desde Recibido hasta En reparación). Si todavía no (la
+// recepción por video de una orden Por recibir), se guarda lo demás y los hallazgos quedan en la ficha (out.Held)
+// para cuando la orden pase a Recibido: guardar por partes no pierde lo que dijo el mecánico. Si solo había
+// hallazgos, se responde la regla de la orden, para que la persona sepa por qué no se guardó nada.
+func (f floorShop) findings(ctx context.Context, tallerID shared.ID, actor shared.Actor, orderID shared.ID, p assistantdomain.FloorProposal,
+	out *assistantapp.FloorApplied) error {
+	if len(p.Findings) == 0 {
+		return nil
+	}
+	o, err := f.m.Flow.Load(ctx, tallerID, orderID)
+	if err != nil {
+		return err
+	}
+	if !o.CanAddFindings() {
+		if len(out.Done) == 0 && len(p.Quote) == 0 && len(p.Expenses) == 0 {
+			return ordersdomain.ErrFindingState
+		}
+		out.Held = p.Findings
+		return nil
+	}
+	for _, fd := range p.Findings {
+		if _, err := f.m.Findings.Add(ctx, ordersapp.FindingInput{TallerID: tallerID, OrderID: orderID, Actor: actor, System: fd.System,
+			Description: fd.Description, Severity: fd.Severity}); err != nil {
+			return err
+		}
+	}
+	out.Done = append(out.Done, plural(len(p.Findings), "hallazgo", "hallazgos"))
+	return nil
 }
 
 func plural(n int, one, many string) string {

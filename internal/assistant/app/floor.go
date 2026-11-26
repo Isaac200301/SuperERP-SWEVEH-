@@ -101,6 +101,8 @@ type FloorApplied struct {
 	Created    bool      `json:"ordenNueva"`
 	Done       []string  `json:"hecho"`
 	Photos     int       `json:"fotos"`
+	// Held son los hallazgos que la orden todavía no admite (Por recibir): quedan en la ficha para después.
+	Held []domain.FloorFinding `json:"hallazgosPendientes,omitempty"`
 	// Message es el "Listo, quedó guardado…" que escribió esta confirmación (no se guarda con la clave).
 	Message *FloorMessage `json:"-"`
 }
@@ -169,6 +171,8 @@ const (
 	floorHistory     = 12
 	floorTimeout     = 60 * time.Second // los modelos gratis tardan 10 a 20 s por ronda (medido con make agent-eval-floor)
 	floorConfirmText = "Listo, quedó guardado:"
+	floorHeldOne     = "El hallazgo queda en la ficha: se guarda cuando la orden pase a Recibido."
+	floorHeldMany    = "Los hallazgos quedan en la ficha: se guardan cuando la orden pase a Recibido."
 )
 
 // Textos fijos del asistente (no son redacción de la IA).
@@ -876,6 +880,7 @@ func (f *Floor) apply(ctx context.Context, c ConfirmCmd, key string) (FloorAppli
 	oid := applied.OrderID
 	cur.OrderID = &oid
 	cur.Proposal = p.Reset(oid.String(), applied.OrderCode, applied.OrderState)
+	cur.Proposal.Findings = applied.Held // siguen en la ficha hasta que la orden los admita
 	prev := cur.Version
 	cur.Version, cur.UpdatedAt = prev+1, now
 	raw, err := json.Marshal(applied)
@@ -890,6 +895,12 @@ func (f *Floor) apply(ctx context.Context, c ConfirmCmd, key string) (FloorAppli
 		return applied, cur, err
 	}
 	text := floorConfirmText + " " + joinY(applied.Done) + "."
+	switch n := len(applied.Held); {
+	case n == 1:
+		text += " " + floorHeldOne
+	case n > 1:
+		text += " " + floorHeldMany
+	}
 	if st, err := f.shop.OrderStatus(ctx, c.TallerID, oid); err == nil && st.State == "por_recibir" && len(st.Missing) > 0 {
 		text += " Para pasar a Recibido falta: " + strings.Join(st.Missing, ", ") + "."
 	}

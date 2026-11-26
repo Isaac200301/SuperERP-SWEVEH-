@@ -119,6 +119,15 @@ describe('Cuadro de guardar', () => {
     expect(screen.queryByRole('region', { name: 'Guardar' })).not.toBeInTheDocument(); // ya no hay nada pendiente
   });
 
+  it('en Por recibir avisa que los hallazgos se guardan cuando la orden pase a Recibido', async () => {
+    const hallazgos = [{ id: 'h1', sistema: 'frenos', descripcion: 'Pastillas gastadas', gravedad: 'urgente', origen: 'video' }];
+    const conHallazgo = base({ pendiente: true, propuesta: { ...base().propuesta, otraOrden: undefined, hallazgos } });
+    mockApi({ 'GET /orders/{id}/assistant': { chat: conHallazgo, disponible: true, voz: false } });
+    renderPage(<OrderAssistantCard ordenId="o41" estado="por_recibir" />);
+    const guardar = await screen.findByRole('region', { name: 'Guardar' });
+    expect(guardar).toHaveTextContent('Los hallazgos se guardan cuando la orden pase a Recibido; mientras tanto quedan en la ficha.');
+  });
+
   it('sin nada pendiente ni otro vehículo no hay tarjetas', async () => {
     mockApi({ 'GET /orders/{id}/assistant': { chat: base({ propuesta: { ...base().propuesta, otraOrden: undefined } }), disponible: true, voz: false } });
     renderPage(<OrderAssistantCard ordenId="o41" estado="recibido" />);

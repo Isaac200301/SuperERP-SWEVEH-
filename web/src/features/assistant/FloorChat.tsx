@@ -324,6 +324,9 @@ function GuardarCard({ chat, conf }: { chat: ChatPiso; conf: Confirmar }) {
       {chat.progreso.falta.length > 0 ? (
         <p className="text-[13px] text-ink-2">Todavía falta {chat.progreso.falta.join(', ')}; lo puedes agregar después.</p>
       ) : null}
+      {(p.hallazgos?.length ?? 0) > 0 && (p.nuevaOrden || p.ordenEstado === 'por_recibir') && !p.estado ? (
+        <p className="text-[13px] text-ink-2">Los hallazgos se guardan cuando la orden pase a Recibido; mientras tanto quedan en la ficha.</p>
+      ) : null}
       {conf.error ? <Alert>{conf.error}</Alert> : null}
       <Button busy={conf.busy} missing={faltaPrecio(p)} onClick={conf.run}>
         {p.nuevaOrden ? 'Guardar orden' : 'Guardar cambios'}

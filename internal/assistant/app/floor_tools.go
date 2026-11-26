@@ -582,7 +582,11 @@ func (t *floorTurn) finding(a floorArgs) string {
 	}
 	p.Findings = append(p.Findings, domain.FloorFinding{ID: shared.NewID().String(), System: a.Sistema, Description: trimRunes(d, 500),
 		Severity: sev, Origin: t.origin(len(t.photos) > 0)})
-	return jsonString(map[string]any{"hallazgos": len(p.Findings)})
+	res := map[string]any{"hallazgos": len(p.Findings)}
+	if p.NewOrder || p.OrderState == "por_recibir" {
+		res["nota"] = "la orden está Por recibir: el hallazgo queda en la ficha y se guarda cuando la orden pase a Recibido"
+	}
+	return jsonString(res)
 }
 
 func (t *floorTurn) quote(items []fItem) string {

@@ -789,6 +789,18 @@ paths:
                       ordenNueva: { type: boolean }
                       hecho: { type: array, items: { type: string } }
                       fotos: { type: integer }
+                      hallazgosPendientes:
+                        description: Hallazgos que la orden todavía no admite (Por recibir); siguen en la ficha y se guardan cuando pase a Recibido
+                        type: array
+                        items:
+                          type: object
+                          required: [id, sistema, descripcion, gravedad, origen]
+                          properties:
+                            id: { type: string }
+                            sistema: { type: string }
+                            descripcion: { type: string }
+                            gravedad: { type: string }
+                            origen: { type: string }
                   chat: { $ref: '#/components/schemas/ChatPiso' }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }

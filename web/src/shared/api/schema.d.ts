@@ -3781,6 +3781,14 @@ export interface operations {
                             ordenNueva: boolean;
                             hecho: string[];
                             fotos: number;
+                            /** @description Hallazgos que la orden todavía no admite (Por recibir); siguen en la ficha y se guardan cuando pase a Recibido */
+                            hallazgosPendientes?: {
+                                id: string;
+                                sistema: string;
+                                descripcion: string;
+                                gravedad: string;
+                                origen: string;
+                            }[];
                         };
                         chat: components["schemas"]["ChatPiso"];
                     };
