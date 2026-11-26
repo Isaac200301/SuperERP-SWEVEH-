@@ -180,13 +180,22 @@ func TestPendingAndReset(t *testing.T) {
 
 // El modelo dijo "Orden creada", "Resumen confirmado" y "ya está en el sistema" antes de Confirmar (piloto, 25-nov).
 func TestFloorUnsaved(t *testing.T) {
-	got := FloorUnsaved("Orden GNO667 creada y abierta en estado Por recibir.\nResumen confirmado:\n- 180.000 km\nLa orden ya está en el sistema.")
+	claim := "Orden GNO667 creada y abierta en estado Por recibir.\nResumen confirmado:\n- 180.000 km\nLa orden ya está en el sistema."
+	got := FloorUnsaved(claim, true, false)
 	if !strings.HasPrefix(got, FloorUnsavedNote) || strings.Contains(got, "ya está en el sistema") || strings.Contains(got, "Resumen confirmado") ||
 		strings.Contains(got, "creada y abierta") {
 		t.Fatalf("texto: %q", got)
 	}
-	if s := "Te dejé la orden nueva en la ficha; toca Confirmar para guardarla."; FloorUnsaved(s) != s {
+	if s := "Te dejé la orden nueva en la ficha; toca Guardar para guardarla."; FloorUnsaved(s, true, false) != s {
 		t.Fatal("un texto correcto no cambia")
+	}
+	// Sin nada pendiente no hay cuadro al cual mandar (OS-0041, 26-nov): sin orden, nada existe; con orden, lo que diga
+	// de la orden puede ser cierto ("la orden OS-0041 ya está guardada") y el texto no se toca.
+	if got := FloorUnsaved(claim, false, false); !strings.HasPrefix(got, FloorNothingNote) || strings.Contains(got, "Guardar") {
+		t.Fatalf("sin orden ni pendiente: %q", got)
+	}
+	if s := "La orden OS-0041 ya está guardada con la placa XVN43F."; FloorUnsaved(s, false, true) != s {
+		t.Fatal("en el chat de una orden sin pendiente, el texto no se toca")
 	}
 }
 

@@ -27,6 +27,7 @@ func (h *handler) floorRoutes(r chi.Router, j func(httpx.Func) http.HandlerFunc)
 	r.With(use).Get("/assistant/floor/chats/{id}", j(h.floorChat))
 	r.With(use).Patch("/assistant/floor/chats/{id}", j(h.floorEdit))
 	r.With(use).Post("/assistant/floor/chats/{id}/confirm", j(h.floorConfirm))
+	r.With(use).Post("/assistant/floor/chats/{id}/other-order", j(h.floorOther))
 	r.With(use).Get("/assistant/floor/chats/{id}/photos/{photo}", h.floorPhoto)
 	r.With(use).Get("/orders/{id}/assistant", j(h.floorOrder))
 	r.With(use).Post("/orders/{id}/reception/video", j(h.floorVideo))
@@ -58,6 +59,8 @@ type floorChatDTO struct {
 	Mensajes   []floorMsgDTO                 `json:"mensajes"`
 	Disponible bool                          `json:"disponible"`
 	Voz        bool                          `json:"voz"`
+	// OtraFalta: lo que falta para la orden del otro vehículo (solo si hay tarjeta de otro vehículo).
+	OtraFalta []string `json:"otraFalta,omitempty"`
 }
 
 func (h *handler) floorChatOut(c assistantapp.FloorChat, msgs []assistantapp.FloorMessage, pr assistantdomain.Progress, available bool) floorChatDTO {
@@ -70,26 +73,33 @@ func (h *handler) floorChatOut(c assistantapp.FloorChat, msgs []assistantapp.Flo
 		s := c.OrderID.String()
 		d.OrdenID = &s
 	}
+	if o := c.Proposal.OtherOrder; o != nil {
+		d.OtraFalta = o.OrderMissing()
+	}
 	for _, m := range msgs {
-		md := floorMsgDTO{ID: m.ID.String(), Rol: m.Role, Texto: m.Text, Adjuntos: []floorAttachDTO{}, Opciones: m.Choices, Creado: m.CreatedAt}
-		if md.Opciones == nil {
-			md.Opciones = []string{}
-		}
-		for _, a := range m.Attachments {
-			ad := floorAttachDTO{Tipo: a.Kind, Segundos: a.Seconds}
-			if a.Kind == "foto" {
-				_, id, _ := strings.Cut(a.Ref, "/")
-				ad.URL = "/api/v1/assistant/floor/chats/" + c.ID.String() + "/photos/" + id
-			}
-			md.Adjuntos = append(md.Adjuntos, ad)
-		}
-		if m.Proposal != nil && m.Proposal.Pending() && m.Role == "asistente" {
-			t := true
-			md.Prop = &t
-		}
-		d.Mensajes = append(d.Mensajes, md)
+		d.Mensajes = append(d.Mensajes, floorMsgOut(c.ID, m))
 	}
 	return d
+}
+
+func floorMsgOut(chatID shared.ID, m assistantapp.FloorMessage) floorMsgDTO {
+	md := floorMsgDTO{ID: m.ID.String(), Rol: m.Role, Texto: m.Text, Adjuntos: []floorAttachDTO{}, Opciones: m.Choices, Creado: m.CreatedAt}
+	if md.Opciones == nil {
+		md.Opciones = []string{}
+	}
+	for _, a := range m.Attachments {
+		ad := floorAttachDTO{Tipo: a.Kind, Segundos: a.Seconds}
+		if a.Kind == "foto" {
+			_, id, _ := strings.Cut(a.Ref, "/")
+			ad.URL = "/api/v1/assistant/floor/chats/" + chatID.String() + "/photos/" + id
+		}
+		md.Adjuntos = append(md.Adjuntos, ad)
+	}
+	if m.Proposal != nil && m.Role == "asistente" && m.Proposal.Pending() {
+		t := true
+		md.Prop = &t
+	}
+	return md
 }
 
 var errFloorChat = shared.NotFound("chat_no_encontrado", "No encontramos esa conversación.")
@@ -373,6 +383,31 @@ func (h *handler) floorConfirm(r *http.Request, p reqctx.Principal) (int, any, e
 			"ordenNueva": applied.Created, "hecho": nonEmpty(applied.Done), "fotos": applied.Photos},
 		"chat": h.floorChatOut(v.Chat, v.Messages, v.Progress, h.s.Floor.HasModel()),
 	}, nil
+}
+
+// floorOther abre la conversación nueva con los datos y las fotos del otro vehículo (Idempotency-Key obligatoria).
+// Responde la conversación nueva; la del chat de la orden queda sin la tarjeta.
+func (h *handler) floorOther(r *http.Request, p reqctx.Principal) (int, any, error) {
+	id, err := httpx.PathID(r, "id", errFloorChat)
+	if err != nil {
+		return 0, nil, err
+	}
+	var q struct {
+		Version int `json:"version"`
+	}
+	if err := httpx.Decode(r, &q); err != nil {
+		return 0, nil, err
+	}
+	c, err := h.s.Floor.OpenOther(r.Context(), assistantapp.OpenOtherCmd{TallerID: p.TallerID, ChatID: id, Actor: p.Actor(),
+		Key: r.Header.Get("Idempotency-Key"), Version: q.Version})
+	if err != nil {
+		return 0, nil, err
+	}
+	v, err := h.s.Floor.Get(r.Context(), p.TallerID, c.ID)
+	if err != nil {
+		return 0, nil, err
+	}
+	return http.StatusOK, map[string]any{"chat": h.floorChatOut(v.Chat, v.Messages, v.Progress, h.s.Floor.HasModel())}, nil
 }
 
 func nonEmpty(s []string) []string {

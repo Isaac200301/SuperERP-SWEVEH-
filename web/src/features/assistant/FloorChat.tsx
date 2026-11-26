@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 
 import { formatoCOP, formatoHora, pesos } from '../../shared/lib/format';
 import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { IconCamera, IconX } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
-import { useConfirmFloor, useEditFloor, useSendFloor, type ChatPiso, type MensajePiso, type PropuestaPiso } from './api';
+import { useConfirmFloor, useEditFloor, useOpenOther, useSendFloor, type ChatPiso, type MensajePiso, type PropuestaPiso } from './api';
 
 /** De dónde salió cada dato (HU-64), en palabras del taller. */
 const ORIGEN: Record<string, string> = { dijiste: 'lo dijiste', foto: 'de la foto', video: 'del video', lista: 'de tu lista', pusiste: 'lo pusiste', taller: 'ya estaba' };
@@ -45,6 +45,7 @@ type Props = Readonly<{
  */
 export function FloorChat({ chat, ordenId, disponible, voz, onChat, conEnlace = false }: Props) {
   const send = useSendFloor();
+  const conf = useConfirmar(chat, onChat);
   const [texto, setTexto] = useState('');
   const [fotos, setFotos] = useState<File[]>([]);
   const fin = useRef<HTMLDivElement>(null);
@@ -95,7 +96,7 @@ export function FloorChat({ chat, ordenId, disponible, voz, onChat, conEnlace = 
           Seguimos en la orden {chat.propuesta.ordenCodigo ?? ''} · abrirla
         </Link>
       ) : null}
-      {chat ? <LiveCard chat={chat} onChat={onChat} /> : null}
+      {chat ? <LiveCard chat={chat} onChat={onChat} conf={conf} /> : null}
 
       <ol aria-label="Conversación con el asistente" className="flex flex-col gap-2">
         {mensajes.length === 0 ? (
@@ -112,6 +113,8 @@ export function FloorChat({ chat, ordenId, disponible, voz, onChat, conEnlace = 
           </li>
         ) : null}
       </ol>
+      {chat?.propuesta.otraOrden && !send.isPending ? <OtraOrdenCard chat={chat} onChat={onChat} /> : null}
+      {chat?.pendiente && !send.isPending ? <GuardarCard chat={chat} conf={conf} /> : null}
       <div ref={fin} />
       {send.isError ? <Alert>{send.error.message}</Alert> : null}
 
@@ -267,26 +270,167 @@ function sinPrecio(p: PropuestaPiso) {
   return (p.cotizacion ?? []).filter((l) => l.precio == null || l.precio <= 0).length;
 }
 
+/** Lo que impide guardar (los precios que faltan); undefined si se puede. */
+function faltaPrecio(p: PropuestaPiso) {
+  const n = sinPrecio(p);
+  if (n === 1) return 'Falta el precio de 1 ítem de la cotización.';
+  if (n > 1) return `Falta el precio de ${n} ítems de la cotización.`;
+  return undefined;
+}
+
+/**
+ * Guardar la propuesta: lo comparten la ficha en vivo y el cuadro del chat, con una sola clave (un toque doble o los
+ * dos botones no guardan dos veces).
+ */
+export type Confirmar = { run: () => void; busy: boolean; error: string | null; listo: string[] | null };
+
+function useConfirmar(chat: ChatPiso | null, onChat?: (c: ChatPiso) => void): Confirmar {
+  const confirm = useConfirmFloor();
+  const [clave, setClave] = useState(() => crypto.randomUUID());
+  const [listo, setListo] = useState<string[] | null>(null);
+  return {
+    busy: confirm.isPending,
+    error: confirm.isError ? confirm.error.message : null,
+    listo,
+    run: () => {
+      if (!chat || confirm.isPending) return;
+      void confirm
+        .mutateAsync({ chat, key: clave })
+        .then((r) => {
+          setListo(r.resultado.hecho);
+          setClave(crypto.randomUUID());
+          onChat?.(r.chat);
+        })
+        .catch(() => undefined); // el error se muestra con conf.error
+    },
+  };
+}
+
+/**
+ * "¿Guardar la orden nueva…?" al final del chat: sale cuando hay algo por guardar (lo decide el código, no la IA). Lo
+ * que falta de la recepción es información, no bloquea: se puede guardar por partes. En el celular queda pegado abajo
+ * mientras se lee la conversación.
+ */
+function GuardarCard({ chat, conf }: { chat: ChatPiso; conf: Confirmar }) {
+  const p = chat.propuesta;
+  const pregunta = p.nuevaOrden ? `¿Guardar la orden nueva para ${p.placa?.valor ?? 'este vehículo'}?` : `¿Guardar los cambios en ${p.ordenCodigo ?? 'la orden'}?`;
+  return (
+    <section
+      aria-label="Guardar"
+      className="sticky bottom-24 z-10 flex flex-col gap-2 rounded-[22px] border-[1.5px] border-primary bg-white p-4 shadow-lg md:static md:shadow-none"
+    >
+      <p className="text-[16px] font-extrabold">{pregunta}</p>
+      <p className="text-[13px] text-ink-2">Revisa la ficha de arriba: se guarda tal cual.</p>
+      {chat.progreso.falta.length > 0 ? (
+        <p className="text-[13px] text-ink-2">Todavía falta {chat.progreso.falta.join(', ')}; lo puedes agregar después.</p>
+      ) : null}
+      {conf.error ? <Alert>{conf.error}</Alert> : null}
+      <Button busy={conf.busy} missing={faltaPrecio(p)} onClick={conf.run}>
+        {p.nuevaOrden ? 'Guardar orden' : 'Guardar cambios'}
+      </Button>
+    </section>
+  );
+}
+
+/** La URL de una foto del chat (la clave del almacenamiento es taller/uuid). */
+function fotoUrl(chatId: string, ref: string) {
+  return `/api/v1/assistant/floor/chats/${chatId}/photos/${ref.split('/')[1] ?? ''}`;
+}
+
+/**
+ * Otro vehículo en el chat de una orden (decisión de Pablo, 26-nov): el código arma la tarjeta con lo que la persona dijo
+ * de ese vehículo y sus fotos, y la persona decide. "Abrir orden nueva con estos datos" crea una conversación nueva con
+ * esa ficha (nada se guarda hasta tocar Guardar allá); "No, sigo aquí" la descarta y las fotos vuelven a esta orden
+ * (pudo ser un error al escribir o al leer la placa).
+ */
+function OtraOrdenCard({ chat, onChat }: { chat: ChatPiso; onChat?: ((c: ChatPiso) => void) | undefined }) {
+  const abrir = useOpenOther();
+  const edit = useEditFloor();
+  const navigate = useNavigate();
+  const [clave] = useState(() => crypto.randomUUID());
+  const p = chat.propuesta;
+  const o = p.otraOrden;
+  if (!o) return null;
+  const placa = o.placa?.valor ?? '';
+  const fotos = o.fotos ?? [];
+  const marca = [o.ficha?.['marca']?.valor, o.ficha?.['linea']?.valor].filter(Boolean).join(' ');
+  const vehiculo = o.vehiculo ?? (marca || (o.tipo === 'moto' ? 'Moto' : o.tipo === 'carro' ? 'Carro' : ''));
+  async function abrirla() {
+    const nuevo = await abrir.mutateAsync({ chat, key: clave });
+    void navigate(`/panel/asistente?chat=${nuevo.id}`);
+  }
+  async function descartar() {
+    const { otraOrden: _quitada, ...resto } = p; // eslint-disable-line @typescript-eslint/no-unused-vars
+    onChat?.(await edit.mutateAsync({ chat, propuesta: resto }));
+  }
+  return (
+    <section aria-label={`Otro vehículo: ${placa}`} className="flex flex-col gap-3 rounded-[22px] border-[1.5px] border-warn bg-white p-4">
+      <div className="flex flex-col gap-1">
+        <p className="text-[16px] font-extrabold">
+          {o.ordenCodigo ? `${placa} ya tiene la orden ${o.ordenCodigo} abierta` : `¿Crear una orden nueva para ${placa}?`}
+        </p>
+        <p className="text-[13px] text-ink-2">
+          Esta conversación es de la orden {p.ordenCodigo ?? ''}
+          {p.placa ? ` (${p.placa.valor})` : ''}: aquí no se guarda nada de {placa}.
+        </p>
+      </div>
+      <ul className="divide-y divide-surface-2">
+        <li className="flex items-center gap-2 py-1.5 text-sm">
+          <span className="w-28 shrink-0 text-ink-2">Placa</span>
+          <Plate value={placa} />
+          <span className="flex-1" />
+          <Origen o={o.placa?.origen} />
+        </li>
+        {vehiculo ? <Fila label="Vehículo" valor={vehiculo} origen={o.ficha?.['marca']?.origen} /> : null}
+        {o.cliente?.nombre ? <Fila label="Cliente" valor={o.cliente.nombre.valor} origen={o.cliente.nombre.origen} /> : null}
+        {o.cliente?.celular ? <Fila label="Celular" valor={o.cliente.celular.valor} origen={o.cliente.celular.origen} /> : null}
+        {o.sintoma ? <Fila label="Qué trae" valor={o.sintoma.valor} origen={o.sintoma.origen} /> : null}
+      </ul>
+      {fotos.length > 0 ? (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[13px] text-ink-2">{fotos.length === 1 ? '1 foto de este vehículo' : `${fotos.length} fotos de este vehículo`} (se van con la orden nueva)</span>
+          <div className="flex flex-wrap gap-1.5">
+            {fotos.map((f) => (
+              <img key={f.ref} src={fotoUrl(chat.id, f.ref)} alt={`Foto de ${placa}`} className="h-16 w-16 rounded-xl object-cover" />
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {(chat.otraFalta ?? []).length > 0 ? <p className="text-[13px] text-ink-2">Falta {(chat.otraFalta ?? []).join(', ')}: lo pides en la conversación nueva.</p> : null}
+      {abrir.isError ? <Alert>{abrir.error.message}</Alert> : null}
+      {edit.isError ? <Alert>{edit.error.message}</Alert> : null}
+      <div className="flex flex-wrap gap-2">
+        <Button busy={abrir.isPending} onClick={() => void abrirla().catch(() => undefined)}>
+          {o.ordenCodigo ? `Seguir en ${o.ordenCodigo} con estos datos` : 'Abrir orden nueva con estos datos'}
+        </Button>
+        <button
+          type="button"
+          disabled={edit.isPending || abrir.isPending}
+          onClick={() => void descartar().catch(() => undefined)}
+          className="min-h-[44px] rounded-btn px-3 font-bold text-ink-2"
+        >
+          No, sigo aquí
+        </button>
+      </div>
+    </section>
+  );
+}
+
 /**
  * Ficha en vivo (Figma 07): "7 de 8 datos · falta…", lo propuesto con su origen, quitar o poner un precio, y Confirmar,
  * que guarda todo en la orden.
  */
-export function LiveCard({ chat, onChat }: { chat: ChatPiso; onChat?: ((c: ChatPiso) => void) | undefined }) {
+export function LiveCard({ chat, onChat, conf }: { chat: ChatPiso; onChat?: ((c: ChatPiso) => void) | undefined; conf: Confirmar }) {
   const [abierta, setAbierta] = useState(true);
   const edit = useEditFloor();
-  const confirm = useConfirmFloor();
-  const [clave, setClave] = useState(() => crypto.randomUUID());
-  const [listo, setListo] = useState<string[] | null>(null);
+  const listo = conf.listo;
   const p = chat.propuesta;
   const pr = chat.progreso;
   const guardar = async (np: PropuestaPiso) => onChat?.(await edit.mutateAsync({ chat, propuesta: np }));
   if (!chat.pendiente && !listo) {
     return pr.total > 0 ? <Resumen pr={pr} /> : null;
   }
-  const faltan = sinPrecio(p);
-  let falta: string | undefined;
-  if (faltan === 1) falta = 'Falta el precio de 1 ítem de la cotización.';
-  else if (faltan > 1) falta = `Falta el precio de ${faltan} ítems de la cotización.`;
+  const falta = faltaPrecio(p);
 
   return (
     <section aria-labelledby={`ficha-${chat.id}`} className="flex flex-col gap-3 rounded-[22px] border-[1.5px] border-kpi-lilac bg-white p-4">
@@ -311,22 +455,9 @@ export function LiveCard({ chat, onChat }: { chat: ChatPiso; onChat?: ((c: ChatP
       ) : null}
       {abierta && chat.pendiente ? <Detalle p={p} onChange={(np) => void guardar(np)} ocupado={edit.isPending} /> : null}
       {edit.isError ? <Alert>{edit.error.message}</Alert> : null}
-      {confirm.isError ? <Alert>{confirm.error.message}</Alert> : null}
+      {conf.error ? <Alert>{conf.error}</Alert> : null}
       {chat.pendiente ? (
-        <Button
-          busy={confirm.isPending}
-          missing={falta}
-          onClick={() =>
-            void confirm
-              .mutateAsync({ chat, key: clave })
-              .then((r) => {
-                setListo(r.resultado.hecho);
-                setClave(crypto.randomUUID());
-                onChat?.(r.chat);
-              })
-              .catch(() => undefined) // el error ya se muestra con confirm.isError
-          }
-        >
+        <Button busy={conf.busy} missing={falta} onClick={conf.run}>
           Confirmar
         </Button>
       ) : null}

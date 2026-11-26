@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -260,8 +261,12 @@ func (f *Floor) Send(ctx context.Context, in FloorInput) (FloorReply, error) {
 	if err != nil {
 		return FloorReply{}, err
 	}
-	if !isNew && chat.Proposal.Pending() && domain.IsConfirmWord(user.Text) {
-		return f.confirmFromChat(ctx, in, chat, user)
+	if !isNew && domain.IsConfirmWord(user.Text) {
+		if chat.Proposal.Pending() {
+			return f.confirmFromChat(ctx, in, chat, user)
+		}
+		// Nada por guardar: lo dice el código, sin IA (el modelo inventaba que ya estaba en la ficha).
+		return f.fixedReply(ctx, in.TallerID, chat, user, nothingToSave(chat.Proposal))
 	}
 	history, err := f.history(ctx, in.TallerID, chat.ID, isNew)
 	if err != nil {
@@ -293,14 +298,7 @@ func (f *Floor) confirmFromChat(ctx context.Context, in FloorInput, chat FloorCh
 		if !ok {
 			return FloorReply{}, err
 		}
-		reply := FloorMessage{ID: shared.NewID(), ChatID: chat.ID, Role: "asistente", CreatedAt: user.CreatedAt.Add(time.Millisecond),
-			Text: "No lo pude guardar: " + e.Message}
-		next := chat
-		next.Version, next.UpdatedAt = chat.Version+1, f.clock.Now()
-		if err := f.save(ctx, in.TallerID, chat, false, next, chat.Version, user, reply); err != nil {
-			return FloorReply{}, err
-		}
-		return FloorReply{Chat: next, Messages: []FloorMessage{user, reply}, Available: true}, nil
+		return f.fixedReply(ctx, in.TallerID, chat, user, "No lo pude guardar: "+e.Message)
 	}
 	// El mensaje de la persona va antes del "Listo, quedó guardado" que escribió Confirm.
 	user.CreatedAt = user.CreatedAt.Add(-time.Millisecond)
@@ -312,6 +310,25 @@ func (f *Floor) confirmFromChat(ctx context.Context, in FloorInput, chat FloorCh
 		msgs = append(msgs, *applied.Message)
 	}
 	return FloorReply{Chat: done, Messages: msgs, Available: f.model != nil}, nil
+}
+
+// fixedReply guarda una respuesta que escribe el código (sin IA) y deja la propuesta como estaba.
+func (f *Floor) fixedReply(ctx context.Context, tallerID shared.ID, chat FloorChat, user FloorMessage, text string) (FloorReply, error) {
+	reply := FloorMessage{ID: shared.NewID(), ChatID: chat.ID, Role: "asistente", CreatedAt: user.CreatedAt.Add(time.Millisecond), Text: text}
+	next := chat
+	next.Version, next.UpdatedAt = chat.Version+1, f.clock.Now()
+	if err := f.save(ctx, tallerID, chat, false, next, chat.Version, user, reply); err != nil {
+		return FloorReply{}, err
+	}
+	return FloorReply{Chat: next, Messages: []FloorMessage{user, reply}, Available: true}, nil
+}
+
+// nothingToSave es lo que dice el código cuando la persona pide confirmar y no hay nada pendiente.
+func nothingToSave(p domain.FloorProposal) string {
+	if p.OtherOrder != nil && p.OtherOrder.Plate != nil {
+		return "Aquí no hay nada por guardar. Para el " + p.OtherOrder.Plate.Value + ", toca «Abrir orden nueva con estos datos» en la tarjeta."
+	}
+	return "No hay nada por guardar en esta conversación. Cuéntame qué quieres agregar."
 }
 
 // validateInput revisa el tamaño del mensaje y el tipo de cada foto por su contenido. Devuelve el texto limpio.
@@ -524,7 +541,9 @@ func (f *Floor) think(ctx context.Context, chat FloorChat, history []FloorMessag
 	// conversación pasa a la orden aunque el modelo olvide la tool, y se ahorra una ronda.
 	// Lo que viene de la persona o de una foto (la propuesta, el cliente de la placa) nunca va en el prompt del sistema
 	// (R-08): entra como resultado de una tool, igual que cualquier dato que consulta el modelo.
-	if plates := domain.FindPlates(user.Text); len(plates) == 1 && work.Proposal.Plate == nil && work.OrderID == nil {
+	// En el chat de una orden, una placa escrita distinta también se busca: así sale la sugerencia de abrirla en el
+	// asistente general aunque el modelo no llame la tool (solo se sugiere; la persona decide).
+	if plates := domain.FindPlatesStrict(user.Text); len(plates) == 1 && preLookup(work, plates[0]) {
 		args := jsonString(map[string]string{"placa": plates[0]})
 		msgs = append(msgs, toolTurn("pre-placa", "buscar_vehiculo", args, t.findVehicle(cctx, plates[0], false))...)
 	}
@@ -543,7 +562,52 @@ func (f *Floor) think(ctx context.Context, chat FloorChat, history []FloorMessag
 	if err != nil || strings.TrimSpace(text) == "" {
 		return thought{}, false, ctx.Err() // la IA falló o se agotó el tiempo: solo se corta si el llamador se fue
 	}
-	return thought{text: floorText(text, t.allowed()), chat: work}, true, nil
+	t.otherInText(cctx, text)
+	if t.otherPhotos { // las fotos de este mensaje son del otro vehículo: van a su borrador, no a esta orden
+		photos := make([]domain.FloorPhoto, 0, len(t.photos))
+		for _, ref := range t.photos {
+			photos = append(photos, domain.FloorPhoto{Ref: ref, Origin: t.photoOrigin()})
+		}
+		work.Proposal.MovePhotosToOther(photos)
+	}
+	return thought{text: floorText(text, t.allowed(), work.Proposal.Pending(), work.OrderID != nil), chat: work}, true, nil
+}
+
+// otherInText: en el chat de una orden, si el asistente nombra otra placa que la persona dijo, o que pudo leer de una
+// foto de este mensaje, sale la tarjeta del otro vehículo aunque el modelo no haya llamado la tool. Sin fotos, una
+// placa que nadie dijo no cuenta (el modelo la inventó o la recuerda mal). Con fotos el código no puede saber si se ve:
+// por eso una placa a un carácter de la de la orden (XVN43E por XVN43F) se toma como mala lectura de esa misma placa.
+// Solo se sugiere: la persona decide y "No, sigo aquí" devuelve las fotos.
+func (t *floorTurn) otherInText(ctx context.Context, text string) {
+	p := &t.chat.Proposal
+	if t.chat.OrderID == nil || p.Plate == nil {
+		return
+	}
+	for _, plate := range domain.FindPlatesStrict(text) {
+		if domain.NearPlate(plate, p.Plate.Value) || (p.OtherOrder != nil && p.OtherOrder.Plate.Value == plate) {
+			continue
+		}
+		said := slices.Contains(domain.FindPlates(t.said), plate)
+		if !said && len(t.photos) == 0 {
+			continue
+		}
+		origin := domain.FromSaid
+		if !said {
+			origin = t.photoOrigin()
+		}
+		t.other(ctx, plate, origin, !said || t.video)
+		return
+	}
+}
+
+// preLookup dice si el código busca la placa antes del modelo: la conversación no tiene vehículo, o es de una orden y
+// la placa escrita es otra.
+func preLookup(c FloorChat, plate string) bool {
+	p := c.Proposal.Plate
+	if c.OrderID == nil {
+		return p == nil
+	}
+	return p != nil && p.Value != plate
 }
 
 // ready dice si se puede llamar a la IA (hay modelo y queda tope este mes) y trae lo que el asistente sabe del taller.
@@ -593,7 +657,7 @@ func chatMessages(history []FloorMessage, user FloorMessage, photos []Blob, vide
 
 // floorText deja el texto del asistente corto y sin markdown; si trae una cifra que no es de la lista ni la dijo la
 // persona, sale el texto fijo.
-func floorText(text string, allowed map[int64]bool) string {
+func floorText(text string, allowed map[int64]bool, pending, hasOrder bool) string {
 	text = domain.Tidy(text)
 	if r := []rune(text); len(r) > 1200 {
 		text = string(r[:1200])
@@ -601,7 +665,7 @@ func floorText(text string, allowed map[int64]bool) string {
 	if !domain.FloorTextOK(text, allowed) {
 		return floorChecked
 	}
-	return domain.FloorUnsaved(text)
+	return domain.FloorUnsaved(text, pending, hasOrder)
 }
 
 // chat llama al modelo y registra la llamada (HU-99) con propósito "piso".

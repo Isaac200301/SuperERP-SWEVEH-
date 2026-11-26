@@ -485,6 +485,23 @@ export interface paths {
         patch: operations["editFloorProposal"];
         trace?: never;
     };
+    "/assistant/floor/chats/{id}/other-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Abrir orden nueva con estos datos: crea una conversación general nueva cuya ficha es el borrador del otro vehículo (datos y fotos) y lo quita de este chat. No guarda nada en ninguna orden: allá la persona toca Guardar. Idempotente por Idempotency-Key. Permiso assistant:use */
+        post: operations["openFloorOtherOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/assistant/floor/chats/{id}/confirm": {
         parameters: {
             query?: never;
@@ -2079,6 +2096,8 @@ export interface components {
             /** @description false = la IA no respondió (no hay, se agotó el tope o falló): sigue con el formulario */
             disponible: boolean;
             voz: boolean;
+            /** @description Lo que falta para la orden del otro vehículo (solo con propuesta.otraOrden) */
+            otraFalta?: string[];
         };
         CampoPiso: {
             valor: string;
@@ -2157,6 +2176,8 @@ export interface components {
             estado?: components["schemas"]["CampoPiso"];
             /** @description Lo que el modelo vio en un video de recepción (marca la guía; no se confirma ni se edita) */
             vistos?: string[];
+            /** @description Borrador de OTRO vehículo que apareció en el chat de una orden (otra placa dicha o leída de una foto), con sus datos y fotos. Va aparte: nunca entra a esta orden. La pantalla lo muestra en una tarjeta; la persona lo abre en una conversación nueva (POST .../other-order) o lo descarta (PATCH sin otraOrden: sus fotos vuelven a esta propuesta). Solo lo arma el código */
+            otraOrden?: components["schemas"]["PropuestaPiso"];
         };
         VistaCliente: {
             documento: components["schemas"]["DocumentoCliente"];
@@ -3687,6 +3708,41 @@ export interface operations {
                     };
                 };
             };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    openFloorOtherOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description La conversación nueva (o la misma, con la misma clave) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        chat: components["schemas"]["ChatPiso"];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
         };

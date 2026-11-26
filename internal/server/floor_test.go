@@ -464,7 +464,7 @@ func TestFloor_ConfirmFromChatAndRealStatus(t *testing.T) {
 	}
 	r := owner.must(http.StatusOK, owner.floorSend(map[string]string{"texto": "llegó el RST321 de Mario Ruiz, 3001112255, cambio de aceite"}, 0))
 	chatID := chatOf(r)["id"].(string)
-	if !strings.HasPrefix(lastReply(r), "Todavía no se ha guardado nada") {
+	if !strings.HasPrefix(lastReply(r), "Lo nuevo todavía no se ha guardado") {
 		t.Fatalf("el texto que da por guardada la propuesta se corrige: %q", lastReply(r))
 	}
 	calls := len(adv.reqs)

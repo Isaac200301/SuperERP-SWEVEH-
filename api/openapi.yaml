@@ -722,6 +722,37 @@ paths:
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
 
+  /assistant/floor/chats/{id}/other-order:
+    post:
+      operationId: openFloorOtherOrder
+      summary: 'Abrir orden nueva con estos datos: crea una conversación general nueva cuya ficha es el borrador del otro vehículo (datos y fotos) y lo quita de este chat. No guarda nada en ninguna orden: allá la persona toca Guardar. Idempotente por Idempotency-Key. Permiso assistant:use'
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 8, maxLength: 100 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [version]
+              properties:
+                version: { type: integer }
+      responses:
+        '200':
+          description: La conversación nueva (o la misma, con la misma clave)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [chat]
+                properties:
+                  chat: { $ref: '#/components/schemas/ChatPiso' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+
   /assistant/floor/chats/{id}/confirm:
     post:
       operationId: confirmFloorProposal
@@ -2887,6 +2918,7 @@ components:
               conPropuesta: { type: boolean }
         disponible: { type: boolean, description: 'false = la IA no respondió (no hay, se agotó el tope o falló): sigue con el formulario' }
         voz: { type: boolean }
+        otraFalta: { type: array, items: { type: string }, description: 'Lo que falta para la orden del otro vehículo (solo con propuesta.otraOrden)' }
 
     CampoPiso:
       type: object
@@ -2974,6 +3006,9 @@ components:
               origen: { type: string }
         estado: { $ref: '#/components/schemas/CampoPiso' }
         vistos: { type: array, items: { type: string }, description: 'Lo que el modelo vio en un video de recepción (marca la guía; no se confirma ni se edita)' }
+        otraOrden:
+          allOf: [{ $ref: '#/components/schemas/PropuestaPiso' }]
+          description: 'Borrador de OTRO vehículo que apareció en el chat de una orden (otra placa dicha o leída de una foto), con sus datos y fotos. Va aparte: nunca entra a esta orden. La pantalla lo muestra en una tarjeta; la persona lo abre en una conversación nueva (POST .../other-order) o lo descarta (PATCH sin otraOrden: sus fotos vuelven a esta propuesta). Solo lo arma el código'
 
     VistaCliente:
       type: object

@@ -98,6 +98,34 @@ export function useConfirmFloor() {
   });
 }
 
+/** Una conversación por su id (la que se abrió con "Abrir orden nueva con estos datos"). */
+export function useFloorChat(id: string | undefined) {
+  return useQuery({
+    queryKey: [...floorKey, 'chat', id],
+    enabled: !!id,
+    queryFn: async () => unwrap(await api.GET('/assistant/floor/chats/{id}', { params: { path: { id: id ?? '' } } })).chat,
+  });
+}
+
+/**
+ * "Abrir orden nueva con estos datos": crea la conversación nueva con el borrador del otro vehículo (datos y fotos).
+ * No guarda nada en ninguna orden. La clave la genera la pantalla: un doble toque abre una sola conversación.
+ */
+export function useOpenOther() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ chat, key }: { chat: ChatPiso; key: string }) =>
+      unwrap(
+        await api.POST('/assistant/floor/chats/{id}/other-order', {
+          params: { path: { id: chat.id }, header: { 'Idempotency-Key': key } },
+          body: { version: chat.version },
+        }),
+      ).chat,
+    onSuccess: (chat) => qc.setQueryData([...floorKey, 'chat', chat.id], chat),
+    onSettled: () => qc.invalidateQueries({ queryKey: floorKey }),
+  });
+}
+
 export type VideoRecepcion = { ordenId: string; segundos: number; audio?: Blob | undefined; cuadros: Blob[]; clave: string };
 
 /**

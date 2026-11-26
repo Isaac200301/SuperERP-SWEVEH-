@@ -1,18 +1,25 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 
 import { Alert } from '../../shared/ui/Alert';
-import { useLatestFloorChat, type ChatPiso } from './api';
+import { useFloorChat, useLatestFloorChat, type ChatPiso } from './api';
 import { FloorChat } from './FloorChat';
 
 /**
  * Pestaña "Asistente" (V-11, HU-107; Figma 06): el chat general del piso. Retoma la última conversación de la persona
- * (12 h); cuando hay placa, la conversación sigue dentro de su orden y aquí queda el enlace.
+ * (12 h); cuando hay placa, la conversación sigue dentro de su orden y aquí queda el enlace. Con ?chat= abre esa
+ * conversación: es la que se creó con "Abrir orden nueva con estos datos" desde el chat de otra orden.
  */
 export function AssistantPage() {
+  const [params] = useSearchParams();
+  const pedida = params.get('chat') ?? undefined;
   const q = useLatestFloorChat();
+  const qc = useFloorChat(pedida);
   // undefined = la que diga el servidor; null = una conversación nueva.
   const [actual, setActual] = useState<ChatPiso | null | undefined>(undefined);
-  const chat = actual === undefined ? (q.data?.chat ?? null) : actual;
+  const delServidor = pedida ? (qc.data ?? null) : (q.data?.chat ?? null);
+  const chat = actual === undefined ? delServidor : actual;
+  const cargando = q.isPending || (!!pedida && qc.isPending);
   return (
     <>
       <header className="flex items-start justify-between gap-3">
@@ -26,9 +33,12 @@ export function AssistantPage() {
           </button>
         ) : null}
       </header>
-      {q.isPending ? <p role="status">Cargando la conversación…</p> : null}
+      {cargando ? <p role="status">Cargando la conversación…</p> : null}
       {q.isError ? <Alert>{q.error.message}</Alert> : null}
-      {q.isSuccess ? <FloorChat chat={chat} disponible={chat ? chat.disponible : q.data.disponible} voz={q.data.voz} onChat={setActual} conEnlace /> : null}
+      {qc.isError ? <Alert>{qc.error.message}</Alert> : null}
+      {q.isSuccess && !cargando ? (
+        <FloorChat key={chat?.id ?? 'nueva'} chat={chat} disponible={chat ? chat.disponible : q.data.disponible} voz={q.data.voz} onChat={setActual} conEnlace />
+      ) : null}
     </>
   );
 }

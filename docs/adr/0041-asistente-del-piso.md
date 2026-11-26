@@ -89,6 +89,13 @@ V-13 limita la IA a **modelos gratuitos** de OpenRouter, con Groq para la voz.
 - Sin modelo, con el tope agotado, con un error o si pasan 60 s, el chat dice **"El asistente no está disponible, sigue con el formulario"** y la propuesta queda como estaba: nada a medias (RNF-13).
 - Los formularios de recepción, diagnóstico, cotización y gastos siguen iguales.
 
+### Otro vehículo en el chat de una orden (ajuste del 26-nov, `docs/07`)
+- El chat de una orden no abre otra orden. Los datos y las fotos de otro vehículo van a un **borrador aparte** (`propuesta.otraOrden`) que arma el código: cuando `buscar_vehiculo` rechaza otra placa, cuando la persona la escribe o cuando el asistente la nombra (la persona la dijo o hay fotos en ese mensaje). El asistente lo llena con `proponer_otra_orden`, con las reglas de `crear_orden`.
+- La pantalla lo muestra en una tarjeta. **Abrir orden nueva con estos datos** (`POST /assistant/floor/chats/{id}/other-order`, `assistant:use`) crea en una transacción una conversación general nueva cuya ficha es el borrador, con sus fotos en un primer mensaje que escribe el código (así la foto se sirve desde ese chat), y quita el borrador del chat original. Idempotente: el id de la conversación nueva sale del chat y de la `Idempotency-Key`; versión optimista. Nada se guarda en ninguna orden hasta tocar Guardar allá. El asistente no tiene memoria entre conversaciones: los datos los lleva el código, no la conversación.
+- **No, sigo aquí** lo descarta y las fotos vuelven a la propuesta. Se hace con el PATCH de la ficha sin `otraOrden`: cualquier PATCH que no lo traiga lo descarta (la pantalla siempre manda la propuesta completa).
+- **Límites:** con fotos en el mensaje, el código no sabe si una placa nombrada por el modelo se ve de verdad; una placa a un carácter de la de la orden se toma como mala lectura de esa misma (sin tarjeta). Una placa mal leída más distinta arma la tarjeta y mueve las fotos del mensaje: no se pierden, la persona decide.
+- "confirmar" sin nada pendiente lo contesta el código, sin IA. El aviso de "no se ha guardado" sale según el estado (con algo pendiente apunta a Guardar).
+
 ### Datos personales
 - Al borrar los datos de un titular (HU-87), se borran los textos, las fotos y la propuesta de las conversaciones del piso de sus órdenes.
 - Los logs no llevan el texto de los mensajes ni el celular (probado).

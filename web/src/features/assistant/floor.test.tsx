@@ -51,7 +51,9 @@ describe('Asistente del piso (R8)', () => {
     expect(screen.getByLabelText('Sin precio · ponlo')).toHaveValue('');
     // DR-06: Confirmar dice qué falta en vez de quedar gris y mudo.
     expect(screen.getByRole('button', { name: 'Confirmar' })).toBeDisabled();
-    expect(screen.getByText('Falta el precio de 1 ítem de la cotización.')).toBeInTheDocument();
+    // El cuadro de guardar del chat dice lo mismo (los dos usan el mismo confirmar).
+    expect(screen.getByRole('button', { name: 'Guardar orden' })).toBeDisabled();
+    expect(screen.getAllByText('Falta el precio de 1 ítem de la cotización.')).toHaveLength(2);
   });
 
   it('el precio que pone la persona se guarda en la ficha con su versión', async () => {

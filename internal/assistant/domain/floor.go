@@ -105,6 +105,81 @@ type FloorProposal struct {
 	// Seen es lo que el modelo reportó haber visto en un video de recepción (guía de lados, R9). No se confirma: solo
 	// marca la guía.
 	Seen []string `json:"vistos,omitempty"`
+	// OtherOrder es el borrador de OTRO vehículo que apareció en el chat de una orden (la persona habló de él o se vio
+	// su placa en una foto o un video). Va aparte: nunca entra a la orden de este chat ni se confirma aquí. La pantalla
+	// lo muestra en una tarjeta y la persona decide: abrirlo en una conversación nueva con estos datos y sus fotos, o
+	// descartarlo (las fotos vuelven a esta propuesta). Solo lo arma el código; la ficha no lo edita.
+	OtherOrder *FloorProposal `json:"otraOrden,omitempty"`
+}
+
+// SetOther pone el borrador del otro vehículo con esa placa. Si ya había uno de otra placa, sus fotos vuelven a la
+// propuesta (no se pierden) y el borrador empieza de nuevo.
+func (p *FloorProposal) SetOther(plate, origin string) *FloorProposal {
+	if p.OtherOrder != nil && p.OtherOrder.Plate != nil && p.OtherOrder.Plate.Value == plate {
+		return p.OtherOrder
+	}
+	p.DismissOther()
+	p.OtherOrder = &FloorProposal{Plate: &Field{Value: plate, Origin: origin}, NewOrder: true, VehicleNew: true}
+	return p.OtherOrder
+}
+
+// DismissOther quita el borrador del otro vehículo; sus fotos vuelven a esta propuesta.
+func (p *FloorProposal) DismissOther() {
+	if p.OtherOrder == nil {
+		return
+	}
+	for _, ph := range p.OtherOrder.Photos {
+		if _, ok := photoByRef(p.Photos, ph.Ref); !ok {
+			p.Photos = append(p.Photos, ph)
+		}
+	}
+	p.OtherOrder = nil
+}
+
+// MovePhotosToOther pasa esas fotos al borrador del otro vehículo (son de ese vehículo). Si la foto ya estaba en esta
+// propuesta, sale de aquí con su lado; si no, entra al borrador como viene.
+func (p *FloorProposal) MovePhotosToOther(photos []FloorPhoto) {
+	if p.OtherOrder == nil {
+		return
+	}
+	for _, ph := range photos {
+		if old, ok := photoByRef(p.Photos, ph.Ref); ok {
+			ph = old
+			p.Photos = slices.DeleteFunc(p.Photos, func(x FloorPhoto) bool { return x.Ref == old.Ref })
+		}
+		if _, ok := photoByRef(p.OtherOrder.Photos, ph.Ref); !ok {
+			p.OtherOrder.Photos = append(p.OtherOrder.Photos, ph)
+		}
+	}
+}
+
+// InOther dice si la foto ya es del borrador del otro vehículo.
+func (p FloorProposal) InOther(ref string) bool {
+	if p.OtherOrder == nil {
+		return false
+	}
+	_, ok := photoByRef(p.OtherOrder.Photos, ref)
+	return ok
+}
+
+// OrderMissing es lo que falta para proponer la orden nueva (la tarjeta lo dice; no bloquea abrir la conversación).
+func (p FloorProposal) OrderMissing() []string {
+	out := []string{}
+	if p.OrderID != "" {
+		return out
+	}
+	if p.VehicleNew {
+		if p.Kind == "" {
+			out = append(out, "si es carro o moto")
+		}
+		if p.Customer == nil || (p.Customer.ID == "" && (p.Customer.Phone == nil || p.Customer.Name == nil)) {
+			out = append(out, "el celular y el nombre del cliente")
+		}
+	}
+	if p.Symptom == nil {
+		out = append(out, "qué trae")
+	}
+	return out
 }
 
 // Pending dice si hay algo por confirmar.
@@ -115,7 +190,8 @@ func (p FloorProposal) Pending() bool {
 
 // Reset deja la propuesta vacía después de confirmar, con la placa y la orden para seguir la conversación.
 func (p FloorProposal) Reset(orderID, code, state string) FloorProposal {
-	return FloorProposal{Plate: p.Plate, Kind: p.Kind, Vehicle: p.Vehicle, OrderID: orderID, OrderCode: code, OrderState: state}
+	return FloorProposal{Plate: p.Plate, Kind: p.Kind, Vehicle: p.Vehicle, OrderID: orderID, OrderCode: code, OrderState: state,
+		OtherOrder: p.OtherOrder}
 }
 
 // ---- De dónde puede salir un precio ----
@@ -236,6 +312,37 @@ func FindPlates(text string) []string {
 		}
 	}
 	return out
+}
+
+// FindPlatesStrict es FindPlates para sugerir o buscar sin que nadie lo pida: una placa en minúsculas separada por un
+// espacio no cuenta ("a las 10" no es LAS10); en mayúsculas ("TPR 418", "TPR-418") o pegada ("tpr418") sí.
+func FindPlatesStrict(text string) []string {
+	var out []string
+	for _, m := range rePlate.FindAllStringSubmatch(text, -1) {
+		if strings.ContainsAny(m[0], " \t\n") && m[1] != strings.ToUpper(m[1]) {
+			continue
+		}
+		p := strings.ToUpper(m[1] + m[2] + m[3])
+		if !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// NearPlate dice si dos placas son la misma o difieren en un solo carácter (una mala lectura de la foto).
+func NearPlate(a, b string) bool {
+	ra, rb := []rune(a), []rune(b)
+	if len(ra) != len(rb) {
+		return false
+	}
+	diff := 0
+	for i := range ra {
+		if ra[i] != rb[i] {
+			diff++
+		}
+	}
+	return diff <= 1
 }
 
 // ---- Qué falta para recibir ("7 de 8 datos · falta la parte trasera") ----
@@ -413,6 +520,10 @@ func HumanEdit(prev, next FloorProposal) FloorProposal {
 		out.Findings[i] = editFinding(prev.Findings, out.Findings[i])
 	}
 	out.Photos = editPhotos(prev.Photos, out.Photos)
+	out.OtherOrder = prev.OtherOrder // el borrador del otro vehículo no se edita en esta ficha: se abre o se descarta
+	if next.OtherOrder == nil {
+		out.DismissOther()
+	}
 	for i, it := range out.Items {
 		if old, ok := itemByKey(prev.Items, it.Key); ok && old.State == it.State && old.Note == it.Note {
 			out.Items[i].Origin = old.Origin
@@ -626,14 +737,24 @@ func IsConfirmWord(text string) bool {
 	return len([]rune(t)) <= 40 && !strings.Contains(" "+t+" ", " no ") && reConfirm.MatchString(t)
 }
 
-// FloorUnsavedNote va al principio de una respuesta que da algo por guardado.
-const FloorUnsavedNote = "Todavía no se ha guardado nada: revisa la ficha de arriba y toca Confirmar."
+// Avisos que van al principio de una respuesta que da algo por guardado. Cuál sale lo decide el estado, no las
+// palabras: con algo pendiente hay un cuadro de Guardar al cual apuntar; sin orden y sin pendiente, nada existe.
+const (
+	FloorUnsavedNote = "Lo nuevo todavía no se ha guardado: toca «Guardar» abajo."
+	FloorNothingNote = "Todavía no se ha guardado nada."
+)
 
-// FloorUnsaved corrige un texto que da por guardado lo que solo es una propuesta: cambia las frases conocidas y, si
-// todavía dice que algo quedó creado o guardado, le antepone el aviso.
-func FloorUnsaved(text string) string {
-	if !reSavedClaim.MatchString(text) {
+// FloorUnsaved corrige un texto que da por guardado lo que no lo está. pending: hay algo por guardar en este chat;
+// hasOrder: el chat es de una orden que ya existe. En el chat de una orden sin nada pendiente el texto no se toca:
+// lo que diga de la orden puede ser cierto (ya está guardada).
+func FloorUnsaved(text string, pending, hasOrder bool) string {
+	switch {
+	case !reSavedClaim.MatchString(text):
 		return text
+	case pending:
+		return FloorUnsavedNote + "\n\n" + unsavedWords.Replace(text)
+	case !hasOrder:
+		return FloorNothingNote + "\n\n" + text
 	}
-	return FloorUnsavedNote + "\n\n" + unsavedWords.Replace(text)
+	return text
 }

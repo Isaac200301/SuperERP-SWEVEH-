@@ -82,9 +82,11 @@ func (f *Floor) Video(ctx context.Context, in VideoInput) (FloorReply, error) {
 	if err != nil {
 		return FloorReply{}, err
 	}
-	// Los cuadros van a la propuesta aunque la IA no responda: no se pierden y se confirman como fotos de la orden.
+	// Los cuadros van a la propuesta aunque la IA no responda: no se pierden y se confirman como fotos de la orden. Si
+	// en el video apareció otra placa, ya están en el borrador del otro vehículo: la tarjeta deja abrirlo o descartarlo
+	// (con "No, sigo aquí" vuelven a esta orden).
 	for _, a := range user.Attachments {
-		if a.Kind == "foto" {
+		if a.Kind == "foto" && !next.Proposal.InOther(a.Ref) {
 			next.Proposal.Photos = upsertPhoto(next.Proposal.Photos, domain.FloorPhoto{Ref: a.Ref, Origin: domain.FromVideo})
 		}
 	}
