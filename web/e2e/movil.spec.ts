@@ -28,10 +28,12 @@ test('el dueño maneja el taller desde el celular', async ({ page }) => {
   await sinDesborde(page);
   await shot(page, 'movil-01-hoy');
 
-  // Asistente: por ahora el chat vacío (R8).
+  // Asistente (R8, Figma 06): el chat con su campo, Fotos y Enviar, sin desbordarse en el celular.
   await barra.getByRole('link', { name: 'Asistente' }).click();
-  await expect(page.getByRole('heading', { name: 'Asistente' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Asistente', level: 1 })).toBeVisible();
+  await expect(page.getByLabel('Mensaje para el asistente')).toBeVisible();
   await sinDesborde(page);
+  await shot(page, 'movil-asistente');
 
   // Nueva orden desde Órdenes: la placa no ha venido, así que va a la pantalla completa.
   await barra.getByRole('link', { name: 'Órdenes' }).click();

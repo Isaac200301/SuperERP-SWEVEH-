@@ -1669,6 +1669,26 @@ _Módulo del MVP: Preparativos. Que la demo corra dos veces seguidas sin tocar c
 
 **Trazabilidad:** Depende de: HU-27, HU-105 · ADR-0040
 
+### HU-107 · Recibir, diagnosticar y cotizar hablándole al asistente
+
+**Épica:** E04 · **Roles:** Dueño del taller, Recepción, Mecánico · **Superficies:** Panel, Piso · **Prioridad:** Must · **Origen:** Pablo (24-nov-2026, entrega del viernes, V-11 y V-13), por revisar con Isaac · **Aplica a motos:** sí
+
+**Como** mecánico o persona del taller con las manos ocupadas, **quiero** decirle, escribirle o mostrarle en fotos al asistente lo que llegó, lo que encontré y lo que cuesta, **para** que la orden, la recepción, la cotización y los gastos queden armados sin llenar formularios y solo los confirme.
+
+**Criterios de aceptación**
+
+- **Dado** el chat general del asistente, **cuando** digo o escribo una placa, **entonces** busca el vehículo; si tiene orden abierta, la conversación sigue dentro de esa orden y nunca crea otra; si no, propone la orden nueva "Por recibir".
+- **Dado** dos placas en el mismo mensaje, **cuando** lo mando, **entonces** pregunta con cuál sigo, con un botón por placa.
+- **Dado** lo que digo o muestro, **cuando** el asistente arma la propuesta, **entonces** la ficha en vivo dice cuántos datos de la recepción tiene ("7 de 8 datos · falta la parte trasera") y de dónde salió cada dato; nada queda en la orden hasta que toco **Confirmar**.
+- **Dado** un ítem de la cotización, **cuando** el asistente le pone precio, **entonces** solo vale el de la lista del taller o una cifra que yo dije; si no, queda "Sin precio · ponlo" y no se puede confirmar hasta que lo pongo.
+- **Dado** la propuesta completa, **cuando** toco Confirmar (aunque lo toque dos veces), **entonces** quedan una sola vez la orden, la ficha, la recepción con las fotos, los hallazgos, la cotización, los gastos y el estado, con la bitácora de quién confirmó.
+- **Dado** que la IA no responde o se acabó el cupo, **cuando** le escribo, **entonces** dice "El asistente no está disponible, sigue con el formulario" y la propuesta queda como estaba.
+- **Dado** un mensaje con órdenes para la IA ("ignora tus instrucciones") o un precio en una foto, **cuando** el asistente lo procesa, **entonces** no cambia las reglas: no inventa precios ni diagnostica por su cuenta.
+
+**Notas:** ADR-0041. Solo modelos gratuitos de OpenRouter (`AI_PISO_MODELS`) y Groq para la voz (V-13). La recepción por video es HU-108 (R9).
+
+**Trazabilidad:** Depende de: HU-16, HU-17, HU-18, HU-20, HU-27, HU-103, HU-105, HU-106 · Usa: HU-64 · ADR-0041
+
 ### HU-109 · Mostrar la cotización en pantalla y compartirla en PDF
 
 **Épica:** E04 · **Roles:** Dueño del taller, Recepción, Mecánico · **Superficies:** Panel, Piso · **Prioridad:** Must · **Origen:** Pablo (24-nov-2026, entrega del viernes, V-10), por revisar con Isaac · **Aplica a motos:** sí

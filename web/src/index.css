@@ -27,6 +27,8 @@
   --color-nav: #ddf47b;
   --color-kpi-peach: #fff1e2;
   --color-kpi-lilac: #eee9fd;
+  /* Texto sobre lila: la etiqueta "Propuesta" y el origen de cada dato del asistente (R8). */
+  --color-lilac-ink: #4b3a8f;
   --color-kpi-aqua: #ddf5f1;
   --color-plate: #f9e03f;
   /* DR-03: el ámbar solo va en el punto del logo. */

@@ -37,6 +37,38 @@ type AssistantBorrador struct {
 	NotaDeVoz         bool
 }
 
+type AssistantChatPiso struct {
+	ID            uuid.UUID
+	TallerID      uuid.UUID
+	UsuarioID     uuid.UUID
+	OrdenID       *uuid.UUID
+	Propuesta     json.RawMessage
+	Version       int32
+	CreadoEn      time.Time
+	ActualizadoEn time.Time
+}
+
+type AssistantChatPisoConfirmacion struct {
+	TallerID  uuid.UUID
+	Clave     string
+	ChatID    uuid.UUID
+	Resultado json.RawMessage
+	CreadoPor uuid.UUID
+	CreadoEn  time.Time
+}
+
+type AssistantChatPisoMensaje struct {
+	ID        uuid.UUID
+	TallerID  uuid.UUID
+	ChatID    uuid.UUID
+	Rol       string
+	Texto     string
+	Adjuntos  json.RawMessage
+	Opciones  json.RawMessage
+	Propuesta json.RawMessage
+	CreadoEn  time.Time
+}
+
 type AssistantLlamadaIum struct {
 	ID            uuid.UUID
 	TallerID      uuid.UUID

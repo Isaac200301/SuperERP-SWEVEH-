@@ -14,6 +14,7 @@ import (
 	automationspg "sweveh/internal/automations/adapters/out/postgres"
 	automationsapp "sweveh/internal/automations/app"
 	"sweveh/internal/catalog/adapters/out/vision"
+	"sweveh/internal/identity"
 	messagingpg "sweveh/internal/messaging/adapters/out/postgres"
 	"sweveh/internal/messaging/adapters/out/whatsapp"
 	"sweveh/internal/messaging/adapters/out/whatsapp/local"
@@ -31,6 +32,7 @@ type Services struct {
 	Messaging   *messagingapp.Service
 	Automations *automationsapp.Service
 	Assistant   *assistantapp.Service
+	Floor       *assistantapp.Floor // asistente del piso (R8, ADR-0041)
 }
 
 // Build arma los servicios del motor sobre los módulos ya cableados.
@@ -38,6 +40,8 @@ func Build(m *server.Modules, wa config.WhatsApp, ai config.AI) *Services {
 	s := BuildWith(m, Channel(wa), Interpreter(ai), ai)
 	if ai.Provider == "openrouter" { // el asesor con tools necesita un modelo; con reglas queda el flujo de plantillas
 		s.Assistant.SetAdvisor(openrouter.New(ai.APIBase, ai.APIKey, ai.Model, 20*time.Second))
+		// R8: el asistente del piso usa su propia cadena de modelos gratis (AI_PISO_MODELS; vacía = AI_MODEL).
+		s.Floor.SetModel(openrouter.New(ai.APIBase, ai.APIKey, ai.FloorModels(), 30*time.Second))
 		// HU-93: la lista de precios por foto se lee con un modelo de visión (ADR-0032).
 		m.Catalog.SetPriceReader(vision.New(ai.APIBase, ai.APIKey, ai.VisionModel, 60*time.Second))
 	}
@@ -95,8 +99,12 @@ func BuildWith(m *server.Modules, ch messagingapp.Channel, it assistantapp.Inter
 		cap = 5_000_000
 	}
 	s.Assistant = assistantapp.NewService(m.Tx, assistantpg.Repository{}, &taller{s: s}, m.Audit, m.Clock, it, rules.Interpreter{}, cap)
-	if ai.STTProvider == "groq" { // HU-60: notas de voz (ADR-0033)
-		s.Assistant.SetTranscriber(groq.New(ai.STTAPIBase, ai.STTAPIKey, ai.STTModel, 45*time.Second))
+	s.Floor = assistantapp.NewFloor(assistantapp.FloorDeps{UoW: m.Tx, Repo: assistantpg.Floor{}, Shop: floorShop{m}, Files: floorFiles{m.Storage},
+		Audit: m.Audit, Events: m.Events, Clock: m.Clock, MonthlyCapMicroUSD: cap, Can: identity.HasPermission})
+	if ai.STTProvider == "groq" { // HU-60: notas de voz (ADR-0033); en el piso, el micrófono del asistente (R8)
+		stt := groq.New(ai.STTAPIBase, ai.STTAPIKey, ai.STTModel, 45*time.Second)
+		s.Assistant.SetTranscriber(stt)
+		s.Floor.SetTranscriber(stt)
 	}
 	m.Customers.SetMover(customerMover{s})   // unir clientes repetidos (HU-15)
 	m.Customers.SetEraser(customerEraser{s}) // borrar los datos del titular (HU-87)

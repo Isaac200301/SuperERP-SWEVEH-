@@ -91,8 +91,9 @@ func newEnvWith(t *testing.T, cfg config.API) *env {
 	return newEnvRaw(t, cfg)
 }
 
-// newEnvRaw usa las banderas tal como vienen, incluso todas apagadas (como en la entrega del 27-nov).
-func newEnvRaw(t *testing.T, cfg config.API) *env {
+// newEnvRaw usa las banderas tal como vienen, incluso todas apagadas (como en la entrega del 27-nov). hooks se
+// aplican a los servicios del motor ya armados (el asistente del piso con una IA falsa, R8).
+func newEnvRaw(t *testing.T, cfg config.API, hooks ...func(*wire.Services)) *env {
 	t.Helper()
 	d := testdb.New(t)
 	key, err := authn.GenerateDevKey()
@@ -120,7 +121,11 @@ func newEnvRaw(t *testing.T, cfg config.API) *env {
 		Verifier:  authn.NewVerifier(map[string]*ecdsa.PublicKey{"test-1": &key.PublicKey}, clk),
 		OTPSender: mem, OTPPepper: []byte("pepper-de-pruebas-de-32-caracteres!!"),
 		AllowedOrigins: []string{origin}, LoginPerMinute: 100000, Storage: st,
-		Extra: wire.Extra(cfg), Public: wire.Public(d.API, cfg, log), PlatformAdmins: cfg.Platform.Admins,
+		Extra: wire.ExtraWith(cfg, func(s *wire.Services) {
+			for _, h := range hooks {
+				h(s)
+			}
+		}), Public: wire.Public(d.API, cfg, log), PlatformAdmins: cfg.Platform.Admins,
 		Features: server.Features(cfg.Features),
 		AuthPIN:  cfg.Auth.PIN(), PINHasher: hasher, RefreshTTL: cfg.Auth.RefreshTTL,
 		LockPolicy: identitydomain.LockPolicy{MaxFailures: cfg.Auth.MaxFailures, Duration: cfg.Auth.Lock},

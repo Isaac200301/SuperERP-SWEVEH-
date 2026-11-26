@@ -30,8 +30,16 @@ import (
 
 // Extra monta las rutas del motor en el api (mensajería, simulador, automatizaciones, bandeja, KPIs, bitácora).
 func Extra(cfg config.API) func(m *server.Modules, g *authn.Guard) []func(chi.Router) {
+	return ExtraWith(cfg, nil)
+}
+
+// ExtraWith es Extra con un gancho sobre los servicios ya armados: las pruebas conectan ahí una IA falsa (R8).
+func ExtraWith(cfg config.API, hook func(*Services)) func(m *server.Modules, g *authn.Guard) []func(chi.Router) {
 	return func(m *server.Modules, g *authn.Guard) []func(chi.Router) {
 		s := Build(m, Engine(cfg.WhatsApp, cfg.Features), cfg.AI)
+		if hook != nil {
+			hook(s)
+		}
 		h := &handler{s: s, g: g, log: m.Log, cfg: cfg}
 		an := analytics.NewHandler(m.Tx, m.OrdersF, m.QuotesF, extra{s}, g, m.Log, m.Clock.Now).WithLegacyKPIs(cfg.Features.WhatsApp)
 		return []func(chi.Router){h.routes, an.Routes}
@@ -58,6 +66,7 @@ func (h *handler) routes(r chi.Router) {
 	j := func(fn httpx.Func) http.HandlerFunc { return httpx.JSON(h.log, fn) }
 	r.With(h.g.Require("audit:read")).Get("/audit", j(h.audit))
 	r.With(h.g.Require("data_request:manage")).Get("/customers/{id}/export", j(h.exportCustomer))
+	h.floorRoutes(r, j) // R8: el asistente del piso no depende de WhatsApp
 	// V-01 y V-02 (entrega del 27-nov): con la bandera apagada estas rutas no se montan y responden 404, igual que
 	// una ruta que no existe. El código queda para volver a encenderlas (FEATURE_WHATSAPP, FEATURE_PLATFORM).
 	if h.cfg.Features.WhatsApp {

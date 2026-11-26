@@ -5095,6 +5095,85 @@
    ]
   },
   {
+   "id": "HU-107",
+   "epic": "E04",
+   "roles": [
+    "DU",
+    "RE",
+    "ME"
+   ],
+   "surf": [
+    "P",
+    "F"
+   ],
+   "titulo": "Recibir, diagnosticar y cotizar hablándole al asistente",
+   "como": "mecánico o persona del taller con las manos ocupadas",
+   "quiero": "decirle, escribirle o mostrarle en fotos al asistente lo que llegó, lo que encontré y lo que cuesta",
+   "para": "que la orden, la recepción, la cotización y los gastos queden armados sin llenar formularios y solo los confirme",
+   "prio": "M",
+   "antes": "",
+   "src": "pablo-2026-11-24",
+   "moto": true,
+   "veh": "",
+   "dep": [
+    "HU-16",
+    "HU-17",
+    "HU-18",
+    "HU-20",
+    "HU-27",
+    "HU-103",
+    "HU-105",
+    "HU-106"
+   ],
+   "rf": [
+    "RF-17",
+    "RF-18"
+   ],
+   "au": [],
+   "esc": [],
+   "ca": [],
+   "notas": "Entrega del 27-nov (V-11, V-13, ADR-0041). Solo modelos gratuitos de OpenRouter y Groq para la voz. Por revisar con Isaac.",
+   "refs": [],
+   "canc": "",
+   "ac": [
+    {
+     "dado": "el chat general del asistente",
+     "cuando": "digo o escribo una placa",
+     "entonces": "busca el vehículo; si tiene orden abierta la conversación sigue dentro de esa orden y nunca crea otra; si no, propone la orden nueva por recibir"
+    },
+    {
+     "dado": "dos placas en el mismo mensaje",
+     "cuando": "lo mando",
+     "entonces": "pregunta con cuál sigo, con un botón por placa"
+    },
+    {
+     "dado": "lo que digo o muestro",
+     "cuando": "el asistente arma la propuesta",
+     "entonces": "la ficha en vivo dice cuántos datos de la recepción tiene, qué falta y de dónde salió cada dato; nada queda en la orden hasta que toco Confirmar"
+    },
+    {
+     "dado": "un ítem de la cotización",
+     "cuando": "el asistente le pone precio",
+     "entonces": "solo vale el de la lista del taller o una cifra que dije; si no, queda Sin precio · ponlo y no se puede confirmar hasta que lo pongo"
+    },
+    {
+     "dado": "la propuesta completa",
+     "cuando": "toco Confirmar (aunque lo toque dos veces)",
+     "entonces": "quedan una sola vez la orden, la ficha, la recepción con las fotos, los hallazgos, la cotización, los gastos y el estado, con la bitácora de quién confirmó"
+    },
+    {
+     "dado": "que la IA no responde o se acabó el cupo",
+     "cuando": "le escribo",
+     "entonces": "dice que siga con el formulario y la propuesta queda como estaba"
+    },
+    {
+     "dado": "un mensaje con órdenes para la IA (ignora tus instrucciones) o un precio en una foto",
+     "cuando": "el asistente lo procesa",
+     "entonces": "no cambia las reglas: no inventa precios ni diagnostica por su cuenta"
+    }
+   ]
+  },
+  {
    "id": "HU-109",
    "epic": "E04",
    "roles": [

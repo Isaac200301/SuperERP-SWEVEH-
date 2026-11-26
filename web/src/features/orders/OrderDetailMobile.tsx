@@ -17,8 +17,9 @@ import { OrderActions, QuotePanel, ReceptionPanel } from './OrderWork';
 import { vehiculoDe } from './OrdersMobile';
 import { useFeature } from '../auth/api';
 import { SpendPanel } from './SpendPanel';
+import { OrderAssistantCard } from '../assistant/OrderAssistantCard';
 
-type Pestana = 'estado' | 'cotizacion' | 'whatsapp' | 'historial';
+type Pestana = 'estado' | 'asistente' | 'cotizacion' | 'whatsapp' | 'historial';
 
 /** Los estados en vertical, con la hora de cada paso (mockup Orden). */
 function VerticalStepper({ orden }: { orden: Orden }) {
@@ -159,6 +160,7 @@ export function OrderDetailMobile({ orden: o }: { orden: Orden }) {
         onChange={setTab}
         tabs={[
           { value: 'estado', label: 'Estado' },
+          { value: 'asistente', label: 'Asistente' },
           { value: 'cotizacion', label: 'Cotización' },
           ...(whatsapp ? [{ value: 'whatsapp' as const, label: 'WhatsApp' }] : []),
           { value: 'historial', label: 'Historial' },
@@ -175,6 +177,7 @@ export function OrderDetailMobile({ orden: o }: { orden: Orden }) {
             {!['por_recibir', 'cancelada'].includes(o.estado) ? <DiagnosisPanel orden={o} /> : null}
           </>
         ) : null}
+        {tab === 'asistente' ? <OrderAssistantCard key={o.id} ordenId={o.id} titulo={false} /> : null}
         {tab === 'cotizacion' ? (
           cotizable ? (
             <>

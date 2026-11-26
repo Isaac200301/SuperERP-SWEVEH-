@@ -9,7 +9,7 @@ GITLEAKS_IMAGE  := zricethezav/gitleaks:v8.30.1
 -include .env
 export
 
-.PHONY: help up down waha dev dev-api dev-worker dev-web agent-eval agent-eval-conv migrate migrate-down gen gen-check lint test test-go test-web cover vuln secrets ci build image e2e seed-demo reset-demo pin-reset
+.PHONY: help up down waha dev dev-api dev-worker dev-web agent-eval agent-eval-conv agent-eval-floor migrate migrate-down gen gen-check lint test test-go test-web cover vuln secrets ci build image e2e seed-demo reset-demo pin-reset
 
 help: ## Lista los comandos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -50,6 +50,9 @@ agent-eval: ## Mide el intérprete configurado (AI_PROVIDER) con los 30 mensajes
 
 agent-eval-conv: ## Mide el asesor con tools (ADR-0029) con las 20 conversaciones; necesita AI_PROVIDER=openrouter
 	go run ./cmd/agent-eval -conversaciones
+
+agent-eval-floor: ## Mide el asistente del piso (R8, ADR-0041) con modelos reales; fuera del CI por el cupo gratis
+	go run ./cmd/agent-eval -piso
 
 gen: ## Regenera sqlc y los tipos TypeScript del contrato OpenAPI
 	docker run --rm -v "$(CURDIR):/src" -w /src $(SQLC_IMAGE) generate

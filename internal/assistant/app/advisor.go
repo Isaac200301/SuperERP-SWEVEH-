@@ -31,6 +31,13 @@ type ChatMessage struct {
 	Content    string
 	ToolCalls  []ToolCall
 	ToolCallID string
+	Images     []Image // fotos de un mensaje del usuario (asistente del piso, R8); el asesor de WhatsApp no las usa
+}
+
+// Image es una foto que va al modelo de visión junto al texto.
+type Image struct {
+	Mime string
+	Data []byte
 }
 
 type ToolCall struct{ ID, Name, Args string }

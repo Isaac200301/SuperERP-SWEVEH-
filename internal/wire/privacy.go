@@ -30,6 +30,18 @@ func (c customerEraser) AnonymizeCustomer(ctx context.Context, tallerID shared.I
 	if out["mensajes"], err = c.s.Messaging.AnonymizeCustomer(ctx, tallerID, cu.ID); err != nil {
 		return nil, err
 	}
+	// R8: las conversaciones del asistente del piso de sus órdenes pueden traer su nombre o su celular.
+	os, err := c.s.M.OrdersF.ByCustomer(ctx, tallerID, cu.ID)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]shared.ID, 0, len(os))
+	for _, o := range os {
+		ids = append(ids, o.ID)
+	}
+	if out["asistente"], err = c.s.Floor.AnonymizeOrders(ctx, tallerID, ids); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 

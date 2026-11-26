@@ -433,6 +433,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/assistant/floor/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mensaje al asistente del piso (R8, V-11, HU-107): texto, nota de voz y hasta 4 fotos. Devuelve la respuesta y la propuesta actualizada; nada se guarda en la orden hasta Confirmar. Permiso assistant:use */
+        post: operations["sendFloorMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assistant/floor/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La última conversación de la persona en las últimas 12 horas (la pestaña Asistente la retoma). Permiso assistant:use */
+        get: operations["latestFloorChat"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assistant/floor/chats/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Conversación del piso con sus mensajes, la propuesta y lo que falta para recibir. Permiso assistant:use */
+        get: operations["getFloorChat"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Lo que la persona cambia o quita en la ficha en vivo. Lo que cambia queda con origen "pusiste". Versión optimista (409). Permiso assistant:use */
+        patch: operations["editFloorProposal"];
+        trace?: never;
+    };
+    "/assistant/floor/chats/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirmar: aplica la propuesta en una transacción por los casos de uso de cada módulo, con bitácora "origen: asistente". Idempotente por Idempotency-Key. Permiso assistant:use y el de cada parte (order:create, quote:edit, expense:manage…) */
+        post: operations["confirmFloorProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assistant/floor/chats/{id}/photos/{photo}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Una foto que se mandó en la conversación. Permiso assistant:use */
+        get: operations["getFloorPhoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{id}/assistant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La conversación del asistente de esta orden (chat null si todavía no hay). Permiso assistant:use */
+        get: operations["getOrderFloorChat"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/orders/{id}/findings": {
         parameters: {
             query?: never;
@@ -1908,6 +2011,125 @@ export interface components {
             /** Format: int64 */
             quedan: number;
         };
+        ChatPisoOpcional: {
+            chat: components["schemas"]["ChatPiso"] | null;
+            /** @description false = no hay IA conectada: sigue con el formulario */
+            disponible: boolean;
+            /** @description true = se le puede mandar una nota de voz */
+            voz: boolean;
+        };
+        ChatPiso: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            ordenId: string | null;
+            version: number;
+            propuesta: components["schemas"]["PropuestaPiso"];
+            /** @description Hay algo por confirmar */
+            pendiente: boolean;
+            /** @description Ficha en vivo de la recepción: "7 de 8 datos · falta la parte trasera" */
+            progreso: {
+                tiene: number;
+                total: number;
+                falta: string[];
+            };
+            mensajes: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                rol: "usuario" | "asistente";
+                texto: string;
+                adjuntos: {
+                    /** @enum {string} */
+                    tipo: "foto" | "voz";
+                    url?: string;
+                }[];
+                /** @description Botones (dos placas) */
+                opciones: string[];
+                /** Format: date-time */
+                creadoEn: string;
+                conPropuesta?: boolean;
+            }[];
+            /** @description false = la IA no respondió (no hay, se agotó el tope o falló): sigue con el formulario */
+            disponible: boolean;
+            voz: boolean;
+        };
+        CampoPiso: {
+            valor: string;
+            /**
+             * @description De dónde salió el dato (HU-64)
+             * @enum {string}
+             */
+            origen: "dijiste" | "foto" | "lista" | "pusiste" | "taller";
+        };
+        /** @description Lo que el asistente propone y todavía no está guardado (R-08). Un precio solo sale de la lista del taller, de lo que dijo la persona o de lo que ella escribe en la ficha */
+        PropuestaPiso: {
+            placa?: components["schemas"]["CampoPiso"];
+            /** @enum {string} */
+            tipo?: "carro" | "moto";
+            vehiculo?: string;
+            vehiculoNuevo?: boolean;
+            ordenId?: string;
+            ordenCodigo?: string;
+            ordenEstado?: string;
+            nuevaOrden?: boolean;
+            cliente?: {
+                id?: string;
+                celular?: components["schemas"]["CampoPiso"];
+                nombre?: components["schemas"]["CampoPiso"];
+            };
+            sintoma?: components["schemas"]["CampoPiso"];
+            ficha?: {
+                [key: string]: components["schemas"]["CampoPiso"];
+            };
+            kilometraje?: components["schemas"]["CampoPiso"];
+            combustible?: components["schemas"]["CampoPiso"];
+            items?: {
+                clave: string;
+                nombre: string;
+                /** @enum {string} */
+                estado: "bien" | "mal" | "no_tiene";
+                nota?: string;
+                origen: string;
+            }[];
+            notas?: components["schemas"]["CampoPiso"][];
+            fotos?: {
+                ref: string;
+                /** @enum {string} */
+                lado?: "frente" | "trasera" | "izquierdo" | "derecho" | "tablero";
+                origen: string;
+            }[];
+            hallazgos?: {
+                id: string;
+                sistema: string;
+                descripcion: string;
+                /** @enum {string} */
+                gravedad: "urgente" | "recomendado" | "puede_esperar";
+                origen: string;
+            }[];
+            cotizacion?: {
+                id: string;
+                /** @enum {string} */
+                tipo: "servicio" | "partida" | "repuesto" | "mano_obra";
+                nombre: string;
+                cantidad: number;
+                /**
+                 * Format: int64
+                 * @description null = "Sin precio · ponlo"
+                 */
+                precio: number | null;
+                origenPrecio?: string;
+                servicioId?: string;
+            }[];
+            gastos?: {
+                id: string;
+                descripcion: string;
+                /** Format: int64 */
+                valor: number;
+                origen: string;
+            }[];
+            estado?: components["schemas"]["CampoPiso"];
+        };
         VistaCliente: {
             documento: components["schemas"]["DocumentoCliente"];
             autorizacion: components["schemas"]["AutorizacionMostrador"];
@@ -3310,6 +3532,224 @@ export interface operations {
                     "application/json": {
                         resumen: components["schemas"]["ResumenGasto"];
                     };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    sendFloorMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    texto?: string;
+                    /**
+                     * Format: uuid
+                     * @description Conversación en la que sigue; sin chatId ni ordenId empieza un chat general
+                     */
+                    chatId?: string;
+                    /**
+                     * Format: uuid
+                     * @description Sigue en la conversación de esa orden (o la empieza)
+                     */
+                    ordenId?: string;
+                    /**
+                     * Format: binary
+                     * @description Nota de voz (webm, mp4, ogg o wav, máx. 10 MB). Se transcribe y no se guarda
+                     */
+                    audio?: string;
+                    /** @description JPG, PNG o WEBP de máx. 5 MB cada una (la pantalla las reduce a 1600 px) */
+                    fotos?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        chat: components["schemas"]["ChatPiso"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    latestFloorChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatPisoOpcional"];
+                };
+            };
+        };
+    };
+    getFloorChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        chat: components["schemas"]["ChatPiso"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    editFloorProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    version: number;
+                    propuesta: components["schemas"]["PropuestaPiso"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        chat: components["schemas"]["ChatPiso"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    confirmFloorProposal: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Aplicada (o ya estaba, con la misma clave) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        resultado: {
+                            /** Format: uuid */
+                            ordenId: string;
+                            ordenCodigo: string;
+                            ordenEstado: string;
+                            ordenNueva: boolean;
+                            hecho: string[];
+                            fotos: number;
+                        };
+                        chat: components["schemas"]["ChatPiso"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getFloorPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+                photo: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La foto */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    getOrderFloorChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatPisoOpcional"];
                 };
             };
             404: components["responses"]["Problem"];

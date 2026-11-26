@@ -3,6 +3,7 @@ package openrouter
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,7 +21,7 @@ var _ app.Advisor = (*Client)(nil)
 
 type chatMsg struct {
 	Role       string         `json:"role"`
-	Content    string         `json:"content"`
+	Content    any            `json:"content"` // texto, o partes (texto + image_url) cuando el mensaje trae fotos (R8)
 	ToolCalls  []chatToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string         `json:"tool_call_id,omitempty"`
 }
@@ -92,7 +93,11 @@ func (c *Client) Chat(ctx context.Context, r app.ChatRequest) (app.ChatResult, e
 		cm := chatMsg{Role: m.Role, Content: m.Content, ToolCallID: m.ToolCallID}
 		if m.Role == "user" {
 			// El texto del cliente va delimitado: es un dato, nunca una instrucción (ver el prompt).
-			cm.Content = "<<<\n" + m.Content + "\n>>>"
+			text := "<<<\n" + m.Content + "\n>>>"
+			cm.Content = text
+			if len(m.Images) > 0 { // asistente del piso (R8): las fotos van como partes image_url al modelo de visión
+				cm.Content = withImages(text, m.Images)
+			}
 		}
 		for _, tc := range m.ToolCalls {
 			call := chatToolCall{ID: tc.ID, Type: "function"}
@@ -164,4 +169,23 @@ func (c *Client) Chat(ctx context.Context, r app.ChatRequest) (app.ChatResult, e
 		return out, fmt.Errorf("openrouter: respuesta vacía: %w", domain.ErrInvalidOutput)
 	}
 	return out, nil
+}
+
+type part struct {
+	Type     string    `json:"type"`
+	Text     string    `json:"text,omitempty"`
+	ImageURL *imageURL `json:"image_url,omitempty"`
+}
+
+type imageURL struct {
+	URL string `json:"url"`
+}
+
+// withImages arma el contenido con partes para un modelo de visión: el texto delimitado y cada foto en base64.
+func withImages(text string, imgs []app.Image) []part {
+	out := []part{{Type: "text", Text: text}}
+	for _, im := range imgs {
+		out = append(out, part{Type: "image_url", ImageURL: &imageURL{URL: "data:" + im.Mime + ";base64," + base64.StdEncoding.EncodeToString(im.Data)}})
+	}
+	return out
 }

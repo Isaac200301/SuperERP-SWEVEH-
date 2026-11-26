@@ -111,6 +111,7 @@ La cuenta de Meta y el número de prueba (plantillas propias y duración del tok
 | `WHATSAPP_APP_SECRET` | Verificar `X-Hub-Signature-256` | staging, prod |
 | `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN` | Envío y verificación del webhook | staging, prod |
 | `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL` | Capa multi-proveedor (D-08 abierta) | staging, prod |
+| `AI_PISO_MODELS` | Cadena de modelos del asistente del piso (R8, ADR-0041): solo `:free`, por coma; vacía = `AI_MODEL` | staging |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (solo backend) | Storage privado y URLs firmadas | staging, prod |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` | Exportación de trazas, métricas y logs | staging, prod |
 | `SONAR_TOKEN`, `SNYK_TOKEN` | Solo como secretos de GitHub Actions | CI |

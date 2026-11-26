@@ -70,3 +70,31 @@ func TestChat_Errors(t *testing.T) {
 		})
 	}
 }
+
+// R8: las fotos del asistente del piso van como partes image_url (base64) junto al texto delimitado; un mensaje sin
+// fotos sigue siendo texto.
+func TestChat_ImagesGoAsParts(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"listo"}}]}`))
+	}))
+	defer srv.Close()
+	c := New(srv.URL, "clave", "google/gemma-4-31b-it:free", 5*time.Second)
+	if _, err := c.Chat(context.Background(), app.ChatRequest{System: "piso", Messages: []app.ChatMessage{
+		{Role: "user", Content: "antes"},
+		{Role: "user", Content: "mira la placa", Images: []app.Image{{Mime: "image/jpeg", Data: []byte{0xFF, 0xD8, 0xFF}}}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	msgs := got["messages"].([]any)
+	if _, ok := msgs[1].(map[string]any)["content"].(string); !ok {
+		t.Fatalf("sin fotos va como texto: %v", msgs[1])
+	}
+	parts := msgs[2].(map[string]any)["content"].([]any)
+	first, second := parts[0].(map[string]any), parts[1].(map[string]any)
+	if len(parts) != 2 || first["type"] != "text" || !strings.HasPrefix(first["text"].(string), "<<<\nmira") ||
+		second["type"] != "image_url" || second["image_url"].(map[string]any)["url"] != "data:image/jpeg;base64,/9j/" {
+		t.Fatalf("partes: %v", parts)
+	}
+}

@@ -637,6 +637,161 @@ paths:
                   resumen: { $ref: '#/components/schemas/ResumenGasto' }
         '404': { $ref: '#/components/responses/Problem' }
 
+  /assistant/floor/messages:
+    post:
+      operationId: sendFloorMessage
+      summary: 'Mensaje al asistente del piso (R8, V-11, HU-107): texto, nota de voz y hasta 4 fotos. Devuelve la respuesta y la propuesta actualizada; nada se guarda en la orden hasta Confirmar. Permiso assistant:use'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                texto: { type: string, maxLength: 2000 }
+                chatId: { type: string, format: uuid, description: 'Conversación en la que sigue; sin chatId ni ordenId empieza un chat general' }
+                ordenId: { type: string, format: uuid, description: 'Sigue en la conversación de esa orden (o la empieza)' }
+                audio: { type: string, format: binary, description: 'Nota de voz (webm, mp4, ogg o wav, máx. 10 MB). Se transcribe y no se guarda' }
+                fotos: { type: array, maxItems: 4, items: { type: string, format: binary }, description: 'JPG, PNG o WEBP de máx. 5 MB cada una (la pantalla las reduce a 1600 px)' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [chat]
+                properties:
+                  chat: { $ref: '#/components/schemas/ChatPiso' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /assistant/floor/latest:
+    get:
+      operationId: latestFloorChat
+      summary: 'La última conversación de la persona en las últimas 12 horas (la pestaña Asistente la retoma). Permiso assistant:use'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatPisoOpcional' }
+
+  /assistant/floor/chats/{id}:
+    get:
+      operationId: getFloorChat
+      summary: 'Conversación del piso con sus mensajes, la propuesta y lo que falta para recibir. Permiso assistant:use'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [chat]
+                properties:
+                  chat: { $ref: '#/components/schemas/ChatPiso' }
+        '404': { $ref: '#/components/responses/Problem' }
+    patch:
+      operationId: editFloorProposal
+      summary: 'Lo que la persona cambia o quita en la ficha en vivo. Lo que cambia queda con origen "pusiste". Versión optimista (409). Permiso assistant:use'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [version, propuesta]
+              properties:
+                version: { type: integer }
+                propuesta: { $ref: '#/components/schemas/PropuestaPiso' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [chat]
+                properties:
+                  chat: { $ref: '#/components/schemas/ChatPiso' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /assistant/floor/chats/{id}/confirm:
+    post:
+      operationId: confirmFloorProposal
+      summary: 'Confirmar: aplica la propuesta en una transacción por los casos de uso de cada módulo, con bitácora "origen: asistente". Idempotente por Idempotency-Key. Permiso assistant:use y el de cada parte (order:create, quote:edit, expense:manage…)'
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 8, maxLength: 100 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [version]
+              properties:
+                version: { type: integer }
+      responses:
+        '200':
+          description: Aplicada (o ya estaba, con la misma clave)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [resultado, chat]
+                properties:
+                  resultado:
+                    type: object
+                    required: [ordenId, ordenCodigo, ordenEstado, ordenNueva, hecho, fotos]
+                    properties:
+                      ordenId: { type: string, format: uuid }
+                      ordenCodigo: { type: string }
+                      ordenEstado: { type: string }
+                      ordenNueva: { type: boolean }
+                      hecho: { type: array, items: { type: string } }
+                      fotos: { type: integer }
+                  chat: { $ref: '#/components/schemas/ChatPiso' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  /assistant/floor/chats/{id}/photos/{photo}:
+    get:
+      operationId: getFloorPhoto
+      summary: 'Una foto que se mandó en la conversación. Permiso assistant:use'
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: photo, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: La foto
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /orders/{id}/assistant:
+    get:
+      operationId: getOrderFloorChat
+      summary: 'La conversación del asistente de esta orden (chat null si todavía no hay). Permiso assistant:use'
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatPisoOpcional' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /orders/{id}/findings:
     get:
       operationId: listFindings
@@ -2641,6 +2796,140 @@ components:
         cotizado: { type: integer, format: int64 }
         gastado: { type: integer, format: int64 }
         quedan: { type: integer, format: int64 }
+
+    ChatPisoOpcional:
+      type: object
+      required: [chat, disponible, voz]
+      properties:
+        chat: { allOf: [{ $ref: '#/components/schemas/ChatPiso' }], nullable: true }
+        disponible: { type: boolean, description: 'false = no hay IA conectada: sigue con el formulario' }
+        voz: { type: boolean, description: 'true = se le puede mandar una nota de voz' }
+
+    ChatPiso:
+      type: object
+      required: [id, ordenId, version, propuesta, pendiente, progreso, mensajes, disponible, voz]
+      properties:
+        id: { type: string, format: uuid }
+        ordenId: { type: string, format: uuid, nullable: true }
+        version: { type: integer }
+        propuesta: { $ref: '#/components/schemas/PropuestaPiso' }
+        pendiente: { type: boolean, description: 'Hay algo por confirmar' }
+        progreso:
+          type: object
+          description: 'Ficha en vivo de la recepción: "7 de 8 datos · falta la parte trasera"'
+          required: [tiene, total, falta]
+          properties:
+            tiene: { type: integer }
+            total: { type: integer }
+            falta: { type: array, items: { type: string } }
+        mensajes:
+          type: array
+          items:
+            type: object
+            required: [id, rol, texto, adjuntos, opciones, creadoEn]
+            properties:
+              id: { type: string, format: uuid }
+              rol: { type: string, enum: [usuario, asistente] }
+              texto: { type: string }
+              adjuntos:
+                type: array
+                items:
+                  type: object
+                  required: [tipo]
+                  properties:
+                    tipo: { type: string, enum: [foto, voz] }
+                    url: { type: string }
+              opciones: { type: array, items: { type: string }, description: 'Botones (dos placas)' }
+              creadoEn: { type: string, format: date-time }
+              conPropuesta: { type: boolean }
+        disponible: { type: boolean, description: 'false = la IA no respondió (no hay, se agotó el tope o falló): sigue con el formulario' }
+        voz: { type: boolean }
+
+    CampoPiso:
+      type: object
+      required: [valor, origen]
+      properties:
+        valor: { type: string }
+        origen: { type: string, enum: [dijiste, foto, lista, pusiste, taller], description: 'De dónde salió el dato (HU-64)' }
+
+    PropuestaPiso:
+      type: object
+      description: 'Lo que el asistente propone y todavía no está guardado (R-08). Un precio solo sale de la lista del taller, de lo que dijo la persona o de lo que ella escribe en la ficha'
+      properties:
+        placa: { $ref: '#/components/schemas/CampoPiso' }
+        tipo: { type: string, enum: [carro, moto] }
+        vehiculo: { type: string }
+        vehiculoNuevo: { type: boolean }
+        ordenId: { type: string }
+        ordenCodigo: { type: string }
+        ordenEstado: { type: string }
+        nuevaOrden: { type: boolean }
+        cliente:
+          type: object
+          properties:
+            id: { type: string }
+            celular: { $ref: '#/components/schemas/CampoPiso' }
+            nombre: { $ref: '#/components/schemas/CampoPiso' }
+        sintoma: { $ref: '#/components/schemas/CampoPiso' }
+        ficha: { type: object, additionalProperties: { $ref: '#/components/schemas/CampoPiso' } }
+        kilometraje: { $ref: '#/components/schemas/CampoPiso' }
+        combustible: { $ref: '#/components/schemas/CampoPiso' }
+        items:
+          type: array
+          items:
+            type: object
+            required: [clave, nombre, estado, origen]
+            properties:
+              clave: { type: string }
+              nombre: { type: string }
+              estado: { type: string, enum: [bien, mal, no_tiene] }
+              nota: { type: string }
+              origen: { type: string }
+        notas: { type: array, items: { $ref: '#/components/schemas/CampoPiso' } }
+        fotos:
+          type: array
+          items:
+            type: object
+            required: [ref, origen]
+            properties:
+              ref: { type: string }
+              lado: { type: string, enum: [frente, trasera, izquierdo, derecho, tablero] }
+              origen: { type: string }
+        hallazgos:
+          type: array
+          items:
+            type: object
+            required: [id, sistema, descripcion, gravedad, origen]
+            properties:
+              id: { type: string }
+              sistema: { type: string }
+              descripcion: { type: string }
+              gravedad: { type: string, enum: [urgente, recomendado, puede_esperar] }
+              origen: { type: string }
+        cotizacion:
+          type: array
+          items:
+            type: object
+            required: [id, tipo, nombre, cantidad, precio]
+            properties:
+              id: { type: string }
+              tipo: { type: string, enum: [servicio, partida, repuesto, mano_obra] }
+              nombre: { type: string }
+              cantidad: { type: integer }
+              precio: { type: integer, format: int64, nullable: true, description: 'null = "Sin precio · ponlo"' }
+              origenPrecio: { type: string }
+              servicioId: { type: string }
+        gastos:
+          type: array
+          items:
+            type: object
+            required: [id, descripcion, valor, origen]
+            properties:
+              id: { type: string }
+              descripcion: { type: string }
+              valor: { type: integer, format: int64 }
+              origen: { type: string }
+        estado: { $ref: '#/components/schemas/CampoPiso' }
 
     VistaCliente:
       type: object

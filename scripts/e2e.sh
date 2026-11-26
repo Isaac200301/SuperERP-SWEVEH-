@@ -18,13 +18,23 @@ npm --prefix web run build
 go build -o "$WORK/api" ./cmd/api
 go build -o "$WORK/worker" ./cmd/worker
 
-APP_ENV=local FEATURE_WHATSAPP="$E2E_WHATSAPP" OTP_SENDER=consola HTTP_ADDR=":$PORT" WEB_DIR="$(pwd)/web/dist" STORAGE_DIR="$WORK/fotos" \
+# R8: sin WhatsApp, el asistente del piso usa una IA falsa con guion fijo (scripts/fake-ai.mjs), nunca un modelo real.
+AI_ENV=""
+FAKE_PID=""
+if [ "$E2E_WHATSAPP" = "false" ]; then
+  AI_PORT="${E2E_AI_PORT:-8091}"
+  node scripts/fake-ai.mjs "$AI_PORT" >"$WORK/fake-ai.log" 2>&1 &
+  FAKE_PID=$!
+  AI_ENV="AI_PROVIDER=openrouter AI_API_KEY=falsa AI_MODEL=falso:free AI_PISO_MODELS=falso:free AI_API_BASE=http://localhost:$AI_PORT STT_PROVIDER="
+fi
+# shellcheck disable=SC2086 # AI_ENV son asignaciones separadas a propósito
+env $AI_ENV APP_ENV=local FEATURE_WHATSAPP="$E2E_WHATSAPP" OTP_SENDER=consola HTTP_ADDR=":$PORT" WEB_DIR="$(pwd)/web/dist" STORAGE_DIR="$WORK/fotos" \
   APP_ORIGINS="http://localhost:$PORT" "$WORK/api" >"$LOG" 2>&1 &
 API_PID=$!
 APP_ENV=local FEATURE_WHATSAPP="$E2E_WHATSAPP" WHATSAPP_PROVIDER=local STORAGE_DIR="$WORK/fotos" "$WORK/worker" >"$WORK/worker.log" 2>&1 &
 WORKER_PID=$!
 # Solo se apagan los procesos que este script levantó (por PID), nunca por nombre.
-trap 'kill "$API_PID" "$WORKER_PID" 2>/dev/null || true' EXIT INT TERM
+trap 'kill "$API_PID" "$WORKER_PID" $FAKE_PID 2>/dev/null || true' EXIT INT TERM
 
 i=0
 until curl -fsS "http://localhost:$PORT/healthz" >/dev/null 2>&1; do
