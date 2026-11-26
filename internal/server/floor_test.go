@@ -301,9 +301,14 @@ func TestFloor_AdversarialPhotoAndInstructions(t *testing.T) {
 	if strings.Contains(first.System, "pintura") || strings.Contains(first.System, "GHI789") {
 		t.Fatalf("el prompt del sistema lleva texto de la persona: %s", first.System)
 	}
-	last := first.Messages[len(first.Messages)-1]
-	if last.Role != "tool" || !strings.Contains(last.Content, "propuesta_sin_confirmar") {
-		t.Fatalf("la ficha va como resultado de una tool: %+v", last)
+	var ficha assistantapp.ChatMessage
+	for _, m := range first.Messages {
+		if m.ToolCallID == "pre-ficha" {
+			ficha = m
+		}
+	}
+	if ficha.Role != "tool" || !strings.Contains(ficha.Content, "propuesta_sin_confirmar") {
+		t.Fatalf("la ficha va como resultado de una tool: %+v", ficha)
 	}
 }
 
@@ -437,5 +442,55 @@ func TestFloor_IsolationBetweenWorkshops(t *testing.T) {
 	}
 	if s := e.client().do("GET", "/api/v1/assistant/floor/latest", nil).status; s != http.StatusUnauthorized {
 		t.Fatalf("sin sesión: %d", s)
+	}
+}
+
+// Pablo (26-nov): el asistente decía "orden creada" sin estarlo. Ahora (1) "confírmalo" en el chat confirma igual que
+// el botón, una sola vez y sin gastar IA; (2) si falta algo, dice qué; (3) tras guardar, el modelo recibe el estado
+// leído de la base (estado_orden) y lo que falta para pasar a Recibido.
+func TestFloor_ConfirmFromChatAndRealStatus(t *testing.T) {
+	adv := &fakeAdvisor{}
+	e := floorEnv(t, adv)
+	owner := e.register("3105550910", "Nora Gil")
+	adv.step = func(r assistantapp.ChatRequest) (assistantapp.ChatMessage, error) {
+		res := floorResult(r)
+		switch u := lastUser(r); {
+		case strings.Contains(u, "RST321") && !strings.Contains(res, "propuesta"):
+			return call("crear_orden", `{"placa":"RST321","sintoma":"cambio de aceite","tipo":"carro","celular":"3001112255","nombre":"Mario Ruiz"}`), nil
+		case strings.Contains(u, "filtro") && !strings.Contains(res, "items"):
+			return call("proponer_cotizacion", `{"items":[{"tipo":"repuesto","nombre":"Filtro","precio":null}]}`), nil
+		}
+		return say("Orden creada y ya está en el sistema."), nil
+	}
+	r := owner.must(http.StatusOK, owner.floorSend(map[string]string{"texto": "llegó el RST321 de Mario Ruiz, 3001112255, cambio de aceite"}, 0))
+	chatID := chatOf(r)["id"].(string)
+	if !strings.HasPrefix(lastReply(r), "Todavía no se ha guardado nada") {
+		t.Fatalf("el texto que da por guardada la propuesta se corrige: %q", lastReply(r))
+	}
+	calls := len(adv.reqs)
+	r = owner.must(http.StatusOK, owner.floorSend(map[string]string{"chatId": chatID, "texto": "Sí, confírmalo"}, 0))
+	if !strings.Contains(lastReply(r), "Listo, quedó guardado") || !strings.Contains(lastReply(r), "Para pasar a Recibido falta") ||
+		chatOf(r)["ordenId"] == nil || countOrders(t, owner) != 1 || len(adv.reqs) != calls {
+		t.Fatalf("confírmalo: %q %v (llamadas a la IA %d → %d)", lastReply(r), chatOf(r)["ordenId"], calls, len(adv.reqs))
+	}
+	// Después de guardar, el modelo recibe el estado real leído de la base.
+	owner.must(http.StatusOK, owner.floorSend(map[string]string{"chatId": chatID, "texto": "¿ya quedó la orden?"}, 0))
+	adv.mu.Lock()
+	last := adv.reqs[len(adv.reqs)-1]
+	adv.mu.Unlock()
+	var estado string
+	for _, m := range last.Messages {
+		if m.ToolCallID == "pre-estado" {
+			estado = m.Content
+		}
+	}
+	if !strings.Contains(estado, `"guardada":true`) || !strings.Contains(estado, "OS-0001") || !strings.Contains(estado, "falta_para_recibido") {
+		t.Fatalf("estado real: %q", estado)
+	}
+	// Con un ítem sin precio, "guárdalo" no guarda y dice qué falta.
+	owner.must(http.StatusOK, owner.floorSend(map[string]string{"chatId": chatID, "texto": "agrega el filtro"}, 0))
+	r = owner.must(http.StatusOK, owner.floorSend(map[string]string{"chatId": chatID, "texto": "guárdalo"}, 0))
+	if !strings.HasPrefix(lastReply(r), "No lo pude guardar:") || chatOf(r)["pendiente"] != true {
+		t.Fatalf("sin precio: %q", lastReply(r))
 	}
 }

@@ -121,6 +121,27 @@ func (f floorShop) Order(ctx context.Context, tallerID, orderID shared.ID) (assi
 	return o, nil
 }
 
+func (f floorShop) OrderStatus(ctx context.Context, tallerID, orderID shared.ID) (assistantapp.FloorOrderStatus, error) {
+	o, err := f.m.Flow.Load(ctx, tallerID, orderID)
+	if err != nil {
+		return assistantapp.FloorOrderStatus{}, err
+	}
+	st := assistantapp.FloorOrderStatus{Code: o.Code(), State: string(o.State)}
+	if o.State == ordersdomain.StatePending {
+		cv, err := f.m.Flow.GetChecklist(ctx, tallerID, orderID)
+		if err != nil {
+			return st, err
+		}
+		st.Missing = cv.Missing
+	}
+	q, err := f.m.QuotesF.ForOrder(ctx, tallerID, orderID)
+	if err != nil || q == nil {
+		return st, err
+	}
+	st.QuoteState, st.QuoteItems, st.QuoteTotal = q.State, len(q.Lines), q.Total
+	return st, nil
+}
+
 func (f floorShop) Saved(ctx context.Context, tallerID, orderID shared.ID) (assistantdomain.Saved, error) {
 	cv, err := f.m.Flow.GetChecklist(ctx, tallerID, orderID)
 	if err != nil {

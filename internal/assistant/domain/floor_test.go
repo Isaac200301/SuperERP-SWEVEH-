@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -174,5 +175,31 @@ func TestPendingAndReset(t *testing.T) {
 	r := p.Reset("o1", "OS-0001", "recibido")
 	if r.Pending() || r.OrderID != "o1" || r.Plate.Value != "ABC123" {
 		t.Fatalf("reset: %+v", r)
+	}
+}
+
+// El modelo dijo "Orden creada", "Resumen confirmado" y "ya está en el sistema" antes de Confirmar (piloto, 25-nov).
+func TestFloorUnsaved(t *testing.T) {
+	got := FloorUnsaved("Orden GNO667 creada y abierta en estado Por recibir.\nResumen confirmado:\n- 180.000 km\nLa orden ya está en el sistema.")
+	if !strings.HasPrefix(got, FloorUnsavedNote) || strings.Contains(got, "ya está en el sistema") || strings.Contains(got, "Resumen confirmado") ||
+		strings.Contains(got, "creada y abierta") {
+		t.Fatalf("texto: %q", got)
+	}
+	if s := "Te dejé la orden nueva en la ficha; toca Confirmar para guardarla."; FloorUnsaved(s) != s {
+		t.Fatal("un texto correcto no cambia")
+	}
+}
+
+// Confirmar por chat (Pablo, 26-nov): solo frases cortas que piden guardar; nada con "no".
+func TestIsConfirmWord(t *testing.T) {
+	for _, s := range []string{"confírmalo", "Sí, guárdalo", "dale, confirma", "Guarda la orden por favor", "confirmar."} {
+		if !IsConfirmWord(s) {
+			t.Errorf("debía confirmar: %q", s)
+		}
+	}
+	for _, s := range []string{"no lo confirmes todavía", "¿ya la guardaste?", "confirma el kilometraje con el cliente y después vemos", "guarda silencio", "hola"} {
+		if IsConfirmWord(s) {
+			t.Errorf("no debía confirmar: %q", s)
+		}
 	}
 }

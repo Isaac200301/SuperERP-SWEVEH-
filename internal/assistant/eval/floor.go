@@ -356,6 +356,11 @@ func (s *floorShop) Order(_ context.Context, _ shared.ID, id shared.ID) (app.Flo
 	return app.FloorOrder{}, app.ErrFloorChat
 }
 
+func (s *floorShop) OrderStatus(_ context.Context, _ shared.ID, id shared.ID) (app.FloorOrderStatus, error) {
+	o, err := s.Order(context.Background(), s.id, id)
+	return app.FloorOrderStatus{Code: o.Code, State: o.State}, err
+}
+
 func (s *floorShop) Saved(context.Context, shared.ID, shared.ID) (domain.Saved, error) {
 	return domain.Saved{}, nil
 }

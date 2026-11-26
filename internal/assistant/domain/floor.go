@@ -594,3 +594,40 @@ func SniffImage(b []byte) string {
 	}
 	return ""
 }
+
+// reSavedClaim son frases con las que el modelo dice que algo ya quedó guardado. El asistente nunca guarda nada
+// (R-08): solo deja la propuesta en la ficha y la persona toca Confirmar.
+var reSavedClaim = regexp.MustCompile(`(?i)\b(cread[oa]s?|cre[eé]|guardad[oa]s?|registrad[oa]s?|confirmad[oa]s?|abiert[oa] en estado|ya est[aá] en el sistema|qued[oó] (guardad|cread|registrad)[oa])\b`)
+
+// unsavedWords cambian lo que el modelo da por hecho por lo que de verdad pasó: está en la ficha, sin guardar.
+var unsavedWords = strings.NewReplacer(
+	"La orden ya está en el sistema", "La orden queda en la ficha",
+	"la orden ya está en el sistema", "la orden queda en la ficha",
+	"ya está en el sistema", "queda en la ficha",
+	"Resumen confirmado", "Resumen de la propuesta",
+	"resumen confirmado", "resumen de la propuesta",
+	"creada y abierta", "propuesta",
+	"creado y abierto", "propuesto",
+)
+
+// reConfirm es la persona pidiendo guardar con palabras ("confírmalo", "sí, guárdalo", "dale, confirma"). Solo
+// mensajes cortos y sin "no": "no lo confirmes todavía" no confirma.
+var reConfirm = regexp.MustCompile(`(?i)^\s*((s[ií]|dale|listo|ok|bueno)[,.]?\s+)?(conf[ií]rma(lo|la|r)?|gu[aá]rda(lo|la|r)?)(\s+(todo|la orden|eso|ya|por favor|porfa))*\s*[.!]*\s*$`)
+
+// IsConfirmWord dice si el mensaje es la persona pidiendo confirmar la propuesta.
+func IsConfirmWord(text string) bool {
+	t := strings.TrimSpace(Normalize(text))
+	return len([]rune(t)) <= 40 && !strings.Contains(" "+t+" ", " no ") && reConfirm.MatchString(t)
+}
+
+// FloorUnsavedNote va al principio de una respuesta que da algo por guardado.
+const FloorUnsavedNote = "Todavía no se ha guardado nada: revisa la ficha de arriba y toca Confirmar."
+
+// FloorUnsaved corrige un texto que da por guardado lo que solo es una propuesta: cambia las frases conocidas y, si
+// todavía dice que algo quedó creado o guardado, le antepone el aviso.
+func FloorUnsaved(text string) string {
+	if !reSavedClaim.MatchString(text) {
+		return text
+	}
+	return FloorUnsavedNote + "\n\n" + unsavedWords.Replace(text)
+}

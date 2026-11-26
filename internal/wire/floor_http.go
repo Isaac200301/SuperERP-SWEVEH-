@@ -98,7 +98,7 @@ func (h *handler) floorSend(r *http.Request, p reqctx.Principal) (int, any, erro
 	if err != nil {
 		return 0, nil, httpx.ErrBadJSON.WithMessage("Envía el mensaje como formulario (multipart).")
 	}
-	in := assistantapp.FloorInput{TallerID: p.TallerID, Actor: p.Actor()}
+	in := assistantapp.FloorInput{TallerID: p.TallerID, Actor: p.Actor(), Roles: p.Roles}
 	for {
 		part, err := mr.NextPart()
 		if errors.Is(err, io.EOF) {

@@ -24,6 +24,8 @@ type FloorWorkshop interface {
 	Vehicle(ctx context.Context, tallerID shared.ID, plate string) (*FloorVehicle, error) // nil = no está en el taller
 	CustomerByPhone(ctx context.Context, tallerID shared.ID, phone string) (*FloorPerson, error)
 	Order(ctx context.Context, tallerID, orderID shared.ID) (FloorOrder, error)
+	// OrderStatus lee de la base cómo está de verdad la orden: estado, qué falta para recibir y su cotización.
+	OrderStatus(ctx context.Context, tallerID, orderID shared.ID) (FloorOrderStatus, error)
 	// Saved dice qué tiene ya guardado la orden de su recepción (fotos por lado, síntoma, kilometraje, combustible).
 	Saved(ctx context.Context, tallerID, orderID shared.ID) (domain.Saved, error)
 	// Apply aplica la propuesta dentro de la transacción del llamador, por los casos de uso de cada módulo. photo lee
@@ -74,6 +76,16 @@ type FloorVehicle struct {
 
 type FloorPerson struct{ ID, Name string }
 
+// FloorOrderStatus es lo que está guardado de verdad en la base (no la propuesta).
+type FloorOrderStatus struct {
+	Code       string   `json:"codigo"`
+	State      string   `json:"estado"`
+	Missing    []string `json:"falta_para_recibido,omitempty"`
+	QuoteState string   `json:"cotizacion_estado,omitempty"`
+	QuoteItems int      `json:"cotizacion_items"`
+	QuoteTotal int64    `json:"cotizacion_total"`
+}
+
 type FloorOrder struct {
 	ID, Code, State, Plate, Kind, Vehicle string
 }
@@ -86,6 +98,8 @@ type FloorApplied struct {
 	Created    bool      `json:"ordenNueva"`
 	Done       []string  `json:"hecho"`
 	Photos     int       `json:"fotos"`
+	// Message es el "Listo, quedó guardado…" que escribió esta confirmación (no se guarda con la clave).
+	Message *FloorMessage `json:"-"`
 }
 
 // FloorChat es una conversación del piso.
@@ -124,6 +138,7 @@ type Blob struct {
 type FloorInput struct {
 	TallerID shared.ID
 	Actor    shared.Actor
+	Roles    []string // para confirmar desde el chat con los permisos de quien escribe
 	ChatID   *shared.ID
 	OrderID  *shared.ID
 	Text     string
@@ -238,6 +253,9 @@ func (f *Floor) Send(ctx context.Context, in FloorInput) (FloorReply, error) {
 	if err != nil {
 		return FloorReply{}, err
 	}
+	if !isNew && chat.Proposal.Pending() && domain.IsConfirmWord(user.Text) {
+		return f.confirmFromChat(ctx, in, chat, user)
+	}
 	history, err := f.history(ctx, in.TallerID, chat.ID, isNew)
 	if err != nil {
 		return FloorReply{}, err
@@ -255,6 +273,38 @@ func (f *Floor) Send(ctx context.Context, in FloorInput) (FloorReply, error) {
 		return FloorReply{}, err
 	}
 	return FloorReply{Chat: next, Messages: []FloorMessage{user, reply}, Available: available}, nil
+}
+
+// confirmFromChat: la persona escribió o dijo "confírmalo" o "guárdalo". Lo detecta el código (no es una tool: la IA
+// no puede confirmar por su cuenta) y confirma igual que el botón, con la clave del mensaje como Idempotency-Key. Si
+// algo falta, responde qué falta sin gastar IA (decisión de Pablo, 26-nov).
+func (f *Floor) confirmFromChat(ctx context.Context, in FloorInput, chat FloorChat, user FloorMessage) (FloorReply, error) {
+	applied, done, err := f.Confirm(ctx, ConfirmCmd{TallerID: in.TallerID, ChatID: chat.ID, Actor: in.Actor, Roles: in.Roles,
+		Key: "chat-" + user.ID.String(), Version: chat.Version})
+	if err != nil {
+		e, ok := shared.AsError(err)
+		if !ok {
+			return FloorReply{}, err
+		}
+		reply := FloorMessage{ID: shared.NewID(), ChatID: chat.ID, Role: "asistente", CreatedAt: user.CreatedAt.Add(time.Millisecond),
+			Text: "No lo pude guardar: " + e.Message}
+		next := chat
+		next.Version, next.UpdatedAt = chat.Version+1, f.clock.Now()
+		if err := f.save(ctx, in.TallerID, chat, false, next, chat.Version, user, reply); err != nil {
+			return FloorReply{}, err
+		}
+		return FloorReply{Chat: next, Messages: []FloorMessage{user, reply}, Available: true}, nil
+	}
+	// El mensaje de la persona va antes del "Listo, quedó guardado" que escribió Confirm.
+	user.CreatedAt = user.CreatedAt.Add(-time.Millisecond)
+	if err := f.uow.Do(ctx, func(ctx context.Context) error { return f.repo.InsertMessage(ctx, in.TallerID, user) }); err != nil {
+		return FloorReply{}, err
+	}
+	msgs := []FloorMessage{user}
+	if applied.Message != nil {
+		msgs = append(msgs, *applied.Message)
+	}
+	return FloorReply{Chat: done, Messages: msgs, Available: f.model != nil}, nil
 }
 
 // validateInput revisa el tamaño del mensaje y el tipo de cada foto por su contenido. Devuelve el texto limpio.
@@ -469,6 +519,9 @@ func (f *Floor) think(ctx context.Context, chat FloorChat, history []FloorMessag
 		msgs = append(msgs, toolTurn("pre-placa", "buscar_vehiculo", args, t.findVehicle(cctx, plates[0], false))...)
 	}
 	msgs = append(msgs, toolTurn("pre-ficha", "ver_ficha", "{}", t.sheetView())...)
+	if work.OrderID != nil { // lo guardado de verdad, leído de la base, para que no diga "creada" sin estarlo
+		msgs = append(msgs, toolTurn("pre-estado", "estado_orden", "{}", t.orderStatus(cctx))...)
+	}
 	chatFn := func(ctx context.Context, req ChatRequest) (ChatMessage, error) {
 		return f.chat(ctx, in.TallerID, user.ID, req)
 	}
@@ -532,7 +585,7 @@ func floorText(text string, allowed map[int64]bool) string {
 	if !domain.FloorTextOK(text, allowed) {
 		return floorChecked
 	}
-	return text
+	return domain.FloorUnsaved(text)
 }
 
 // chat llama al modelo y registra la llamada (HU-99) con propósito "piso".
@@ -756,8 +809,13 @@ func (f *Floor) apply(ctx context.Context, c ConfirmCmd, key string) (FloorAppli
 	if err != nil {
 		return applied, cur, err
 	}
-	done := FloorMessage{ID: shared.NewID(), ChatID: cur.ID, Role: "asistente", Text: floorConfirmText + " " + joinY(applied.Done) + ".",
+	text := floorConfirmText + " " + joinY(applied.Done) + "."
+	if st, err := f.shop.OrderStatus(ctx, c.TallerID, oid); err == nil && st.State == "por_recibir" && len(st.Missing) > 0 {
+		text += " Para pasar a Recibido falta: " + strings.Join(st.Missing, ", ") + "."
+	}
+	done := FloorMessage{ID: shared.NewID(), ChatID: cur.ID, Role: "asistente", Text: text,
 		Proposal: &cur.Proposal, CreatedAt: now}
+	applied.Message = &done
 	if err := f.save(ctx, c.TallerID, cur, false, cur, prev, done); err != nil {
 		return applied, cur, err
 	}

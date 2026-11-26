@@ -42,6 +42,7 @@ V-13 limita la IA a **modelos gratuitos** de OpenRouter, con Groq para la voz.
 - **Si el texto que el asistente muestra trae una cifra de plata** (con $, "95 mil" o "95.000"; no cuenta el kilometraje) que no es de la lista ni la dijo la persona, se cambia por un texto fijo ("Te dejé la propuesta en la ficha…").
 - **El texto de la persona va delimitado (`<<< >>>`)**: es un dato, no una instrucción. Lo que se lea en una foto tampoco es instrucción.
 - **Nada de lo que viene de la persona va en el prompt del sistema.** La propuesta actual (con el síntoma, las notas, el cliente) le llega al modelo como resultado de la tool `ver_ficha`, que el código consulta antes de cada mensaje; el prompt del sistema solo lleva datos del taller (nombre, servicios con su precio, ítems del checklist, el código y el estado de la orden). Lo encontró el revisor en la primera ronda.
+- **El asistente no dice que algo quedó guardado si no lo está** (piloto, 26-nov: dijo "Orden creada… ya está en el sistema" sin confirmar). Antes de cada mensaje, el código consulta la base con la tool `estado_orden` (qué está guardado de verdad: código, estado, qué falta para pasar a Recibido, cotización) y se la pasa al modelo; si el texto igual dice "creada", "guardada", "confirmado" o "en el sistema", el código lo corrige y antepone "Todavía no se ha guardado nada…" (`domain.FloorUnsaved`).
 - **La IA no diagnostica.** El prompt solo le deja anotar hallazgos que el mecánico dijo o mostró. Las pruebas adversariales lo miden.
 
 ### Conversación y propuesta (migración 00036)
@@ -78,6 +79,11 @@ V-13 limita la IA a **modelos gratuitos** de OpenRouter, con Groq para la voz.
 - **No se confirma** con ítems sin precio (422 `precio_pendiente`), con un vehículo nuevo sin cliente o sin tipo, ni con la versión vieja (409).
 - **Permisos (R-05):** las rutas piden `assistant:use` (los 3 roles). Al confirmar, el servidor revisa además el permiso de cada parte: `order:create`, `vehicle:update`, `evidence:upload`, `order:diagnose`, `quote:edit`, `expense:manage` y `order:update_state`.
 - **Las fotos se pasan a la orden dentro de la transacción.** Ya están en el almacenamiento desde que se mandaron: se leen y se guardan de nuevo como evidencias. Es I/O dentro de la transacción, acotado a pocas fotos; se eligió así porque pasar a Recibido las exige en la misma confirmación.
+
+### Confirmar desde el chat (decisión de Pablo, 26-nov)
+- Además del botón, la persona puede escribir o decir **"confírmalo"**, "sí, guárdalo" o "dale, confirma". Lo detecta el **código** (`domain.IsConfirmWord`: frases cortas, nada con "no"), no la IA: no es una tool y el modelo no puede confirmar por su cuenta. Llama al mismo `Confirm`, con los permisos de quien escribe y la clave `chat-<id del mensaje>`, así que repetir el mensaje no guarda dos veces. Si falta algo, responde "No lo pude guardar: …" con el motivo, sin gastar IA.
+- Sigue cumpliendo R-08 (la persona aprueba); cambia el cómo: botón o palabra.
+- Después de guardar, el mensaje dice qué falta para pasar a Recibido, leído de la base.
 
 ### Si la IA falla o se acaba el cupo
 - Sin modelo, con el tope agotado, con un error o si pasan 60 s, el chat dice **"El asistente no está disponible, sigue con el formulario"** y la propuesta queda como estaba: nada a medias (RNF-13).
