@@ -48,6 +48,8 @@ type FloorRepository interface {
 	LatestForUser(ctx context.Context, tallerID, userID shared.ID, since time.Time) (*FloorChat, error)
 	UpdateChat(ctx context.Context, c FloorChat, prevVersion int) (bool, error)
 	InsertMessage(ctx context.Context, tallerID shared.ID, m FloorMessage) error
+	// MessageChat dice en qué conversación está el mensaje (found=false si no existe).
+	MessageChat(ctx context.Context, tallerID, msgID shared.ID) (chatID shared.ID, found bool, err error)
 	Messages(ctx context.Context, tallerID, chatID shared.ID, limit int) ([]FloorMessage, error)
 	// Confirmation devuelve el resultado guardado con esa clave y la conversación en que se usó.
 	Confirmation(ctx context.Context, tallerID shared.ID, key string) (json.RawMessage, shared.ID, bool, error)
@@ -111,10 +113,12 @@ type FloorChat struct {
 	CreatedAt, UpdatedAt time.Time
 }
 
-// FloorAttachment es una foto o una nota de voz del mensaje (la voz no se guarda: solo su transcripción).
+// FloorAttachment es una foto, una nota de voz o un video del mensaje. La voz y el video no se guardan: de la voz
+// queda la transcripción y del video, la transcripción y sus cuadros (que van como fotos).
 type FloorAttachment struct {
-	Kind string `json:"tipo"` // foto | voz
-	Ref  string `json:"ref,omitempty"`
+	Kind    string `json:"tipo"` // foto | voz | video
+	Ref     string `json:"ref,omitempty"`
+	Seconds int    `json:"segundos,omitempty"` // duración del video
 }
 
 // FloorMessage es un mensaje de la conversación.
@@ -144,6 +148,8 @@ type FloorInput struct {
 	Text     string
 	Audio    *Blob
 	Photos   []Blob
+	// Video: el mensaje es una recepción por video (lo pone solo el caso de uso Video; no llega por HTTP).
+	Video bool
 }
 
 // FloorReply es lo que ve la pantalla después de un mensaje.
@@ -166,10 +172,11 @@ const (
 
 // Textos fijos del asistente (no son redacción de la IA).
 const (
-	FloorUnavailable = "El asistente no está disponible, sigue con el formulario."
-	floorNoVoice     = "No pude escuchar la nota de voz. Escríbeme lo que necesitas."
-	floorChecked     = "Te dejé la propuesta en la ficha. Revisa los valores antes de confirmar."
-	floorEmpty       = "Escríbeme, mándame una nota de voz o una foto."
+	FloorUnavailable  = "El asistente no está disponible, sigue con el formulario."
+	floorNoVoice      = "No pude escuchar la nota de voz. Escríbeme lo que necesitas."
+	floorNoVideoAudio = "No pude escuchar el audio del video: solo revisé los cuadros."
+	floorChecked      = "Te dejé la propuesta en la ficha. Revisa los valores antes de confirmar."
+	floorEmpty        = "Escríbeme, mándame una nota de voz o una foto."
 )
 
 var (
@@ -374,7 +381,10 @@ func (f *Floor) answer(ctx context.Context, chat FloorChat, history []FloorMessa
 		return chat, false, err
 	}
 	reply.Text = res.text
-	if voiceFailed {
+	switch {
+	case voiceFailed && in.Video:
+		reply.Text = floorNoVideoAudio + " " + reply.Text
+	case voiceFailed:
 		reply.Text = floorNoVoice + " " + reply.Text
 	}
 	return res.chat, true, nil
@@ -498,11 +508,11 @@ func (f *Floor) think(ctx context.Context, chat FloorChat, history []FloorMessag
 	if err != nil || !ok {
 		return thought{}, false, err
 	}
-	msgs, saidTexts := chatMessages(history, user, in.Photos)
+	msgs, saidTexts := chatMessages(history, user, in.Photos, in.Video)
 	work := chat
 	work.Proposal = cloneProposal(chat.Proposal)
 	t := &floorTurn{f: f, tallerID: in.TallerID, chat: &work, fctx: fctx, said: strings.Join(saidTexts, "\n"),
-		amounts: domain.SaidAmounts(saidTexts...)}
+		amounts: domain.SaidAmounts(saidTexts...), video: in.Video}
 	for _, a := range user.Attachments {
 		if a.Kind == "foto" {
 			t.photos = append(t.photos, a.Ref)
@@ -526,6 +536,9 @@ func (f *Floor) think(ctx context.Context, chat FloorChat, history []FloorMessag
 		return f.chat(ctx, in.TallerID, user.ID, req)
 	}
 	system := floorSystem(fctx, work.Proposal, f.clock.Now())
+	if in.Video {
+		system += floorVideoSystem
+	}
 	text, _, err := Converse(cctx, chatFn, ChatRequest{System: system, Messages: msgs, Tools: FloorTools}, t.run)
 	if err != nil || strings.TrimSpace(text) == "" {
 		return thought{}, false, ctx.Err() // la IA falló o se agotó el tiempo: solo se corta si el llamador se fue
@@ -554,7 +567,7 @@ func (f *Floor) ready(ctx context.Context, tallerID shared.ID) (FloorContext, bo
 }
 
 // chatMessages arma el historial para el modelo (el mensaje actual con sus fotos) y lo que dijo la persona.
-func chatMessages(history []FloorMessage, user FloorMessage, photos []Blob) ([]ChatMessage, []string) {
+func chatMessages(history []FloorMessage, user FloorMessage, photos []Blob, video bool) ([]ChatMessage, []string) {
 	said := []string{user.Text}
 	msgs := make([]ChatMessage, 0, len(history)+1)
 	for _, h := range history {
@@ -566,7 +579,10 @@ func chatMessages(history []FloorMessage, user FloorMessage, photos []Blob) ([]C
 		msgs = append(msgs, ChatMessage{Role: role, Content: h.Text})
 	}
 	um := ChatMessage{Role: "user", Content: user.Text}
-	if um.Content == "" {
+	switch {
+	case um.Content == "" && video:
+		um.Content = "(video de recepción sin audio)"
+	case um.Content == "":
 		um.Content = "(mandó fotos sin texto)"
 	}
 	for _, p := range photos {

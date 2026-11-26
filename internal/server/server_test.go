@@ -508,6 +508,10 @@ func TestSecurity_SessionAndCSRF(t *testing.T) {
 	if !strings.Contains(r.header.Get("Content-Security-Policy"), "frame-ancestors 'none'") || r.header.Get("X-Content-Type-Options") != "nosniff" {
 		t.Fatalf("cabeceras: %v", r.header)
 	}
+	// Cámara y micrófono solo para este origen (voz del asistente, R8, y video de recepción, R9); geolocalización no.
+	if pp := r.header.Get("Permissions-Policy"); pp != "camera=(self), geolocation=(), microphone=(self)" {
+		t.Fatalf("Permissions-Policy: %q", pp)
+	}
 	// Cuerpo con campos desconocidos → 400 (validación estricta en el borde).
 	if r := c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550003", "nombre": "X", "taller_id": "otro"}); r.status != http.StatusBadRequest {
 		t.Fatalf("campo desconocido (taller_id del cliente): %d %v", r.status, r.body)

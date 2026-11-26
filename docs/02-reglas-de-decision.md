@@ -261,3 +261,4 @@ Preferir la biblioteca estándar de Go; librerías con licencia permisiva (MIT, 
 | 25-nov-2026 | §11: entrada con celular + PIN (V-03) y HU-104 nueva (R-12: alcance pedido por Pablo, rango 1) | Pablo |
 | 25-nov-2026 | §11: HU-109 (la cotización en pantalla y en PDF, V-10, ADR-0043) agregada con R7 (R-12: alcance pedido por Pablo, rango 1) | Pablo |
 | 25-nov-2026 | HU-107 (asistente del piso, V-11 y V-13, ADR-0041) agregada con R8 (R-12: alcance pedido por Pablo, rango 1) | Pablo |
+| 26-nov-2026 | HU-108 (recepción por video, V-12, ADR-0042) agregada con R9 (R-12: alcance pedido por Pablo, rango 1) | Pablo |

@@ -26,7 +26,7 @@ var FloorTools = []ToolSpec{
 	{Name: "proponer_ficha", Description: "Llena datos de la ficha del vehículo que la persona dijo o que se ven en una foto. Vacío = no lo sabes.",
 		Params: obj(`"marca":{"type":"string"},"linea":{"type":"string"},"anio":{"type":"integer"},"color":{"type":"string"},"combustible":{"type":"string","enum":["gasolina","diesel","gas","hibrido","hibrido_enchufable","electrico",""]},"caja":{"type":"string","enum":["manual","automatica","cvt","doble_embrague","amt","semiautomatica",""]},"cilindraje":{"type":"integer","description":"en cc"},"aspiracion":{"type":"string","enum":["atmosferico","turbo","supercargado",""]},"traccion":{"type":"string","enum":["delantera","trasera","awd","4x4",""]},"ciclo":{"type":"string","enum":["2t","4t",""]},"refrigeracion":{"type":"string","enum":["aire","liquido",""]},"de_foto":{"type":"boolean"}`)},
 	{Name: "proponer_recepcion", Description: "Llena la recepción: kilometraje, nivel de combustible, ítems del checklist del taller, notas (golpes, rayones, lo que deja el cliente) y qué lado del vehículo muestra cada foto de este mensaje.",
-		Params: obj(`"kilometraje":{"type":"integer"},"combustible":{"type":"string","enum":["vacio","1/4","1/2","3/4","lleno","no_aplica",""]},"items":{"type":"array","items":{"type":"object","properties":{"nombre":{"type":"string"},"estado":{"type":"string","enum":["bien","mal","no_tiene"]},"nota":{"type":"string"}},"required":["nombre","estado"]}},"notas":{"type":"array","items":{"type":"string"}},"lados":{"type":"array","items":{"type":"object","properties":{"foto":{"type":"integer","description":"1 = la primera foto de este mensaje"},"lado":{"type":"string","enum":["frente","trasera","izquierdo","derecho","tablero"]}},"required":["foto","lado"]}},"de_foto":{"type":"boolean","description":"true si el kilometraje o el combustible los leíste de una foto"}`)},
+		Params: obj(`"kilometraje":{"type":"integer"},"combustible":{"type":"string","enum":["vacio","1/4","1/2","3/4","lleno","no_aplica",""]},"items":{"type":"array","items":{"type":"object","properties":{"nombre":{"type":"string"},"estado":{"type":"string","enum":["bien","mal","no_tiene"]},"nota":{"type":"string"}},"required":["nombre","estado"]}},"notas":{"type":"array","items":{"type":"string"}},"lados":{"type":"array","items":{"type":"object","properties":{"foto":{"type":"integer","description":"1 = la primera foto de este mensaje"},"lado":{"type":"string","enum":["placa","tablero","frente","izquierdo","trasera","derecho"]}},"required":["foto","lado"]}},"de_foto":{"type":"boolean","description":"true si el kilometraje o el combustible los leíste de una foto"}`)},
 	{Name: "proponer_hallazgo", Description: "Anota un hallazgo de diagnóstico que el mecánico DIJO o MOSTRÓ. Nunca diagnostiques por tu cuenta.",
 		Params: obj(`"sistema":{"type":"string","enum":["motor","frenos","suspension","direccion","electrico","transmision","refrigeracion","llantas","carroceria","otro"]},"descripcion":{"type":"string"},"gravedad":{"type":"string","enum":["urgente","recomendado","puede_esperar"]}`, "sistema", "descripcion")},
 	{Name: "proponer_cotizacion", Description: "Agrega ítems a la cotización. Un precio solo puede ser el de la lista del taller o una cifra que la persona dijo en esta conversación; si no, deja precio en null.",
@@ -50,6 +50,7 @@ type floorTurn struct {
 	said     string         // lo que escribió o dijo la persona en la conversación
 	amounts  map[int64]bool // cifras que dijo la persona
 	photos   []string       // fotos de este mensaje
+	video    bool           // el mensaje es un video de recepción: todo lo que trae sale "del video" (R9)
 }
 
 type floorArgs struct {
@@ -168,10 +169,21 @@ func jsonString(v any) string {
 }
 
 func (t *floorTurn) origin(fromPhoto bool) string {
-	if fromPhoto && len(t.photos) > 0 {
+	switch {
+	case t.video: // lo dijo en el audio del video o se ve en un cuadro
+		return domain.FromVideo
+	case fromPhoto && len(t.photos) > 0:
 		return domain.FromPhoto
 	}
 	return domain.FromSaid
+}
+
+// photoOrigin es el origen de lo que se leyó de una imagen: una foto o un cuadro del video.
+func (t *floorTurn) photoOrigin() string {
+	if t.video {
+		return domain.FromVideo
+	}
+	return domain.FromPhoto
 }
 
 var rePlateClean = regexp.MustCompile(`[\s-]`)
@@ -203,7 +215,7 @@ func (t *floorTurn) findVehicle(ctx context.Context, raw string, fromPhoto bool)
 	}
 	origin := domain.FromSaid
 	if !said {
-		origin = domain.FromPhoto
+		origin = t.photoOrigin()
 	}
 	if p.Plate == nil || p.Plate.Value != plate {
 		p.Plate = &domain.Field{Value: plate, Origin: origin}
@@ -370,22 +382,34 @@ func (t *floorTurn) reception(a floorArgs) string {
 			p.Notes = append(p.Notes, domain.Field{Value: trimRunes(n, 300), Origin: t.origin(a.DeFoto)})
 		}
 	}
+	t.sides(a)
+	for _, ref := range t.photos { // toda foto del mensaje va a la orden, aunque no se sepa el lado
+		p.Photos = upsertPhoto(p.Photos, domain.FloorPhoto{Ref: ref, Origin: t.photoOrigin()})
+	}
+	pr := p.Progress(domain.Saved{})
+	out["tiene"], out["total"], out["falta"] = pr.Have, pr.Total, pr.Missing
+	return jsonString(out)
+}
+
+// sides marca qué lado muestra cada foto. En un video también cuenta lo que se vio sin ser un lado con foto de la
+// orden (la placa, o el tablero de un carro): marca la guía y la foto va sin lado.
+func (t *floorTurn) sides(a floorArgs) {
+	p := &t.chat.Proposal
 	sides := domain.CarSides
 	if p.Kind == "moto" {
 		sides = domain.MotoSides
 	}
 	for _, l := range a.Lados {
-		if l.Foto < 1 || l.Foto > len(t.photos) || !slices.Contains(sides, l.Lado) {
+		if l.Foto < 1 || l.Foto > len(t.photos) {
 			continue
 		}
-		p.Photos = upsertPhoto(p.Photos, domain.FloorPhoto{Ref: t.photos[l.Foto-1], Side: l.Lado, Origin: domain.FromPhoto})
+		if t.video {
+			p.MarkSeen(l.Lado)
+		}
+		if slices.Contains(sides, l.Lado) {
+			p.Photos = upsertPhoto(p.Photos, domain.FloorPhoto{Ref: t.photos[l.Foto-1], Side: l.Lado, Origin: t.photoOrigin()})
+		}
 	}
-	for _, ref := range t.photos { // toda foto del mensaje va a la orden, aunque no se sepa el lado
-		p.Photos = upsertPhoto(p.Photos, domain.FloorPhoto{Ref: ref, Origin: domain.FromPhoto})
-	}
-	pr := p.Progress(domain.Saved{})
-	out["tiene"], out["total"], out["falta"] = pr.Have, pr.Total, pr.Missing
-	return jsonString(out)
 }
 
 func matchItem(items []FloorChecklistItem, name string) (FloorChecklistItem, bool) {
@@ -483,7 +507,7 @@ func (t *floorTurn) expense(a floorArgs) string {
 	}
 	o := domain.FromSaid
 	if fromInvoice && !t.amounts[a.Valor] {
-		o = domain.FromPhoto
+		o = t.photoOrigin()
 	}
 	p.Expenses = append(p.Expenses, domain.FloorExpense{ID: shared.NewID().String(), Description: trimRunes(d, 200), Value: a.Valor, Origin: o})
 	return jsonString(map[string]any{"gasto": d, "valor": a.Valor, "nota": "queda por confirmar"})

@@ -102,6 +102,9 @@ type FloorProposal struct {
 	Quote      []FloorLine      `json:"cotizacion,omitempty"`
 	Expenses   []FloorExpense   `json:"gastos,omitempty"`
 	Move       *Field           `json:"estado,omitempty"`
+	// Seen es lo que el modelo reportó haber visto en un video de recepción (guía de lados, R9). No se confirma: solo
+	// marca la guía.
+	Seen []string `json:"vistos,omitempty"`
 }
 
 // Pending dice si hay algo por confirmar.
@@ -239,9 +242,10 @@ func FindPlates(text string) []string {
 
 // Progress es el resumen de la ficha en vivo.
 type Progress struct {
-	Have    int      `json:"tiene"`
-	Total   int      `json:"total"`
-	Missing []string `json:"falta"`
+	Have    int         `json:"tiene"`
+	Total   int         `json:"total"`
+	Missing []string    `json:"falta"`
+	Guide   []GuideStep `json:"guia,omitempty"` // la guía de lados del video (R9)
 }
 
 var sideWords = map[string]string{"frente": "el frente", "trasera": "la parte trasera", "izquierdo": "el lado izquierdo",
@@ -301,6 +305,7 @@ func (p FloorProposal) Progress(saved Saved) Progress {
 		}
 		check(ok, sideWords[s])
 	}
+	pr.Guide = p.Guide(saved)
 	return pr
 }
 
@@ -427,6 +432,7 @@ func HumanEdit(prev, next FloorProposal) FloorProposal {
 func keepIdentity(prev, next FloorProposal) FloorProposal {
 	out := next
 	out.OrderID, out.OrderCode, out.OrderState, out.VehicleNew, out.Vehicle = prev.OrderID, prev.OrderCode, prev.OrderState, prev.VehicleNew, prev.Vehicle
+	out.Seen = prev.Seen // lo que vio el modelo no se edita a mano
 	if prev.OrderID != "" {
 		out.NewOrder = false
 	}

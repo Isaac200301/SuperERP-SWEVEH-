@@ -5174,6 +5174,81 @@
    ]
   },
   {
+   "id": "HU-108",
+   "epic": "E04",
+   "roles": [
+    "DU",
+    "RE",
+    "ME"
+   ],
+   "surf": [
+    "P",
+    "F"
+   ],
+   "titulo": "Recibir el vehículo con un video",
+   "como": "persona del taller que recibe un vehículo",
+   "quiero": "grabar un video corto dando la vuelta al vehículo y contando lo que veo",
+   "para": "que la recepción, las fotos por lado y lo que dije queden propuestos en la ficha sin llenar el formulario",
+   "prio": "M",
+   "antes": "",
+   "src": "pablo-2026-11-24",
+   "moto": true,
+   "veh": "",
+   "dep": [
+    "HU-107",
+    "HU-17",
+    "HU-18",
+    "HU-21"
+   ],
+   "rf": [
+    "RF-17",
+    "RF-18"
+   ],
+   "au": [],
+   "esc": [],
+   "ca": [],
+   "notas": "Entrega del 27-nov (V-12, ADR-0042). El video no sale del celular: solo el audio y los cuadros. Sin las mediciones de P1 (Q-47). Por revisar con Isaac.",
+   "refs": [],
+   "canc": "",
+   "ac": [
+    {
+     "dado": "una orden por recibir",
+     "cuando": "toco Grabar recepción",
+     "entonces": "veo la cámara, un contador hasta 1:30 y la guía de lados; a los 90 s se corta solo"
+    },
+    {
+     "dado": "que grabo",
+     "cuando": "termino",
+     "entonces": "del celular salen solo el audio y de 8 a 10 cuadros; el video completo no se guarda ni se manda"
+    },
+    {
+     "dado": "el audio y los cuadros",
+     "cuando": "el asistente los revisa",
+     "entonces": "la ficha en vivo trae lo que se vio y se dijo con origen del video y la guía marca lo visto; nada queda en la orden hasta que toco Confirmar"
+    },
+    {
+     "dado": "que no se vio algún lado",
+     "cuando": "llega la respuesta",
+     "entonces": "el asistente dice cuál falta y puedo grabar otro video o contestarle cómo está"
+    },
+    {
+     "dado": "que la red reintenta el envío",
+     "cuando": "llega dos veces el mismo video",
+     "entonces": "queda una sola vez en la conversación"
+    },
+    {
+     "dado": "un celular que no graba video o que la IA no responde",
+     "cuando": "recibo",
+     "entonces": "puedo tomar fotos por lado en la misma pantalla y los cuadros o fotos quedan en la propuesta para confirmarlos"
+    },
+    {
+     "dado": "una moto",
+     "cuando": "la recibo por video",
+     "entonces": "se piden los 5 lados con el tablero y el combustible puede ser no aplica"
+    }
+   ]
+  },
+  {
    "id": "HU-109",
    "epic": "E04",
    "roles": [

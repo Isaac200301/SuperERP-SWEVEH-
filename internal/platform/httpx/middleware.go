@@ -80,7 +80,9 @@ func SecurityHeaders(hsts bool) func(http.Handler) http.Handler {
 				"img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 			h.Set("X-Content-Type-Options", "nosniff")
 			h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-			h.Set("Permissions-Policy", "camera=(self), geolocation=(), microphone=()")
+			// Cámara y micrófono solo para este origen: el asistente del piso graba notas de voz (R8) y el video de recepción
+			// (R9); el navegador igual le pide permiso a la persona.
+			h.Set("Permissions-Policy", "camera=(self), geolocation=(), microphone=(self)")
 			h.Set("Cross-Origin-Opener-Policy", "same-origin")
 			h.Set("X-Frame-Options", "DENY")
 			if hsts {

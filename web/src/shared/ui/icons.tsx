@@ -40,6 +40,7 @@ export const IconInbox = (p: IconProps) => <Base {...p}><path d="M4 13l3-8h10l3 
 export const IconGrid = (p: IconProps) => <Base {...p}><rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="3" width="7" height="7" rx="2" /><rect x="3" y="14" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" /></Base>;
 export const IconSearch = (p: IconProps) => <Base {...p}><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></Base>;
 export const IconCamera = (p: IconProps) => <Base {...p}><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></Base>;
+export const IconVideo = (p: IconProps) => <Base {...p}><rect x="3" y="6" width="13" height="12" rx="2" /><path d="M16 10l5-3v10l-5-3z" /></Base>;
 export const IconChevron = (p: IconProps) => <Base {...p}><path d="M9 6l6 6-6 6" /></Base>;
 export const IconMore = (p: IconProps) => <Base {...p}><circle cx="5" cy="12" r="1.2" /><circle cx="12" cy="12" r="1.2" /><circle cx="19" cy="12" r="1.2" /></Base>;
 export const IconUser = (p: IconProps) => <Base {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" /></Base>;

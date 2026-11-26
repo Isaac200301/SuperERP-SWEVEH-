@@ -34,11 +34,11 @@ const LADO_MAX = 1600;
  * Reduce la foto a 1600 px por el lado más largo, en JPEG, antes de subirla: la del celular pesa varios MB y el envío
  * completo tiene un tope (y el modelo de visión no necesita más). Si el navegador no puede, va la original.
  */
-export async function reducir(f: File): Promise<File> {
+export async function reducir(f: File, lado = LADO_MAX): Promise<File> {
   if (typeof createImageBitmap !== 'function' || typeof OffscreenCanvas === 'undefined') return f;
   try {
     const img = await createImageBitmap(f);
-    const escala = Math.min(1, LADO_MAX / Math.max(img.width, img.height));
+    const escala = Math.min(1, lado / Math.max(img.width, img.height));
     if (escala === 1 && f.size < 1_500_000) return f;
     const canvas = new OffscreenCanvas(Math.round(img.width * escala), Math.round(img.height * escala));
     canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -94,6 +94,34 @@ export function useConfirmFloor() {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: floorKey });
       void qc.invalidateQueries({ queryKey: ordersKey });
+    },
+  });
+}
+
+export type VideoRecepcion = { ordenId: string; segundos: number; audio?: Blob | undefined; cuadros: Blob[]; clave: string };
+
+/**
+ * Recepción por video (R9, HU-108, ADR-0042): manda solo el audio y los cuadros (el video nunca sale del celular). La
+ * clave la genera la pantalla por grabación: si la red reintenta, no se repite.
+ */
+export function useSendVideo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: VideoRecepcion) => {
+      const fd = new FormData();
+      fd.append('segundos', String(v.segundos));
+      if (v.audio) fd.append('audio', v.audio, v.audio.type.includes('mp4') ? 'audio.mp4' : 'audio.webm');
+      v.cuadros.forEach((c, i) => fd.append('cuadros', c, `cuadro-${i + 1}.jpg`));
+      const r = await api.POST('/orders/{id}/reception/video', {
+        params: { path: { id: v.ordenId }, header: { 'Idempotency-Key': v.clave } },
+        body: { cuadros: [] },
+        bodySerializer: () => fd,
+      });
+      return unwrap(r).chat;
+    },
+    onSuccess: (chat) => {
+      qc.setQueryData([...floorKey, 'chat', chat.id], chat);
+      void qc.invalidateQueries({ queryKey: floorKey });
     },
   });
 }

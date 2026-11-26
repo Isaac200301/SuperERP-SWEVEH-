@@ -490,7 +490,7 @@ Marco de referencia: **OWASP ASVS 5.0.0** como lista de verificación (objetivo 
 
 - **TLS 1.2+** en todo tráfico externo, **HSTS** con `includeSubDomains`; certificados automáticos.
 - **CSP estricta** sin `unsafe-inline`: `default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; img-src 'self' data: <dominio-storage>; connect-src 'self'`. Vite produce archivos con hash; no se necesitan scripts en línea.
-- Encabezados: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` mínima (cámara solo para evidencias), `Cross-Origin-Opener-Policy: same-origin`.
+- Encabezados: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` mínima (cámara y micrófono solo para el propio origen: evidencias, voz del asistente y video de recepción, ADR-0042; geolocalización apagada), `Cross-Origin-Opener-Policy: same-origin`.
 - React escapa por defecto; **prohibido** `dangerouslySetInnerHTML` sin sanear (regla de ESLint que rompe el build).
 - Subida de archivos: validación de tipo por contenido (no por extensión), tamaño máximo, renombrado a UUID, reescritura de imágenes (elimina EXIF/GPS cuando no sea necesario) y almacenamiento en bucket privado.
 

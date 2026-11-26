@@ -536,6 +536,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orders/{id}/reception/video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recepción por video (R9, V-12, HU-108): el audio y de 1 a 10 cuadros de un video de hasta 90 s. El video completo nunca se manda (Ley 1581). Devuelve la conversación de la orden con la propuesta "del video" y la guía de lados; nada se guarda hasta Confirmar. Solo órdenes por recibir. Idempotency-Key obligatoria. Permiso assistant:use */
+        post: operations["sendReceptionVideo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/orders/{id}/findings": {
         parameters: {
             query?: never;
@@ -2032,6 +2049,13 @@ export interface components {
                 tiene: number;
                 total: number;
                 falta: string[];
+                /** @description Guía de lados del video de recepción (R9): ✓ lo que se vio o ya tiene foto, ○ lo que falta. Solo mientras se recibe */
+                guia?: {
+                    /** @enum {string} */
+                    clave: "placa" | "tablero" | "frente" | "izquierdo" | "trasera" | "derecho";
+                    nombre: string;
+                    visto: boolean;
+                }[];
             };
             mensajes: {
                 /** Format: uuid */
@@ -2041,8 +2065,10 @@ export interface components {
                 texto: string;
                 adjuntos: {
                     /** @enum {string} */
-                    tipo: "foto" | "voz";
+                    tipo: "foto" | "voz" | "video";
                     url?: string;
+                    /** @description Duración del video (el video no se guarda: solo su audio en texto y sus cuadros) */
+                    segundos?: number;
                 }[];
                 /** @description Botones (dos placas) */
                 opciones: string[];
@@ -2060,7 +2086,7 @@ export interface components {
              * @description De dónde salió el dato (HU-64)
              * @enum {string}
              */
-            origen: "dijiste" | "foto" | "lista" | "pusiste" | "taller";
+            origen: "dijiste" | "foto" | "video" | "lista" | "pusiste" | "taller";
         };
         /** @description Lo que el asistente propone y todavía no está guardado (R-08). Un precio solo sale de la lista del taller, de lo que dijo la persona o de lo que ella escribe en la ficha */
         PropuestaPiso: {
@@ -2129,6 +2155,8 @@ export interface components {
                 origen: string;
             }[];
             estado?: components["schemas"]["CampoPiso"];
+            /** @description Lo que el modelo vio en un video de recepción (marca la guía; no se confirma ni se edita) */
+            vistos?: string[];
         };
         VistaCliente: {
             documento: components["schemas"]["DocumentoCliente"];
@@ -3753,6 +3781,48 @@ export interface operations {
                 };
             };
             404: components["responses"]["Problem"];
+        };
+    };
+    sendReceptionVideo: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    segundos?: number;
+                    /**
+                     * Format: binary
+                     * @description Audio del video (webm, mp4, ogg o wav, máx. 10 MB). Se transcribe y no se guarda
+                     */
+                    audio?: string;
+                    /** @description JPG, PNG o WEBP de máx. 2 MB cada uno (la pantalla los toma de 1280 px) */
+                    cuadros: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        chat: components["schemas"]["ChatPiso"];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
         };
     };
     listFindings: {

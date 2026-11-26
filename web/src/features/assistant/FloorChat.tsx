@@ -9,7 +9,7 @@ import { Plate } from '../../shared/ui/Plate';
 import { useConfirmFloor, useEditFloor, useSendFloor, type ChatPiso, type MensajePiso, type PropuestaPiso } from './api';
 
 /** De dónde salió cada dato (HU-64), en palabras del taller. */
-const ORIGEN: Record<string, string> = { dijiste: 'lo dijiste', foto: 'de la foto', lista: 'de tu lista', pusiste: 'lo pusiste', taller: 'ya estaba' };
+const ORIGEN: Record<string, string> = { dijiste: 'lo dijiste', foto: 'de la foto', video: 'del video', lista: 'de tu lista', pusiste: 'lo pusiste', taller: 'ya estaba' };
 
 const LADO: Record<string, string> = { frente: 'Frente', trasera: 'Atrás', izquierdo: 'Lado izq.', derecho: 'Lado der.', tablero: 'Tablero' };
 
@@ -176,7 +176,10 @@ function Burbuja({ m, onOpcion, ocupado }: { m: MensajePiso; onOpcion: (o: strin
   return (
     <li className={`flex max-w-[88%] flex-col gap-1.5 ${mio ? 'self-end' : 'self-start'}`}>
       <div className={`rounded-2xl px-3.5 py-2.5 text-[15px] whitespace-pre-wrap ${mio ? 'bg-primary text-white' : 'bg-white'}`}>
-        {m.adjuntos.some((a) => a.tipo === 'voz') ? <span className="mb-1 block text-xs font-bold opacity-80">Nota de voz</span> : null}
+        {m.adjuntos.some((a) => a.tipo === 'voz') && !m.adjuntos.some((a) => a.tipo === 'video') ? (
+          <span className="mb-1 block text-xs font-bold opacity-80">Nota de voz</span>
+        ) : null}
+        <VideoTag m={m} />
         {m.texto}
         {m.conPropuesta ? (
           <span className="mt-2 block w-fit rounded-full bg-kpi-lilac px-2 py-0.5 text-[11px] font-extrabold text-lilac-ink">Propuesta · revísala arriba</span>
@@ -203,6 +206,16 @@ function Burbuja({ m, onOpcion, ocupado }: { m: MensajePiso; onOpcion: (o: strin
       <span className={`text-[11px] text-ink-3 ${mio ? 'self-end' : ''}`}>{formatoHora(m.creadoEn)}</span>
     </li>
   );
+}
+
+/** "Video de recepción · 1:02 · 8 cuadros": el video no se guarda, solo su audio en texto y los cuadros. */
+function VideoTag({ m }: { m: MensajePiso }) {
+  const v = m.adjuntos.find((a) => a.tipo === 'video');
+  if (!v) return null;
+  const s = v.segundos ?? 0;
+  const n = m.adjuntos.filter((a) => a.tipo === 'foto').length;
+  const dur = s > 0 ? ` · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '';
+  return <span className="mb-1 block text-xs font-bold opacity-80">{`${s > 0 ? 'Video de recepción' : 'Fotos de recepción'}${dur} · ${n} ${n === 1 ? 'cuadro' : 'cuadros'}`}</span>;
 }
 
 /** Nota de voz con MediaRecorder: un toque empieza, otro la manda. */

@@ -177,7 +177,7 @@ export function OrderDetailPage() {
         <aside className="flex min-w-0 flex-col gap-5">
           {/* V-08: lo gastado contra lo cotizado, interno del taller. */}
           {avanzada ? <SpendPanel orden={o} /> : null}
-          <OrderAssistantCard key={o.id} ordenId={o.id} />
+          <OrderAssistantCard key={o.id} ordenId={o.id} estado={o.estado} />
           {whatsapp ? <OrderMessages orden={o} /> : null}
         </aside>
       </div>

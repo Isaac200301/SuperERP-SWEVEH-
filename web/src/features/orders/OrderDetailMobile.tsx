@@ -177,7 +177,7 @@ export function OrderDetailMobile({ orden: o }: { orden: Orden }) {
             {!['por_recibir', 'cancelada'].includes(o.estado) ? <DiagnosisPanel orden={o} /> : null}
           </>
         ) : null}
-        {tab === 'asistente' ? <OrderAssistantCard key={o.id} ordenId={o.id} titulo={false} /> : null}
+        {tab === 'asistente' ? <OrderAssistantCard key={o.id} ordenId={o.id} estado={o.estado} titulo={false} /> : null}
         {tab === 'cotizacion' ? (
           cotizable ? (
             <>

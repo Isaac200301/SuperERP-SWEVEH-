@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +29,7 @@ func (h *handler) floorRoutes(r chi.Router, j func(httpx.Func) http.HandlerFunc)
 	r.With(use).Post("/assistant/floor/chats/{id}/confirm", j(h.floorConfirm))
 	r.With(use).Get("/assistant/floor/chats/{id}/photos/{photo}", h.floorPhoto)
 	r.With(use).Get("/orders/{id}/assistant", j(h.floorOrder))
+	r.With(use).Post("/orders/{id}/reception/video", j(h.floorVideo))
 }
 
 type floorMsgDTO struct {
@@ -41,8 +43,9 @@ type floorMsgDTO struct {
 }
 
 type floorAttachDTO struct {
-	Tipo string `json:"tipo"`
-	URL  string `json:"url,omitempty"`
+	Tipo     string `json:"tipo"`
+	URL      string `json:"url,omitempty"`
+	Segundos int    `json:"segundos,omitempty"`
 }
 
 type floorChatDTO struct {
@@ -73,7 +76,7 @@ func (h *handler) floorChatOut(c assistantapp.FloorChat, msgs []assistantapp.Flo
 			md.Opciones = []string{}
 		}
 		for _, a := range m.Attachments {
-			ad := floorAttachDTO{Tipo: a.Kind}
+			ad := floorAttachDTO{Tipo: a.Kind, Segundos: a.Seconds}
 			if a.Kind == "foto" {
 				_, id, _ := strings.Cut(a.Ref, "/")
 				ad.URL = "/api/v1/assistant/floor/chats/" + c.ID.String() + "/photos/" + id
@@ -177,6 +180,91 @@ func floorPart(in *assistantapp.FloorInput, part interface {
 		if len(in.Photos) > assistantapp.FloorMaxPhotos {
 			return assistantapp.ErrFloorPhotos
 		}
+	}
+	return nil
+}
+
+var errVideoFull = shared.Validation("video_completo", "No mandes el video completo: solo el audio y los cuadros.").WithField("video")
+
+// floorVideo recibe un video de recepción (R9, HU-108) como multipart: el audio (opcional), de 1 a 10 cuadros y los
+// segundos que duró. El video completo se rechaza: nunca sale del celular (Ley 1581). Idempotency-Key obligatoria.
+func (h *handler) floorVideo(r *http.Request, p reqctx.Principal) (int, any, error) {
+	id, err := httpx.PathID(r, "id", shared.NotFound("orden_no_encontrada", "No encontramos esa orden en tu taller."))
+	if err != nil {
+		return 0, nil, err
+	}
+	r.Body = http.MaxBytesReader(nil, r.Body, 32<<20)
+	mr, err := r.MultipartReader()
+	if err != nil {
+		return 0, nil, httpx.ErrBadJSON.WithMessage("Envía el video como formulario (multipart).")
+	}
+	in := assistantapp.VideoInput{TallerID: p.TallerID, Actor: p.Actor(), Roles: p.Roles, OrderID: id, Key: r.Header.Get("Idempotency-Key")}
+	for {
+		part, err := mr.NextPart()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return 0, nil, httpx.ErrBadJSON.WithMessage("El video llegó incompleto.")
+		}
+		if err := videoPart(&in, part); err != nil {
+			return 0, nil, err
+		}
+	}
+	res, err := h.s.Floor.Video(r.Context(), in)
+	if err != nil {
+		return 0, nil, err
+	}
+	pr, err := h.s.Floor.Progress(r.Context(), res.Chat)
+	if err != nil {
+		return 0, nil, err
+	}
+	return http.StatusOK, map[string]any{"chat": h.floorChatOut(res.Chat, res.Messages, pr, res.Available)}, nil
+}
+
+func videoPart(in *assistantapp.VideoInput, part interface {
+	io.Reader
+	FormName() string
+	FileName() string
+}) error {
+	read := func(max int64) ([]byte, error) {
+		b, err := io.ReadAll(io.LimitReader(part, max+1))
+		if err != nil {
+			return nil, httpx.ErrBadJSON.WithMessage("El video llegó incompleto.")
+		}
+		return b, nil
+	}
+	switch part.FormName() {
+	case "video":
+		return errVideoFull
+	case "segundos":
+		b, err := read(8)
+		if err != nil {
+			return err
+		}
+		n, err := strconv.Atoi(strings.TrimSpace(string(b)))
+		if err != nil {
+			return assistantapp.ErrVideoLength
+		}
+		in.Seconds = n
+	case "audio":
+		b, err := read(assistantapp.FloorMaxAudio)
+		if err != nil {
+			return err
+		}
+		if len(b) > assistantapp.FloorMaxAudio {
+			return assistantapp.ErrFloorAudio
+		}
+		in.Audio = &assistantapp.Blob{Data: b, Mime: audioMime(part)}
+	case "cuadros":
+		b, err := read(assistantapp.VideoMaxFrame)
+		if err != nil {
+			return err
+		}
+		if len(in.Frames) >= assistantdomain.VideoMaxFrames || len(b) > assistantapp.VideoMaxFrame {
+			return assistantapp.ErrVideoFrames
+		}
+		in.Frames = append(in.Frames, assistantapp.Blob{Data: b})
 	}
 	return nil
 }

@@ -429,6 +429,19 @@ func (r *floorRepo) InsertMessage(_ context.Context, _ shared.ID, m app.FloorMes
 	return nil
 }
 
+func (r *floorRepo) MessageChat(_ context.Context, _ shared.ID, id shared.ID) (shared.ID, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for chatID, list := range r.msgs {
+		for _, m := range list {
+			if m.ID == id {
+				return chatID, true, nil
+			}
+		}
+	}
+	return shared.NilID, false, nil
+}
+
 func (r *floorRepo) Messages(_ context.Context, _ shared.ID, chatID shared.ID, limit int) ([]app.FloorMessage, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

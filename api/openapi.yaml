@@ -792,6 +792,38 @@ paths:
               schema: { $ref: '#/components/schemas/ChatPisoOpcional' }
         '404': { $ref: '#/components/responses/Problem' }
 
+  /orders/{id}/reception/video:
+    post:
+      operationId: sendReceptionVideo
+      summary: 'Recepción por video (R9, V-12, HU-108): el audio y de 1 a 10 cuadros de un video de hasta 90 s. El video completo nunca se manda (Ley 1581). Devuelve la conversación de la orden con la propuesta "del video" y la guía de lados; nada se guarda hasta Confirmar. Solo órdenes por recibir. Idempotency-Key obligatoria. Permiso assistant:use'
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 8, maxLength: 100 } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [cuadros]
+              properties:
+                segundos: { type: integer, minimum: 0, maximum: 90 }
+                audio: { type: string, format: binary, description: 'Audio del video (webm, mp4, ogg o wav, máx. 10 MB). Se transcribe y no se guarda' }
+                cuadros: { type: array, minItems: 1, maxItems: 10, items: { type: string, format: binary }, description: 'JPG, PNG o WEBP de máx. 2 MB cada uno (la pantalla los toma de 1280 px)' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [chat]
+                properties:
+                  chat: { $ref: '#/components/schemas/ChatPiso' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '400': { $ref: '#/components/responses/Problem' }
+
   /orders/{id}/findings:
     get:
       operationId: listFindings
@@ -2822,6 +2854,16 @@ components:
             tiene: { type: integer }
             total: { type: integer }
             falta: { type: array, items: { type: string } }
+            guia:
+              type: array
+              description: 'Guía de lados del video de recepción (R9): ✓ lo que se vio o ya tiene foto, ○ lo que falta. Solo mientras se recibe'
+              items:
+                type: object
+                required: [clave, nombre, visto]
+                properties:
+                  clave: { type: string, enum: [placa, tablero, frente, izquierdo, trasera, derecho] }
+                  nombre: { type: string }
+                  visto: { type: boolean }
         mensajes:
           type: array
           items:
@@ -2837,8 +2879,9 @@ components:
                   type: object
                   required: [tipo]
                   properties:
-                    tipo: { type: string, enum: [foto, voz] }
+                    tipo: { type: string, enum: [foto, voz, video] }
                     url: { type: string }
+                    segundos: { type: integer, description: 'Duración del video (el video no se guarda: solo su audio en texto y sus cuadros)' }
               opciones: { type: array, items: { type: string }, description: 'Botones (dos placas)' }
               creadoEn: { type: string, format: date-time }
               conPropuesta: { type: boolean }
@@ -2850,7 +2893,7 @@ components:
       required: [valor, origen]
       properties:
         valor: { type: string }
-        origen: { type: string, enum: [dijiste, foto, lista, pusiste, taller], description: 'De dónde salió el dato (HU-64)' }
+        origen: { type: string, enum: [dijiste, foto, video, lista, pusiste, taller], description: 'De dónde salió el dato (HU-64)' }
 
     PropuestaPiso:
       type: object
@@ -2930,6 +2973,7 @@ components:
               valor: { type: integer, format: int64 }
               origen: { type: string }
         estado: { $ref: '#/components/schemas/CampoPiso' }
+        vistos: { type: array, items: { type: string }, description: 'Lo que el modelo vio en un video de recepción (marca la guía; no se confirma ni se edita)' }
 
     VistaCliente:
       type: object

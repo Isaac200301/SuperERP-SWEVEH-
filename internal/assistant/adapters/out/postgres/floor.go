@@ -123,6 +123,16 @@ func (Floor) InsertMessage(ctx context.Context, tallerID shared.ID, m app.FloorM
 	return err
 }
 
+func (Floor) MessageChat(ctx context.Context, tallerID, msgID shared.ID) (shared.ID, bool, error) {
+	rows, err := db.Many[struct {
+		ChatID shared.ID `db:"chat_id"`
+	}](ctx, `SELECT chat_id FROM assistant.chat_piso_mensaje WHERE taller_id = $1 AND id = $2`, tallerID, msgID)
+	if err != nil || len(rows) == 0 {
+		return shared.NilID, false, err
+	}
+	return rows[0].ChatID, true, nil
+}
+
 func nonNil[T any](s []T) []T {
 	if s == nil {
 		return []T{}

@@ -1689,6 +1689,26 @@ _Módulo del MVP: Preparativos. Que la demo corra dos veces seguidas sin tocar c
 
 **Trazabilidad:** Depende de: HU-16, HU-17, HU-18, HU-20, HU-27, HU-103, HU-105, HU-106 · Usa: HU-64 · ADR-0041
 
+### HU-108 · Recibir el vehículo con un video
+
+**Épica:** E04 · **Roles:** Dueño del taller, Recepción, Mecánico · **Superficies:** Piso, Panel · **Prioridad:** Must · **Origen:** Pablo (24-nov-2026, entrega del viernes, V-12), por revisar con Isaac · **Aplica a motos:** sí
+
+**Como** persona del taller que recibe un vehículo, **quiero** grabar un video corto dando la vuelta al vehículo y contando lo que veo, **para** que la recepción, las fotos por lado y lo que dije queden propuestos en la ficha sin llenar el formulario.
+
+**Criterios de aceptación**
+
+- **Dado** una orden "Por recibir", **cuando** toco "Grabar recepción", **entonces** veo la cámara, un contador hasta 1:30 y la guía de lados (Placa, Tablero, Frente, Lado izq., Atrás, Lado der.); a los 90 s se corta solo.
+- **Dado** que grabo, **cuando** termino, **entonces** del celular salen solo el audio y de 8 a 10 cuadros; el video completo no se guarda ni se manda.
+- **Dado** el audio y los cuadros, **cuando** el asistente los revisa, **entonces** la ficha en vivo trae lo que se vio y se dijo (kilometraje, combustible, notas y el lado de cada cuadro) con origen "del video", y la guía marca lo que el asistente vio; nada queda en la orden hasta que toco **Confirmar**.
+- **Dado** que no se vio algún lado, **cuando** llega la respuesta, **entonces** el asistente dice cuál falta y puedo grabar otro video o contestarle cómo está.
+- **Dado** que la red reintenta el envío, **cuando** llega dos veces el mismo video, **entonces** queda una sola vez en la conversación.
+- **Dado** un celular que no graba video o que la IA no responde, **cuando** recibo, **entonces** puedo tomar fotos por lado en la misma pantalla y los cuadros o fotos quedan en la propuesta para confirmarlos.
+- **Dado** una moto, **cuando** la recibo por video, **entonces** se piden los 5 lados con el tablero y el combustible puede ser "no aplica" (HU-18).
+
+**Notas:** ADR-0042. Sin las mediciones del prototipo P1 (Q-47): los dos caminos, video y fotos por lado, usan el mismo endpoint.
+
+**Trazabilidad:** Depende de: HU-107, HU-17, HU-18, HU-21 · Usa: HU-64 · ADR-0042
+
 ### HU-109 · Mostrar la cotización en pantalla y compartirla en PDF
 
 **Épica:** E04 · **Roles:** Dueño del taller, Recepción, Mecánico · **Superficies:** Panel, Piso · **Prioridad:** Must · **Origen:** Pablo (24-nov-2026, entrega del viernes, V-10), por revisar con Isaac · **Aplica a motos:** sí
