@@ -95,7 +95,7 @@ func (g *Guard) Require(perm string) func(http.Handler) http.Handler {
 				return
 			}
 			if !g.can(p.Roles, perm) {
-				g.log.WarnContext(r.Context(), "permiso denegado", "permiso", perm, "ruta", r.URL.Path)
+				g.log.WarnContext(r.Context(), "permiso denegado", "permiso", perm, "ruta", httpx.LogPath(r.URL.Path))
 				httpx.WriteError(w, r, g.log, ErrForbidden)
 				return
 			}

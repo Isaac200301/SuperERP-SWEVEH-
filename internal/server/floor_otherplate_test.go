@@ -59,8 +59,8 @@ func TestFloorOtherOrder_VideoCardThenOpenWithData(t *testing.T) {
 		proposalOf(r)["sintoma"] != nil || proposalOf(r)["cliente"] != nil {
 		t.Fatalf("datos del otro vehículo: %v / %v", o, proposalOf(r))
 	}
-	if f, _ := chatOf(r)["otraFalta"].([]any); len(f) != 0 {
-		t.Fatalf("ya no falta nada para la orden nueva: %v", f)
+	if f, _ := chatOf(r)["otraFalta"].([]any); len(f) != 1 || f[0] != "la autorización de datos del cliente" {
+		t.Fatalf("para la orden nueva solo falta la autorización, que se marca allá: %v", f)
 	}
 
 	// 4. Abrir con estos datos: conversación nueva con la ficha del Toyota y sus fotos; la de la moto queda sin tarjeta.
@@ -107,6 +107,7 @@ func TestFloorOtherOrder_VideoCardThenOpenWithData(t *testing.T) {
 
 	// 5. Guardar en la conversación nueva crea la orden del Toyota con sus fotos.
 	nid := chatOf(n)["id"].(string)
+	n = markConsent(t, owner, n, true)
 	g := owner.must(http.StatusOK, owner.confirmFloor(nid, chatOf(n)["version"], "guardar-otra-0001"))
 	if g.body["resultado"].(map[string]any)["ordenNueva"] != true || countOrders(t, owner) != before+1 {
 		t.Fatalf("guardar: %v", g.body["resultado"])

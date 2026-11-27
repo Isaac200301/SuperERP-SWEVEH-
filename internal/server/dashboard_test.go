@@ -24,7 +24,7 @@ func kpi(t *testing.T, body map[string]any, code string) map[string]any {
 // motoOrder abre una orden "Recibido" para una moto nueva con su cliente.
 func motoOrder(t *testing.T, c *client, plate string) string {
 	t.Helper()
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005551" + plate[3:5] + "0", "nombre": "Moto " + plate}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005551" + plate[3:5] + "0", "nombre": "Moto " + plate}))
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": plate, "clienteId": nested(r.body, "cliente", "id"),
 		"cilindraje": "150", "energia": "gasolina", "ciclo": "4t", "refrigeracion": "aire", "transmision": "manual"}))
 	return c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": plate, "sintoma": "Cambio de aceite",
@@ -36,7 +36,7 @@ func motoOrder(t *testing.T, c *client, plate string) string {
 func TestDashboard_ExampleMarkAndStateCounts(t *testing.T) {
 	e := newEnv(t)
 	c := e.register("3105550600", "Rosa Pérez")
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550601", "nombre": "Cliente Ejemplo"}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550601", "nombre": "Cliente Ejemplo"}))
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": "EJE601", "clienteId": nested(r.body, "cliente", "id")}))
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": "EJE601", "sintoma": "Ejemplo", "ejemplo": true}))
 

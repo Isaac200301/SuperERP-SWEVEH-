@@ -150,7 +150,7 @@ export interface paths {
         /** Clientes del taller; con q busca por nombre o celular. Permiso customer:read */
         get: operations["listCustomers"];
         put?: never;
-        /** Buscar o crear un cliente por celular (HU-09). Permiso customer:create */
+        /** Buscar o crear un cliente por celular (HU-09). Un cliente nuevo pide la respuesta a la autorización de datos (HU-86, R11). Permiso customer:create */
         post: operations["registerCustomer"];
         delete?: never;
         options?: never;
@@ -2122,6 +2122,8 @@ export interface components {
                 id?: string;
                 celular?: components["schemas"]["CampoPiso"];
                 nombre?: components["schemas"]["CampoPiso"];
+                /** @description Lo que respondió el cliente nuevo a la autorización de datos (HU-86). Solo lo marca la persona en la ficha; la IA no lo pone. Sin respuesta no se confirma un cliente nuevo */
+                autoriza?: boolean;
             };
             sintoma?: components["schemas"]["CampoPiso"];
             ficha?: {
@@ -2403,10 +2405,12 @@ export interface components {
             adminPlataforma?: boolean;
             /** @description Entró con un PIN temporal que puso el dueño: debe escoger uno propio (HU-104) */
             cambiarPin?: boolean;
-            /** @description Lo encendido en este servidor (FEATURE_WHATSAPP, FEATURE_PLATFORM; V-01 y V-02). Las rutas con x-feature apagada no existen (404) */
+            /** @description Lo encendido en este servidor (FEATURE_WHATSAPP, FEATURE_PLATFORM, FEATURE_CUSTOMER_TOOLS; V-01, V-02 y V-15). Las rutas con x-feature apagada no existen (404) */
             funciones?: {
                 whatsapp: boolean;
                 plataforma: boolean;
+                /** @description Unir clientes repetidos (HU-15) e importar clientes y vehículos por CSV (HU-92) */
+                herramientasClientes: boolean;
             };
         };
         Cliente: {
@@ -2934,6 +2938,10 @@ export interface operations {
                     celular: string;
                     nombre: string;
                     correo?: string | null;
+                    /** @description Lo que respondió el cliente en el mostrador al texto de la autorización (HU-86). Obligatoria si el cliente es nuevo (400 autorizacion_requerida); si ya existía, no cambia su autorización */
+                    autorizacion?: {
+                        acepta: boolean;
+                    };
                 };
             };
         };
@@ -2947,7 +2955,7 @@ export interface operations {
                     "application/json": components["schemas"]["RegistroCliente"];
                 };
             };
-            /** @description Cliente creado con autorización pendiente. */
+            /** @description Cliente creado con su respuesta a la autorización (autorizada o rechazada). */
             201: {
                 headers: {
                     [name: string]: unknown;

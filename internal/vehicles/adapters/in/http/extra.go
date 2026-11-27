@@ -18,7 +18,9 @@ import (
 func (h *Handler) ExtraRoutes(r chi.Router) {
 	r.With(h.guard.Require(permRead)).Get("/customers/{id}/vehicles", httpx.JSON(h.log, h.byCustomer))
 	r.With(h.guard.Require("vehicle:change_owner")).Patch("/vehicles/{id}/owner", httpx.JSON(h.log, h.changeOwner))
-	r.With(h.guard.Require("import:run")).Post("/vehicles/import", httpx.JSON(h.log, h.importCSV))
+	if h.importOn { // V-15: importar clientes y vehículos (HU-92) solo con FEATURE_CUSTOMER_TOOLS
+		r.With(h.guard.Require("import:run")).Post("/vehicles/import", httpx.JSON(h.log, h.importCSV))
+	}
 }
 
 type importRowDTO struct {

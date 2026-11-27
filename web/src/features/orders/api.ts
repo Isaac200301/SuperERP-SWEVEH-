@@ -61,7 +61,8 @@ export type NewOrderInput = {
   placa: string;
   vehiculoExistente: Vehiculo | null;
   etag: string;
-  cliente: { celular: string; nombre: string; correo?: string };
+  // autorizacion: lo que respondió el cliente nuevo en el mostrador (HU-86); sin ella el servidor no lo guarda (R11).
+  cliente: { celular: string; nombre: string; correo?: string; autorizacion?: { acepta: boolean } };
   vehiculo: {
     tipo?: 'carro' | 'moto';
     confirmarPlacaEspecial: boolean;

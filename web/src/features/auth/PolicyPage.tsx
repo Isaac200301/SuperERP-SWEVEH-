@@ -17,9 +17,9 @@ export function PolicyPage() {
       <p className="text-sm text-ink-2">
         Versión <span className="font-mono">{policyVersion}</span> · vigente desde el {policyDate}
       </p>
-      <Alert kind="warn" title="Borrador sin validar">
-        Esta política todavía no está publicada. El texto definitivo lo redacta y revisa un abogado antes de atender talleres
-        reales. Mientras tanto, SWEVEH solo se usa con datos de ejemplo.
+      <Alert kind="warn" title="Texto en revisión jurídica">
+        Esta versión es un borrador. El texto definitivo lo redacta y revisa un abogado; cuando esté listo, se publica aquí
+        con una versión nueva.
       </Alert>
       <p className="text-ink-2">
         SWEVEH trata los datos según la Ley 1581 de 2012 y el Decreto 1377 de 2013: con autorización previa, expresa e

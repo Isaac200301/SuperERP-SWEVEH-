@@ -195,7 +195,7 @@ paths:
   /customers:
     post:
       operationId: registerCustomer
-      summary: Buscar o crear un cliente por celular (HU-09). Permiso customer:create
+      summary: Buscar o crear un cliente por celular (HU-09). Un cliente nuevo pide la respuesta a la autorización de datos (HU-86, R11). Permiso customer:create
       requestBody:
         required: true
         content:
@@ -208,6 +208,13 @@ paths:
                 celular: { type: string }
                 nombre: { type: string, maxLength: 120 }
                 correo: { type: string, nullable: true }
+                autorizacion:
+                  type: object
+                  additionalProperties: false
+                  required: [acepta]
+                  description: 'Lo que respondió el cliente en el mostrador al texto de la autorización (HU-86). Obligatoria si el cliente es nuevo (400 autorizacion_requerida); si ya existía, no cambia su autorización'
+                  properties:
+                    acepta: { type: boolean }
       responses:
         '200':
           description: El celular ya existía en el taller; se devuelve ese cliente.
@@ -215,7 +222,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/RegistroCliente' }
         '201':
-          description: Cliente creado con autorización pendiente.
+          description: Cliente creado con su respuesta a la autorización (autorizada o rechazada).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RegistroCliente' }
@@ -312,6 +319,7 @@ paths:
         '422': { $ref: '#/components/responses/Problem' }
 
   /vehicles/import:
+    x-feature: customer-tools
     post:
       operationId: importVehicles
       summary: Importar clientes y vehículos desde CSV (HU-92). Sin confirmar=1 es solo la vista previa; con errores no se importa nada. Los clientes nuevos quedan con autorización pendiente. Permiso import:run
@@ -1229,6 +1237,7 @@ paths:
         '409': { $ref: '#/components/responses/Problem' }
 
   /customers/duplicates:
+    x-feature: customer-tools
     get:
       operationId: listDuplicateCustomers
       summary: Posibles clientes repetidos, agrupados por nombre (HU-15). Permiso customer:merge
@@ -1250,6 +1259,7 @@ paths:
                         clientes: { type: array, items: { $ref: '#/components/schemas/Cliente' } }
 
   /customers/merge:
+    x-feature: customer-tools
     post:
       operationId: mergeCustomers
       summary: Unir un cliente repetido al que se conserva (HU-15). Sus vehículos, órdenes y conversaciones pasan al que queda; queda en la bitácora. Permiso customer:merge
@@ -2957,6 +2967,7 @@ components:
             id: { type: string }
             celular: { $ref: '#/components/schemas/CampoPiso' }
             nombre: { $ref: '#/components/schemas/CampoPiso' }
+            autoriza: { type: boolean, description: 'Lo que respondió el cliente nuevo a la autorización de datos (HU-86). Solo lo marca la persona en la ficha; la IA no lo pone. Sin respuesta no se confirma un cliente nuevo' }
         sintoma: { $ref: '#/components/schemas/CampoPiso' }
         ficha: { type: object, additionalProperties: { $ref: '#/components/schemas/CampoPiso' } }
         kilometraje: { $ref: '#/components/schemas/CampoPiso' }
@@ -3244,11 +3255,12 @@ components:
         cambiarPin: { type: boolean, description: 'Entró con un PIN temporal que puso el dueño: debe escoger uno propio (HU-104)' }
         funciones:
           type: object
-          description: 'Lo encendido en este servidor (FEATURE_WHATSAPP, FEATURE_PLATFORM; V-01 y V-02). Las rutas con x-feature apagada no existen (404)'
-          required: [whatsapp, plataforma]
+          description: 'Lo encendido en este servidor (FEATURE_WHATSAPP, FEATURE_PLATFORM, FEATURE_CUSTOMER_TOOLS; V-01, V-02 y V-15). Las rutas con x-feature apagada no existen (404)'
+          required: [whatsapp, plataforma, herramientasClientes]
           properties:
             whatsapp: { type: boolean }
             plataforma: { type: boolean }
+            herramientasClientes: { type: boolean, description: 'Unir clientes repetidos (HU-15) e importar clientes y vehículos por CSV (HU-92)' }
 
     Cliente:
       type: object

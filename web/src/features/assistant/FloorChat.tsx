@@ -6,6 +6,7 @@ import { Alert } from '../../shared/ui/Alert';
 import { Button } from '../../shared/ui/Button';
 import { IconCamera, IconX } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
+import { CounterConsent } from '../../shared/legal/CounterConsent';
 import { useConfirmFloor, useEditFloor, useOpenOther, useSendFloor, type ChatPiso, type MensajePiso, type PropuestaPiso } from './api';
 
 /** De dónde salió cada dato (HU-64), en palabras del taller. */
@@ -270,8 +271,15 @@ function sinPrecio(p: PropuestaPiso) {
   return (p.cotizacion ?? []).filter((l) => l.precio == null || l.precio <= 0).length;
 }
 
-/** Lo que impide guardar (los precios que faltan); undefined si se puede. */
+/** Un cliente nuevo que todavía no respondió la autorización de datos (HU-86, R11). */
+function sinAutorizacion(p: PropuestaPiso) {
+  const c = p.cliente;
+  return !!c && !c.id && !!c.celular && !!c.nombre && c.autoriza === undefined;
+}
+
+/** Lo que impide guardar (los precios que faltan y la autorización del cliente nuevo); undefined si se puede. */
 function faltaPrecio(p: PropuestaPiso) {
+  if (sinAutorizacion(p)) return 'Falta la autorización de datos del cliente: marca lo que respondió.';
   const n = sinPrecio(p);
   if (n === 1) return 'Falta el precio de 1 ítem de la cotización.';
   if (n > 1) return `Falta el precio de ${n} ítems de la cotización.`;
@@ -558,6 +566,10 @@ function Detalle({ p, onChange, ocupado }: { p: PropuestaPiso; onChange: (np: Pr
         ))}
         {p.estado ? <Fila label="Pasar a" valor={ESTADO[p.estado.valor] ?? p.estado.valor} origen={p.estado.origen} onQuitar={() => quitar('estado')} /> : null}
       </ul>
+      {p.cliente && !p.cliente.id && p.cliente.celular && p.cliente.nombre ? (
+        // HU-86 (R11): la marca la persona según lo que respondió el cliente; la IA nunca la pone.
+        <CounterConsent value={p.cliente.autoriza} onChange={(autoriza) => set({ cliente: { ...p.cliente, autoriza } })} />
+      ) : null}
       {(p.cotizacion ?? []).length > 0 ? (
         <div className="flex flex-col gap-1">
           <h3 className="text-[14px] font-extrabold">Cotización</h3>

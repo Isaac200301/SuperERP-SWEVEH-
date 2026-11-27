@@ -26,10 +26,18 @@ type Handler struct {
 	svc   *app.Service
 	guard *authn.Guard
 	log   *slog.Logger
+	// importOn: importar clientes y vehículos por CSV (HU-92) solo con FEATURE_CUSTOMER_TOOLS (V-15).
+	importOn bool
 }
 
 func NewHandler(svc *app.Service, guard *authn.Guard, log *slog.Logger) *Handler {
 	return &Handler{svc: svc, guard: guard, log: log}
+}
+
+// WithImport monta la importación de clientes y vehículos (HU-92). Apagada, la ruta no existe (V-15).
+func (h *Handler) WithImport(on bool) *Handler {
+	h.importOn = on
+	return h
 }
 
 func (h *Handler) Routes(r chi.Router) {

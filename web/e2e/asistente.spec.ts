@@ -35,6 +35,9 @@ test('recibir un carro hablándole al asistente y confirmar', async ({ page }) =
   await expect(ficha.getByText('45000 km')).toBeVisible();
   await shot(page, 'asistente-ficha-en-vivo');
 
+  // HU-86 (R11): el cliente es nuevo; sin su respuesta a la autorización no se guarda nada.
+  await expect(ficha.getByRole('button', { name: 'Confirmar' })).toBeDisabled();
+  await ficha.getByRole('radio', { name: 'Autoriza', exact: true }).click();
   await ficha.getByRole('button', { name: 'Confirmar' }).click();
   await expect(page.getByText(/Quedó guardado: .*la orden OS-\d{4}/)).toBeVisible();
   await page.getByRole('link', { name: /Seguimos en la orden OS-\d{4}/ }).click();

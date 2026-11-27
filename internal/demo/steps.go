@@ -51,16 +51,13 @@ func (l *loader) setup() error {
 		return err
 	}
 	for _, c := range l.customers() {
-		r, err := l.call(http.StatusCreated, "POST", "/api/v1/customers", map[string]any{"celular": c.Phone, "nombre": c.Name})
+		// Autorizaron en el mostrador al registrarlos (HU-86): sin autorización no les salen los avisos.
+		r, err := l.call(http.StatusCreated, "POST", "/api/v1/customers", map[string]any{"celular": c.Phone, "nombre": c.Name,
+			"autorizacion": map[string]any{"acepta": true}})
 		if err != nil {
 			return err
 		}
-		id := r["cliente"].(map[string]any)["id"].(string)
-		l.ids[c.Name] = id
-		// Autorizaron en el mostrador (HU-86): sin autorización no les salen los avisos.
-		if _, err := l.call(http.StatusOK, "POST", "/api/v1/customers/"+id+"/consent", map[string]any{"acepta": true}); err != nil {
-			return err
-		}
+		l.ids[c.Name] = r["cliente"].(map[string]any)["id"].(string)
 	}
 	for _, v := range vehicles {
 		body := map[string]any{"placa": v.Plate, "clienteId": l.ids[v.Owner], "marca": v.Brand, "linea": v.Line, "modeloAnio": v.Year}

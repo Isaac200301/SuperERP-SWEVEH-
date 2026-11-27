@@ -15,16 +15,18 @@ import (
 
 // Texto y versión de la autorización del cliente final. Borrador hasta la revisión jurídica (AQ-10).
 const (
-	ConsentVersion = "autorizacion-cliente-borrador-2026-11-01"
-	ConsentText    = "Autorizo al taller a tratar mis datos (nombre, celular y datos del vehículo) para atender mi vehículo y avisarme por WhatsApp."
+	ConsentVersion = domain.CounterConsentVersion
+	ConsentText    = domain.CounterConsentText
 )
 
 // ExtraRoutes: lista de clientes y autorización en mostrador (HU-86).
 func (h *Handler) ExtraRoutes(r chi.Router) {
 	r.With(h.guard.Require(permRead)).Get("/customers", httpx.JSON(h.log, h.list))
 	r.With(h.guard.Require(permCreate)).Post("/customers/{id}/consent", httpx.JSON(h.log, h.consent))
-	r.With(h.guard.Require("customer:merge")).Get("/customers/duplicates", httpx.JSON(h.log, h.duplicates))
-	r.With(h.guard.Require("customer:merge")).Post("/customers/merge", httpx.JSON(h.log, h.merge))
+	if h.merge { // V-15: "Posibles repetidos" (HU-15) solo con FEATURE_CUSTOMER_TOOLS
+		r.With(h.guard.Require("customer:merge")).Get("/customers/duplicates", httpx.JSON(h.log, h.duplicates))
+		r.With(h.guard.Require("customer:merge")).Post("/customers/merge", httpx.JSON(h.log, h.mergeCustomers))
+	}
 	r.With(h.guard.Require("data_request:manage")).Post("/customers/{id}/anonymize", httpx.JSON(h.log, h.anonymize))
 }
 
@@ -53,7 +55,7 @@ func (h *Handler) duplicates(r *http.Request, p reqctx.Principal) (int, any, err
 }
 
 // merge une el cliente "unir" al que se "conservar" (HU-15): sus vehículos, órdenes y conversaciones pasan al que queda.
-func (h *Handler) merge(r *http.Request, p reqctx.Principal) (int, any, error) {
+func (h *Handler) mergeCustomers(r *http.Request, p reqctx.Principal) (int, any, error) {
 	var q struct {
 		Conservar string `json:"conservar"`
 		Unir      string `json:"unir"`

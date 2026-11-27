@@ -117,6 +117,7 @@ La cuenta de Meta y el número de prueba (plantillas propias y duración del tok
 | `SONAR_TOKEN`, `SNYK_TOKEN` | Solo como secretos de GitHub Actions | CI |
 | `AUTH_MODE`, `PIN_PEPPER`, `PIN_MAX_INTENTOS`, `PIN_BLOQUEO`, `SESSION_REFRESH_TTL`, `PIN_ARGON_MEMORY_KIB`, `PIN_ARGON_TIME`, `PIN_ARGON_THREADS` | Entrada con celular + PIN (HU-104, ADR-0037). `AUTH_MODE=pin` por defecto (`otp` = el código de antes). `PIN_PEPPER` (si falta, `OTP_PEPPER`) es secreto, ≥ 32 caracteres fuera de local. 5 intentos, 15 minutos, refresh de 720 h; argon2id m = 19456 KiB, t = 2, p = 1 | local, staging, prod |
 | `DEMO_PIN` | PIN del dueño, el mecánico y la recepción del taller ficticio (`make seed-demo`); obligatorio fuera de local | local, staging |
+| `FEATURE_CUSTOMER_TOOLS` | Entrega del 27-nov (V-15, R11; `false` por defecto): con `false` no se montan "Posibles repetidos" ni unir clientes (HU-15) ni la importación de clientes y vehículos (HU-92); `/me` lo dice en `funciones.herramientasClientes`. La importación de repuestos (HU-37) no depende de ella | local, staging, prod |
 | `FEATURE_WHATSAPP`, `FEATURE_PLATFORM` | Banderas de la entrega del 27-nov (V-01, V-02; `false` por defecto): con `false` no se montan las rutas de WhatsApp (mensajería, automatizaciones, bandeja, asesor, lista por foto, simulador, webhooks) ni las de Plataforma, `/me` lo dice en `funciones` y el worker deja esos eventos `omitido: whatsapp_apagado` | local, staging, prod |
 
 `.env.example` con **valores ficticios** sí va al repositorio; `.env` real, no (en `.gitignore`).

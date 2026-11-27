@@ -58,7 +58,7 @@ func is4xx(t *testing.T, what string, r resp) {
 // seedOrder crea cliente, carro con motor y una orden en Por recibir.
 func seedOrder(t *testing.T, c *client, phone, plate string) (clienteID, vehiculoID, ordenID string) {
 	t.Helper()
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": phone, "nombre": "Cliente " + plate}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": phone, "nombre": "Cliente " + plate}))
 	clienteID = nested(r.body, "cliente", "id").(string)
 	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{
 		"placa": plate, "clienteId": clienteID, "marca": "Renault", "linea": "Logan", "cilindraje": "1600", "turbo": false, "energia": "gasolina", "transmision": "manual",

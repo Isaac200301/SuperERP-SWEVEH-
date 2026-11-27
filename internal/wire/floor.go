@@ -322,7 +322,14 @@ func (f floorShop) customer(ctx context.Context, tallerID shared.ID, actor share
 	if c.Phone == nil || c.Name == nil {
 		return shared.NilID, assistantdomain.ErrFloorCustomer
 	}
-	res, err := f.m.Customers.Register(ctx, customersapp.RegisterCustomer{TallerID: tallerID, Actor: actor, Phone: c.Phone.Value, Name: c.Name.Value})
+	// HU-86 (R11): un cliente nuevo no se guarda sin su respuesta a la autorización, que marcó la persona en la ficha.
+	cmd := customersapp.RegisterCustomer{TallerID: tallerID, Actor: actor, Phone: c.Phone.Value, Name: c.Name.Value, RequireConsent: true}
+	if c.Consent != nil {
+		by := actor.ID
+		cmd.Consent = &customersapp.ConsentAnswer{Granted: *c.Consent, Record: customersapp.ConsentRecord{
+			Text: customersdomain.CounterConsentText, Version: customersdomain.CounterConsentVersion, Channel: "mostrador", By: &by}}
+	}
+	res, err := f.m.Customers.Register(ctx, cmd)
 	return res.Customer.ID, err
 }
 

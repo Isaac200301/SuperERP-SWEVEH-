@@ -17,7 +17,7 @@ func TestFloor_FindingsWaitForReceived(t *testing.T) {
 	adv := &fakeAdvisor{}
 	e := floorEnv(t, adv)
 	owner := e.register("3105550931", "Lucía Mora")
-	cr := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550931", "nombre": "Andrés Vélez"}))
+	cr := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550931", "nombre": "Andrés Vélez"}))
 	owner.must(http.StatusCreated, owner.do("POST", "/api/v1/vehicles", map[string]any{"placa": "HLZ123", "clienteId": nested(cr.body, "cliente", "id"),
 		"cilindraje": "1600", "energia": "gasolina", "aspiracion": "atmosferico", "transmision": "manual"}))
 	orderID := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/orders", map[string]any{"placa": "HLZ123", "sintoma": "Frena mal"})).str("id")

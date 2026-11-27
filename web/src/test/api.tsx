@@ -56,7 +56,7 @@ export const owner = {
   roles: ['dueno'],
   cuentaNueva: false,
   // Las pruebas de antes corren con WhatsApp y Plataforma encendidos; features.test.tsx los apaga (V-01, V-02).
-  funciones: { whatsapp: true, plataforma: true },
+  funciones: { whatsapp: true, plataforma: true, herramientasClientes: true },
   permisos: ['order:read', 'order:update_state', 'order:diagnose', 'part:return', 'order:override_approval', 'quote:register_response', 'service:manage', 'user:manage', 'workshop:manage'],
 };
 

@@ -74,26 +74,34 @@ func (s *Service) List(ctx context.Context, tallerID shared.ID) ([]domain.Custom
 // SetConsent registra la autorización (o el rechazo) del cliente con su prueba (HU-85, HU-86).
 // Corre en la transacción del llamador si la hay.
 func (s *Service) SetConsent(ctx context.Context, tallerID, customerID shared.ID, actor shared.Actor, granted bool, rec ConsentRecord) error {
-	st := domain.ConsentRejected
-	if granted {
-		st = domain.ConsentGranted
-	}
 	return s.uow.Do(ctx, func(ctx context.Context) error {
 		c, err := s.repo.ByID(ctx, tallerID, customerID)
 		if err != nil {
 			return err
 		}
-		if err := s.extra.SetConsent(ctx, tallerID, customerID, st, rec); err != nil {
-			return err
-		}
-		if err := s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "cliente.autorizacion", Entity: "cliente",
-			EntityID: customerID, Before: map[string]any{"estado": string(c.Consent)},
-			After: map[string]any{"estado": string(st), "canal": rec.Channel, "version": rec.Version}, OccurredAt: rec.At}); err != nil {
-			return err
-		}
-		return s.events.Publish(ctx, tallerID, shared.Event{Type: "customers.autorizacion", AggregateID: customerID, OccurredAt: rec.At,
-			Payload: map[string]any{"estado": string(st), "canal": rec.Channel}})
+		_, err = s.recordConsent(ctx, tallerID, c, actor, granted, rec)
+		return err
 	})
+}
+
+// recordConsent guarda la respuesta con su prueba, la bitácora y el evento; corre dentro de la transacción de quien
+// llama (al autorizar después o al crear al cliente, HU-86).
+func (s *Service) recordConsent(ctx context.Context, tallerID shared.ID, c domain.Customer, actor shared.Actor, granted bool,
+	rec ConsentRecord) (domain.ConsentStatus, error) {
+	st := domain.ConsentRejected
+	if granted {
+		st = domain.ConsentGranted
+	}
+	if err := s.extra.SetConsent(ctx, tallerID, c.ID, st, rec); err != nil {
+		return c.Consent, err
+	}
+	if err := s.audit.Record(ctx, audit.Entry{TallerID: tallerID, Actor: actor, Action: "cliente.autorizacion", Entity: "cliente",
+		EntityID: c.ID, Before: map[string]any{"estado": string(c.Consent)},
+		After: map[string]any{"estado": string(st), "canal": rec.Channel, "version": rec.Version}, OccurredAt: rec.At}); err != nil {
+		return c.Consent, err
+	}
+	return st, s.events.Publish(ctx, tallerID, shared.Event{Type: "customers.autorizacion", AggregateID: c.ID, OccurredAt: rec.At,
+		Payload: map[string]any{"estado": string(st), "canal": rec.Channel}})
 }
 
 // FillName pone el nombre que el cliente le dio al asesor (ADR-0029), solo si el que tiene es de relleno. false = no

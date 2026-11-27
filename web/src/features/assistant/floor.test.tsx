@@ -15,7 +15,7 @@ const propuesta = (over: Record<string, unknown> = {}) => ({
   tipo: 'carro',
   nuevaOrden: true,
   vehiculoNuevo: true,
-  cliente: { nombre: { valor: 'Carlos Gómez', origen: 'dijiste' }, celular: { valor: '3001112233', origen: 'dijiste' } },
+  cliente: { nombre: { valor: 'Carlos Gómez', origen: 'dijiste' }, celular: { valor: '3001112233', origen: 'dijiste' }, autoriza: true },
   sintoma: { valor: 'le suenan los frenos', origen: 'dijiste' },
   cotizacion: [
     { id: 'l1', tipo: 'servicio', nombre: 'Cambio de aceite', cantidad: 1, precio: 45000, origenPrecio: 'lista' },
@@ -54,6 +54,35 @@ describe('Asistente del piso (R8)', () => {
     // El cuadro de guardar del chat dice lo mismo (los dos usan el mismo confirmar).
     expect(screen.getByRole('button', { name: 'Guardar orden' })).toBeDisabled();
     expect(screen.getAllByText('Falta el precio de 1 ítem de la cotización.')).toHaveLength(2);
+  });
+
+  it('un cliente nuevo pide su autorización de datos antes de guardar y la marca la persona (HU-86, R11)', async () => {
+    const sin = propuesta({
+      cliente: { nombre: { valor: 'Carlos Gómez', origen: 'dijiste' }, celular: { valor: '3001112233', origen: 'dijiste' } },
+      cotizacion: [],
+    });
+    const calls = mockApi({
+      'GET /me': owner,
+      'GET /assistant/floor/latest': { chat: chat({ propuesta: sin }), disponible: true, voz: false },
+      'PATCH /assistant/floor/chats/{id}': { chat: chat({ version: 4 }) },
+    });
+    renderPage(<AssistantPage />);
+    expect(await screen.findByText(/Autorizo al taller a tratar mis datos/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar' })).toBeDisabled();
+    expect(screen.getAllByText('Falta la autorización de datos del cliente: marca lo que respondió.')).toHaveLength(2);
+    await userEvent.click(screen.getByRole('radio', { name: 'No autoriza' }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'PATCH')).toBeDefined());
+    const body = calls.find((c) => c.method === 'PATCH')?.body as { propuesta: { cliente: { autoriza?: boolean } } };
+    expect(body.propuesta.cliente.autoriza).toBe(false);
+  });
+
+  it('un cliente que ya existía no pregunta la autorización en la ficha', async () => {
+    const existe = propuesta({ cliente: { id: 'cl1', nombre: { valor: 'Carlos Gómez', origen: 'taller' } }, cotizacion: [] });
+    mockApi({ 'GET /me': owner, 'GET /assistant/floor/latest': { chat: chat({ propuesta: existe }), disponible: true, voz: false } });
+    renderPage(<AssistantPage />);
+    expect(await screen.findByText('Carlos Gómez')).toBeInTheDocument();
+    expect(screen.queryByText(/Autorizo al taller a tratar mis datos/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar' })).toBeEnabled();
   });
 
   it('el precio que pone la persona se guarda en la ficha con su versión', async () => {

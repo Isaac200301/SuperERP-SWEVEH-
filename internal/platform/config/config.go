@@ -106,13 +106,19 @@ func loadAuth(env Env, otpPepper string, errs *[]error) Auth {
 // Features son las banderas de la entrega del 27-nov (docs/plan-entrega-viernes.md, V-01 y V-02): lo apagado
 // no se borra, solo no se monta. WhatsApp agrupa mensajería, automatizaciones, bandeja, asesor, notas de voz,
 // lista de precios por foto y el simulador; Platform el medidor y el registro técnico del administrador del ERP.
+// CustomerTools (V-15, R11) agrupa unir clientes repetidos (HU-15) e importar clientes y vehículos por CSV (HU-92).
 type Features struct {
-	WhatsApp bool // FEATURE_WHATSAPP, por defecto false
-	Platform bool // FEATURE_PLATFORM, por defecto false
+	WhatsApp      bool // FEATURE_WHATSAPP, por defecto false
+	Platform      bool // FEATURE_PLATFORM, por defecto false
+	CustomerTools bool // FEATURE_CUSTOMER_TOOLS, por defecto false
 }
 
 func loadFeatures(errs *[]error) Features {
-	return Features{WhatsApp: getBool("FEATURE_WHATSAPP", false, errs), Platform: getBool("FEATURE_PLATFORM", false, errs)}
+	return Features{
+		WhatsApp:      getBool("FEATURE_WHATSAPP", false, errs),
+		Platform:      getBool("FEATURE_PLATFORM", false, errs),
+		CustomerTools: getBool("FEATURE_CUSTOMER_TOOLS", false, errs),
+	}
 }
 
 // Platform es lo del administrador del ERP (HU-74, ADR-0030): quiénes son y con qué números se compara el consumo.

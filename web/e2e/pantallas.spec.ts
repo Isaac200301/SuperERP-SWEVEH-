@@ -91,6 +91,7 @@ test('las pantallas de escritorio siguen a Figma y no se desbordan', async ({ pa
   await page.getByLabel('Placa').fill(placa);
   await page.getByLabel('Celular del cliente').fill(`300${uniq}2`);
   await page.getByLabel('Nombre', { exact: true }).fill('Laura Cliente');
+  await page.getByRole('radio', { name: 'Autoriza', exact: true }).click(); // HU-86: autorización en el mostrador
   await page.getByLabel('Combustible', { exact: true }).selectOption('gasolina');
   await page.getByLabel('Caja', { exact: true }).selectOption('manual');
   await page.getByLabel('Cilindraje', { exact: true }).fill('1600');

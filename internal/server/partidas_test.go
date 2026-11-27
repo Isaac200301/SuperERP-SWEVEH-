@@ -12,7 +12,7 @@ import (
 // quotedOrder deja una orden en diagnóstico, lista para cotizar, y devuelve la ruta de su cotización.
 func quotedOrder(t *testing.T, c *client, phone, plate string) string {
 	t.Helper()
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": phone, "nombre": "Cliente " + plate}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": phone, "nombre": "Cliente " + plate}))
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": plate, "clienteId": nested(r.body, "cliente", "id"),
 		"cilindraje": "1600", "turbo": false, "energia": "gasolina", "transmision": "manual"}))
 	id := c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": plate, "sintoma": "Restauración", "estadoInicial": "recibido"})).str("id")

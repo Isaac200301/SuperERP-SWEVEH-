@@ -13,7 +13,7 @@ func TestCustomers_MergeDuplicates(t *testing.T) {
 	e := newEnv(t)
 	owner := e.register("3105550800", "Rosa Pérez")
 	customer := func(phone, name, plate string) string {
-		r := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"celular": phone, "nombre": name}))
+		r := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": phone, "nombre": name}))
 		id := nested(r.body, "cliente", "id").(string)
 		owner.must(http.StatusCreated, owner.do("POST", "/api/v1/vehicles", map[string]any{"placa": plate, "clienteId": id}))
 		return id

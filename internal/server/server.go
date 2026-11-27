@@ -75,8 +75,9 @@ type Deps struct {
 
 // Features: lo que está encendido. Lo apagado no se monta (404) y /me lo dice a la pantalla.
 type Features struct {
-	WhatsApp bool
-	Platform bool
+	WhatsApp      bool
+	Platform      bool
+	CustomerTools bool // V-15: unir repetidos (HU-15) e importar clientes por CSV (HU-92)
 }
 
 // New devuelve el router HTTP completo.
@@ -106,10 +107,10 @@ func New(d Deps) *chi.Mux {
 	}
 	identityH := identityhttp.NewHandler(identitySvc, d.Log, httpx.NewRateLimiter(d.LoginPerMinute, 5), d.TrustProxy)
 	identityH.SetPlatformAdmins(d.PlatformAdmins)
-	identityH.SetFeatures(d.Features.WhatsApp, d.Features.Platform)
+	identityH.SetFeatures(d.Features.WhatsApp, d.Features.Platform, d.Features.CustomerTools)
 	identityH.SetPINMode(d.AuthPIN)
-	customersH := customershttp.NewHandler(m.Customers, guard, d.Log)
-	vehiclesH := vehicleshttp.NewHandler(m.Vehicles, guard, d.Log)
+	customersH := customershttp.NewHandler(m.Customers, guard, d.Log).WithMerge(d.Features.CustomerTools)
+	vehiclesH := vehicleshttp.NewHandler(m.Vehicles, guard, d.Log).WithImport(d.Features.CustomerTools)
 	ordersH := ordershttp.NewHandler(m.Orders, m.Flow, guard, d.Log)
 	routes := []func(chi.Router){
 		identityH.PrivateRoutes, customersH.Routes, customersH.ExtraRoutes, vehiclesH.Routes, vehiclesH.ExtraRoutes, ordersH.Routes,

@@ -93,7 +93,7 @@ func TestMechanic_PendingTodayWithoutAmounts(t *testing.T) {
 	owner := e.register("3105550175", "Felipe Duque")
 	owner.must(http.StatusCreated, owner.do("POST", "/api/v1/users", map[string]any{"celular": "3005550176", "nombre": "Andrés Mecánico", "rol": "mecanico"}))
 	svc := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/services", map[string]any{"nombre": "Revisión", "tipoVehiculo": "carro", "precio": 85000})).str("id")
-	r := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550177", "nombre": "Ana Ríos"}))
+	r := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550177", "nombre": "Ana Ríos"}))
 	owner.must(http.StatusCreated, owner.do("POST", "/api/v1/vehicles", map[string]any{"placa": "PEN177", "clienteId": nested(r.body, "cliente", "id"),
 		"cilindraje": "1400", "turbo": false, "energia": "gasolina", "transmision": "manual"}))
 	id := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/orders", map[string]any{"placa": "PEN177", "sintoma": "Frena mal", "estadoInicial": "recibido"})).str("id")

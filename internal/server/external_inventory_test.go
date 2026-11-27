@@ -25,7 +25,7 @@ func TestExternalInventory_ManualPartsNoStockMoves(t *testing.T) {
 	pid := c.must(http.StatusCreated, c.do("POST", "/api/v1/parts", map[string]any{
 		"referencia": "PF-410", "nombre": "Pastillas", "tipoVehiculo": "carro", "costo": 40000, "precioVenta": 65000, "existencia": 5, "minimo": 1,
 	})).str("id")
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550411", "nombre": "Ana Ríos"}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550411", "nombre": "Ana Ríos"}))
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": "EXT410", "clienteId": nested(r.body, "cliente", "id"),
 		"cilindraje": "1400", "turbo": false, "energia": "gasolina", "transmision": "manual"}))
 	id := c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": "EXT410", "sintoma": "Frena mal", "estadoInicial": "recibido"})).str("id")

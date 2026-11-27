@@ -93,9 +93,9 @@ func TestCustomersAndVehicles_ErrorPaths(t *testing.T) {
 		status       int
 		code         string
 	}{
-		{"POST", "/api/v1/customers", map[string]any{"celular": "12345", "nombre": "X"}, 400, "celular_invalido"},
-		{"POST", "/api/v1/customers", map[string]any{"celular": "3005550301", "nombre": "  "}, 400, "nombre_requerido"},
-		{"POST", "/api/v1/customers", map[string]any{"celular": "3005550301", "nombre": "X", "correo": "malo"}, 400, "correo_invalido"},
+		{"POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "12345", "nombre": "X"}, 400, "celular_invalido"},
+		{"POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550301", "nombre": "  "}, 400, "nombre_requerido"},
+		{"POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550301", "nombre": "X", "correo": "malo"}, 400, "correo_invalido"},
 		{"GET", "/api/v1/customers/by-phone/123", nil, 400, "celular_invalido"},
 		{"GET", "/api/v1/customers/by-phone/3009999999", nil, 404, "cliente_no_encontrado"},
 		{"GET", "/api/v1/customers/no-es-uuid", nil, 404, "cliente_no_encontrado"},
@@ -124,7 +124,7 @@ func TestCustomersAndVehicles_ErrorPaths(t *testing.T) {
 func TestOrders_Pagination(t *testing.T) {
 	e := newEnv(t)
 	c := e.register("3105550205", "Dueño J")
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550302", "nombre": "Cliente"}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550302", "nombre": "Cliente"}))
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": "JNX907", "clienteId": nested(r.body, "cliente", "id")}))
 	for i := 0; i < 5; i++ {
 		e.clk.Advance(time.Second)

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -31,7 +32,7 @@ func Recover(log *slog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if v := recover(); v != nil {
-					log.ErrorContext(r.Context(), "panic en solicitud", "valor", v, "ruta", r.URL.Path)
+					log.ErrorContext(r.Context(), "panic en solicitud", "valor", v, "ruta", LogPath(r.URL.Path))
 					WriteError(w, r, log, errPanic)
 				}
 			}()
@@ -46,6 +47,15 @@ type panicErr struct{}
 
 func (*panicErr) Error() string { return "panic" }
 
+// reLongDigits: un celular u otro número largo dentro de la ruta (por ejemplo /customers/by-phone/{celular}).
+var reLongDigits = regexp.MustCompile(`\d{7,}`)
+
+// LogPath es la ruta como va al log: los números de 7 o más dígitos quedan con solo los 2 últimos (docs/06 §10,
+// docs/08: nunca el celular completo, R-03 punto 6). Los UUID tienen letras y guiones, así que no se tocan.
+func LogPath(p string) string {
+	return reLongDigits.ReplaceAllStringFunc(p, func(d string) string { return strings.Repeat("*", len(d)-2) + d[len(d)-2:] })
+}
+
 // AccessLog registra método, ruta, estado y duración. Nunca cuerpos, cookies ni encabezados.
 func AccessLog(log *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -54,7 +64,7 @@ func AccessLog(log *slog.Logger) func(http.Handler) http.Handler {
 			sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(sw, r)
 			log.InfoContext(r.Context(), "http",
-				"metodo", r.Method, "ruta", r.URL.Path, "status", sw.status,
+				"metodo", r.Method, "ruta", LogPath(r.URL.Path), "status", sw.status,
 				"duration_ms", time.Since(start).Milliseconds())
 		})
 	}

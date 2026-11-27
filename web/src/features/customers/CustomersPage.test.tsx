@@ -121,3 +121,20 @@ describe('CustomersPage (HU-82)', () => {
     expect(screen.getByRole('link', { name: 'OS-0009' })).toHaveClass('line-through');
   });
 });
+
+// R11 (V-15): con FEATURE_CUSTOMER_TOOLS apagada no salen "Posibles repetidos" (HU-15) ni la importación (HU-92),
+// aunque el dueño tenga los permisos.
+describe('CustomersPage con las herramientas de clientes apagadas (V-15)', () => {
+  it('no muestra repetidos ni importación', async () => {
+    const calls = mockApi({
+      'GET /me': { ...owner, funciones: { ...owner.funciones, herramientasClientes: false },
+        permisos: [...owner.permisos, 'import:run', 'customer:merge', 'customer:read_all'] },
+      'GET /customers': { clientes: [laura] },
+    });
+    renderPage(<CustomersPage />);
+    expect(await screen.findByRole('button', { name: /Laura Gómez/ })).toBeInTheDocument();
+    expect(screen.queryByText('Subir clientes y vehículos (CSV)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Posibles repetidos')).not.toBeInTheDocument();
+    expect(calls.some((c) => c.path.startsWith('/customers/duplicates'))).toBe(false);
+  });
+});

@@ -63,7 +63,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, log *slog.Logger, err er
 		p.Detail = e.Message
 		p.Field = e.Field
 	} else {
-		log.ErrorContext(r.Context(), "error interno", "error", err.Error(), "ruta", r.URL.Path)
+		log.ErrorContext(r.Context(), "error interno", "error", err.Error(), "ruta", LogPath(r.URL.Path))
 		p.Status = http.StatusInternalServerError
 		p.Code = "error_interno"
 		p.Detail = "Algo falló de nuestro lado. Intenta de nuevo en un momento."

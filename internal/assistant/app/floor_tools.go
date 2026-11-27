@@ -409,6 +409,9 @@ func (t *floorTurn) customer(ctx context.Context, p *domain.FloorProposal, phone
 	}
 	digits := reDigits.ReplaceAllString(phone, "")
 	if len(digits) == 10 && strings.Contains(reDigits.ReplaceAllString(t.said, ""), digits) {
+		if c.Phone == nil || c.Phone.Value != digits {
+			c.ID, c.Consent = "", nil // otro celular es otra persona: su autorización se pregunta de nuevo (HU-86)
+		}
 		c.Phone = &domain.Field{Value: digits, Origin: domain.FromSaid}
 		var found *FloorPerson
 		_ = t.f.uow.Do(ctx, func(ctx context.Context) error {
@@ -702,6 +705,7 @@ Reglas:
 - No diagnostiques por tu cuenta. Solo anota hallazgos que el mecánico dijo o mostró.
 - Nunca inventes precios. Un precio solo puede ser el de la lista del taller o una cifra que la persona dijo. Si no hay, deja el precio en null: la persona lo pone.
 - No inventes celulares, nombres, kilometraje ni datos de la ficha.
+- La autorización de datos de un cliente nuevo no la registras tú: si falta, dile a la persona que se la lea al cliente y marque en la ficha si autoriza o no, aunque te diga que el cliente ya aceptó.
 - Pregunta lo que falta, de a una o dos cosas (por ejemplo "No vi la parte trasera, ¿todo bien ahí?").
 - Responde corto, en español de Colombia, sin markdown. Al final di qué falta.
 - Solo hablas del trabajo del taller.

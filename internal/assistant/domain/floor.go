@@ -34,6 +34,14 @@ type FloorCustomer struct {
 	ID    string `json:"id,omitempty"`
 	Phone *Field `json:"celular,omitempty"`
 	Name  *Field `json:"nombre,omitempty"`
+	// Consent: lo que respondió el cliente nuevo a la autorización de datos (HU-86, R11). Solo lo marca la persona en
+	// la ficha (HumanEdit); la IA no lo pone, y se borra si cambia el celular (sería otra persona).
+	Consent *bool `json:"autoriza,omitempty"`
+}
+
+// NeedsConsent dice si es un cliente nuevo que todavía no respondió la autorización de datos.
+func (c *FloorCustomer) NeedsConsent() bool {
+	return c != nil && c.ID == "" && c.Consent == nil
 }
 
 // FloorItem es un ítem del checklist de recepción del taller.
@@ -174,6 +182,8 @@ func (p FloorProposal) OrderMissing() []string {
 		}
 		if p.Customer == nil || (p.Customer.ID == "" && (p.Customer.Phone == nil || p.Customer.Name == nil)) {
 			out = append(out, "el celular y el nombre del cliente")
+		} else if p.Customer.NeedsConsent() {
+			out = append(out, "la autorización de datos del cliente")
 		}
 	}
 	if p.Symptom == nil {
@@ -429,6 +439,7 @@ var (
 	ErrFloorFinding    = shared.Validation("hallazgo_invalido", "Cada hallazgo necesita una descripción.").WithField("hallazgos")
 	ErrFloorFuel       = shared.Validation("combustible_invalido", "Elige el nivel de combustible.").WithField("combustible")
 	ErrFloorKm         = shared.Validation("kilometraje_invalido", "El kilometraje es un número sin puntos.").WithField("kilometraje")
+	ErrFloorConsent    = shared.Validation("autorizacion_requerida", "Falta la autorización de datos del cliente nuevo: pregúntale y marca su respuesta en la ficha.").WithField("cliente")
 	ErrFloorNeedsOrder = shared.Validation("orden_requerida", "Para eso primero hay que abrir la orden: dime la placa y qué trae.").WithField("placa")
 )
 
@@ -461,6 +472,8 @@ func (p FloorProposal) validateOrder() error {
 		return ErrFloorKind
 	case p.Customer == nil || (p.Customer.ID == "" && (p.Customer.Phone == nil || p.Customer.Name == nil)):
 		return ErrFloorCustomer
+	case p.Customer.NeedsConsent():
+		return ErrFloorConsent
 	}
 	return nil
 }
@@ -567,6 +580,13 @@ func editCustomer(prev, next *FloorCustomer) *FloorCustomer {
 	c := *next
 	c.ID = pc.ID
 	c.Phone, c.Name = editField(pc.Phone, c.Phone), editField(pc.Name, c.Name)
+	// La respuesta es de quien tiene ese celular: si la persona cambió el celular sin volver a marcarla, se pregunta otra vez.
+	if fieldValue(pc.Phone) != fieldValue(c.Phone) && sameBool(pc.Consent, c.Consent) {
+		c.Consent = nil
+	}
+	if c.ID != "" {
+		c.Consent = nil // un cliente que ya existe conserva su autorización; la ficha no la cambia
+	}
 	return &c
 }
 
@@ -651,6 +671,15 @@ func editField(prev, next *Field) *Field {
 	}
 	return &Field{Value: strings.TrimSpace(next.Value), Origin: FromYou}
 }
+
+func fieldValue(f *Field) string {
+	if f == nil {
+		return ""
+	}
+	return f.Value
+}
+
+func sameBool(a, b *bool) bool { return (a == nil && b == nil) || (a != nil && b != nil && *a == *b) }
 
 func samePrice(a, b *int64) bool { return (a == nil && b == nil) || (a != nil && b != nil && *a == *b) }
 

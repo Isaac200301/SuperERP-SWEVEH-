@@ -16,7 +16,7 @@ afterEach(() => vi.unstubAllGlobals());
 const apagado = {
   ...owner,
   adminPlataforma: true,
-  funciones: { whatsapp: false, plataforma: false },
+  funciones: { whatsapp: false, plataforma: false, herramientasClientes: false },
   permisos: [...owner.permisos, 'inbox:manage', 'conversation:read', 'automation:manage', 'kpi:read'],
 } as Sesion;
 
@@ -31,7 +31,7 @@ describe('Funciones apagadas (V-01, V-02)', () => {
   });
 
   it('con las funciones encendidas vuelven', () => {
-    const rutas = sectionsFor({ ...apagado, funciones: { whatsapp: true, plataforma: true } }, false).map((s) => s.to);
+    const rutas = sectionsFor({ ...apagado, funciones: { whatsapp: true, plataforma: true, herramientasClientes: true } }, false).map((s) => s.to);
     expect(rutas).toEqual(expect.arrayContaining(['/panel/por-revisar', '/panel/conversaciones', '/panel/automatizaciones', '/panel/plataforma']));
   });
 

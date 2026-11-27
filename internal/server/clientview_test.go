@@ -163,6 +163,7 @@ func TestClientView_RejectWithReason(t *testing.T) {
 }
 
 // HU-86: la pantalla dice si el cliente ya autorizó sus datos y con qué texto; al autorizar en el mostrador cambia.
+// Desde R11 el cliente nuevo responde al crearlo; aquí había dicho que no y después autoriza.
 func TestClientView_CounterConsent(t *testing.T) {
 	e := newPINEnv(t)
 	c := e.registerPIN("3105551107", "Servitaller El Pistón")
@@ -170,7 +171,9 @@ func TestClientView_CounterConsent(t *testing.T) {
 	c.must(http.StatusOK, c.do("POST", q+"/send", nil))
 
 	a := c.must(http.StatusOK, c.do("GET", q+"/client-view", nil)).body["autorizacion"].(map[string]any)
-	if a["estado"] != "pendiente" || !strings.HasPrefix(a["texto"].(string), "Autorizo al taller a tratar mis datos") {
+	c.must(http.StatusOK, c.do("POST", "/api/v1/customers/"+a["clienteId"].(string)+"/consent", map[string]any{"acepta": false}))
+	a = c.must(http.StatusOK, c.do("GET", q+"/client-view", nil)).body["autorizacion"].(map[string]any)
+	if a["estado"] != "rechazada" || !strings.HasPrefix(a["texto"].(string), "Autorizo al taller a tratar mis datos") {
 		t.Fatalf("autorización antes: %v", a)
 	}
 	c.must(http.StatusOK, c.do("POST", "/api/v1/customers/"+a["clienteId"].(string)+"/consent", map[string]any{"acepta": true}))

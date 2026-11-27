@@ -96,7 +96,7 @@ func TestQuote_BuildSendApproveDiscountAndReturn(t *testing.T) {
 		"referencia": "PF-20", "nombre": "Pastillas", "tipoVehiculo": "carro", "costo": 40000, "precioVenta": 65000, "existencia": 5, "minimo": 1,
 	})).str("id")
 
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550191", "nombre": "Ana Ríos"}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550191", "nombre": "Ana Ríos"}))
 	cid := nested(r.body, "cliente", "id").(string)
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": "WSX741", "clienteId": cid, "cilindraje": "1400", "turbo": false, "energia": "gasolina", "transmision": "manual"}))
 	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": "WSX741", "sintoma": "Frena mal", "estadoInicial": "recibido"}))
@@ -239,7 +239,7 @@ func TestQuote_PriceAskedWhenNeeded(t *testing.T) {
 		return nil
 	}
 	quote := func(phone, plate string) string {
-		r := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"celular": phone, "nombre": "Ana Ríos"}))
+		r := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": phone, "nombre": "Ana Ríos"}))
 		owner.must(http.StatusCreated, owner.do("POST", "/api/v1/vehicles", map[string]any{"placa": plate, "clienteId": nested(r.body, "cliente", "id"),
 			"cilindraje": "1400", "turbo": false, "energia": "gasolina", "transmision": "manual"}))
 		id := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/orders", map[string]any{"placa": plate, "sintoma": "No prende", "estadoInicial": "recibido"})).str("id")

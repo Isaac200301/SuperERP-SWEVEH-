@@ -15,6 +15,7 @@ import { useCustomerByPhone, useOpenOrder, useVehicleByPlate, type NewOrderInput
 import { conDefectos, faltantesFicha, fichaPayload, fichaVacia, type Ficha } from './sheet';
 import { VehicleSheet } from './VehicleSheet';
 import { useFeature } from '../auth/api';
+import { CounterConsent, type Respuesta } from '../../shared/legal/CounterConsent';
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -39,6 +40,7 @@ export function NewOrderPage() {
   const [celular, setCelular] = useState('');
   const [nombre, setNombre] = useState('');
   const [correo, setCorreo] = useState('');
+  const [autoriza, setAutoriza] = useState<Respuesta>(undefined); // HU-86: sin respuesta no se guarda el cliente nuevo
   const [marca, setMarca] = useState('');
   const [linea, setLinea] = useState('');
   const [anio, setAnio] = useState('');
@@ -56,6 +58,7 @@ export function NewOrderPage() {
     setPlaca(moto ? 'EJM12A' : 'EJM123');
     setCelular('3000000000');
     setNombre('Cliente de ejemplo');
+    setAutoriza(false); // cliente ficticio: no se registra una autorización de alguien que no existe
     setSintoma(moto ? 'Revisión general de la moto (ejemplo)' : 'Revisión general del carro (ejemplo)');
     setEjemplo(true);
   }
@@ -84,7 +87,9 @@ export function NewOrderPage() {
   if (!placaLista) faltantes.push('la placa');
   if (formato === 'especial' && esNuevo && (!confirmarEspecial || tipoEspecial === '')) faltantes.push('confirmar la placa especial');
   if (esNuevo && !celularValido(celular)) faltantes.push('el celular del cliente');
-  if (esNuevo && celularValido(celular) && clienteExistente === null && nombre.trim() === '') faltantes.push('el nombre del cliente');
+  const clienteNuevo = esNuevo && celularValido(celular) && !cq.isPending && clienteExistente === null;
+  if (clienteNuevo && nombre.trim() === '') faltantes.push('el nombre del cliente');
+  if (clienteNuevo && autoriza === undefined) faltantes.push('la autorización de datos del cliente');
   if (sintoma.trim() === '') faltantes.push('lo que dice el cliente');
   const missing = faltantes.length > 0 ? `Falta ${faltantes.join(', ')}.` : undefined;
 
@@ -97,6 +102,7 @@ export function NewOrderPage() {
         celular: soloCelular(celular),
         nombre: clienteExistente?.nombre ?? nombre.trim(),
         ...(correo.trim() !== '' ? { correo: correo.trim() } : {}),
+        ...(autoriza !== undefined ? { autorizacion: { acepta: autoriza } } : {}),
       },
       vehiculo: {
         ...(formato === 'especial' && tipoEspecial !== '' ? { tipo: tipoEspecial } : {}),
@@ -235,7 +241,10 @@ export function NewOrderPage() {
                 label="Celular del cliente"
                 inputMode="tel"
                 value={celular}
-                onChange={(e) => setCelular(e.target.value)}
+                onChange={(e) => {
+                  setCelular(e.target.value);
+                  setAutoriza(undefined); // otro celular es otra persona: se le pregunta a ella
+                }}
                 placeholder="300 123 4567"
                 error={
                   (intentado && !celularValido(celular) ? 'Escribe un celular colombiano de 10 dígitos que empiece por 3.' : undefined) ??
@@ -259,10 +268,16 @@ export function NewOrderPage() {
                   <Field label="Correo (opcional)" type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} error={fieldErr('correo')} />
                 </div>
               ) : null}
-              <p className="text-sm text-ink-2">
-                Queda con autorización de datos <b>pendiente</b>
-                {whatsapp ? ': no le escribimos por WhatsApp hasta que la dé.' : '.'}
-              </p>
+              {clienteNuevo ? (
+                <CounterConsent
+                  value={autoriza}
+                  onChange={setAutoriza}
+                  error={(intentado && autoriza === undefined ? 'Marca lo que respondió el cliente.' : undefined) ?? fieldErr('autorizacion')}
+                />
+              ) : null}
+              {whatsapp && clienteNuevo && autoriza === false ? (
+                <p className="text-sm text-ink-2">No le escribimos por WhatsApp.</p>
+              ) : null}
             </Card>
           ) : null}
 

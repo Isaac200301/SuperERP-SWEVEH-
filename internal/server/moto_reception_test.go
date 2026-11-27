@@ -11,7 +11,7 @@ import (
 func TestMotoReception_SidesAndFuelNotApplicable(t *testing.T) {
 	e := newEnv(t)
 	c := e.register("3105550390", "Pablo Rodríguez")
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550390", "nombre": "Andrés Moto"}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550390", "nombre": "Andrés Moto"}))
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": "MTO39F", "clienteId": nested(r.body, "cliente", "id"),
 		"cilindraje": "150", "energia": "gasolina", "ciclo": "4t", "refrigeracion": "aire", "transmision": "manual"}))
 	id := c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": "MTO39F", "sintoma": "Frena mal"})).str("id")

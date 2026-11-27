@@ -13,7 +13,7 @@ import { BottomSheet } from '../../shared/ui/BottomSheet';
 import { IconCheck, IconSearch, IconWarn } from '../../shared/ui/icons';
 import { Plate } from '../../shared/ui/Plate';
 import { useIsMobile } from '../../shared/ui/useIsMobile';
-import { usePermission } from '../auth/api';
+import { useFeature, usePermission } from '../auth/api';
 import { abrirNuevaOrden } from '../panel/TabBar';
 
 type Cliente = Schemas['Cliente'];
@@ -235,8 +235,10 @@ function CustomersMobile() {
   const [sel, setSel] = useState<Cliente | null>(null);
   const term = q.trim();
   const qc = useQueryClient();
-  const puedeImportar = usePermission('import:run');
-  const puedeUnir = usePermission('customer:merge');
+  // V-15 (R11): "Posibles repetidos" (HU-15) y la importación (HU-92) solo con FEATURE_CUSTOMER_TOOLS.
+  const herramientas = useFeature('herramientasClientes');
+  const puedeImportar = usePermission('import:run') && herramientas;
+  const puedeUnir = usePermission('customer:merge') && herramientas;
   const puedeDatos = usePermission('data_request:manage');
   const puedeOrden = usePermission('order:create');
   const list = useQuery({
@@ -333,8 +335,10 @@ function CustomersDesktop() {
   const [q, setQ] = useState('');
   const term = q.trim();
   const qc = useQueryClient();
-  const puedeImportar = usePermission('import:run');
-  const puedeUnir = usePermission('customer:merge');
+  // V-15 (R11): "Posibles repetidos" (HU-15) y la importación (HU-92) solo con FEATURE_CUSTOMER_TOOLS.
+  const herramientas = useFeature('herramientasClientes');
+  const puedeImportar = usePermission('import:run') && herramientas;
+  const puedeUnir = usePermission('customer:merge') && herramientas;
   const list = useQuery({
     queryKey: ['clientes', term],
     queryFn: async () => unwrap(await api.GET('/customers', { params: { query: term ? { q: term } : {} } })).clientes,

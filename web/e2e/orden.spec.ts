@@ -41,6 +41,7 @@ test('orden de punta a punta en un taller real', async ({ page }) => {
   await page.getByLabel('Placa').fill(placa);
   await page.getByLabel('Celular del cliente').fill(`300${uniq}2`);
   await page.getByLabel('Nombre', { exact: true }).fill('Laura Cliente');
+  await page.getByRole('radio', { name: 'Autoriza', exact: true }).click(); // HU-86: autorización en el mostrador
   await page.getByLabel('Combustible', { exact: true }).selectOption('gasolina');
   await page.getByLabel('Caja', { exact: true }).selectOption('manual');
   await page.getByLabel('Cilindraje', { exact: true }).fill('1600');
@@ -91,7 +92,8 @@ test('orden de punta a punta en un taller real', async ({ page }) => {
   await shot(page, '05-cotizacion');
   await page.getByRole('button', { name: 'Enviar cotización al cliente' }).click();
 
-  // 7b. V-10: la cotización en pantalla completa para el cliente; autoriza sus datos (HU-86) y aprueba en el mostrador.
+  // 7b. V-10: la cotización en pantalla completa para el cliente, que aprueba en el mostrador. Sus datos ya los autorizó
+  // al abrir la orden (HU-86, R11), así que la pantalla no vuelve a pedirlo.
   const orderId = /ordenes\/([0-9a-f-]{36})/.exec(page.url())?.[1] ?? '';
   await page.getByRole('link', { name: 'Mostrar al cliente' }).click();
   await expect(page).toHaveURL(/\/cliente$/);
@@ -111,7 +113,6 @@ test('orden de punta a punta en un taller real', async ({ page }) => {
   expect(pdf.headers()['content-type']).toBe('application/pdf');
   expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
   await page.getByRole('button', { name: 'El cliente aprobó' }).click();
-  await page.getByRole('button', { name: 'El cliente autoriza y aprueba' }).click();
   await expect(page.getByText('Aprobada. El trabajo puede empezar.')).toBeVisible();
   // Para volver al panel hay que mantener presionado "Volver": un toque corto no sale.
   const volver = page.getByRole('button', { name: 'Volver', exact: true });

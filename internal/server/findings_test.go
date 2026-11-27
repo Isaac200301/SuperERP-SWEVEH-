@@ -25,7 +25,7 @@ func TestFindings_DiagnoseByMechanicWithIsolation(t *testing.T) {
 	}
 
 	// Orden recibida: el mecánico registra el diagnóstico.
-	r = owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550183", "nombre": "Sara Gil"}))
+	r = owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550183", "nombre": "Sara Gil"}))
 	owner.must(http.StatusCreated, owner.do("POST", "/api/v1/vehicles", map[string]any{"placa": "DGN456", "clienteId": nested(r.body, "cliente", "id"),
 		"cilindraje": "1600", "energia": "gasolina", "aspiracion": "atmosferico", "transmision": "manual"}))
 	r = owner.must(http.StatusCreated, owner.do("POST", "/api/v1/orders", map[string]any{"placa": "DGN456", "sintoma": "Chilla al frenar", "estadoInicial": "recibido"}))

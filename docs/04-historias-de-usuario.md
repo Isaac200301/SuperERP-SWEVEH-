@@ -287,6 +287,8 @@ _Módulo del MVP: M2. Un solo registro por celular y por placa, sea carro o moto
 
 **Trazabilidad:** Depende de: HU-88
 
+**Historial:** 26-nov-2026, R11 (V-15): inhabilitada en la entrega del 27-nov. "Posibles repetidos" y unir clientes quedan detrás de `FEATURE_CUSTOMER_TOOLS` (apagada por defecto); no se borró nada.
+
 ## E03 · Recepción y orden de servicio
 
 _Módulo del MVP: M3. El respaldo: checklist, fotos, estados y constancia de recibo._
@@ -1359,6 +1361,8 @@ _Módulo del MVP: M10. Autorización previa (Ley 1581) y bitácora de todo._
 
 **Trazabilidad:** RF: RF-22 · Depende de: HU-17
 
+**Historial:** 26-nov-2026, R11 (V-17, R-10): la autorización se pide **al crear un cliente nuevo** en el mostrador (orden nueva) y desde el asistente del piso, antes de guardar sus datos; el servidor no lo crea sin una respuesta (`autorizacion_requerida`). "No autoriza" también es respuesta: el cliente y la orden se crean igual, marcados (criterio 2). En el asistente la respuesta la marca la persona en la ficha, nunca la IA. El texto sigue en borrador (AQ-10).
+
 ### HU-87 · Pedir mis datos o que los borren
 
 **Épica:** E12 · **Roles:** Cliente final, Dueño del taller · **Superficies:** Panel, Motor · **Prioridad:** Must (antes Should) · **Origen:** Propuesta
@@ -1369,6 +1373,8 @@ _Módulo del MVP: M10. Autorización previa (Ley 1581) y bitácora de todo._
 
 - **Dado** una solicitud del cliente, **cuando** el dueño la atiende, **entonces** exporta sus datos o los anonimiza conservando órdenes y montos sin identificarlo.
 
+
+**Historial:** 26-nov-2026, R11 (V-15): la copia y el borrado se quedan en la entrega del 27-nov, solo para el dueño (`data_request:manage`, 403 para el mecánico y la recepción).
 ### HU-88 · Ver quién cambió qué
 
 **Épica:** E12 · **Roles:** Dueño del taller · **Superficies:** Panel, Motor · **Prioridad:** Must · **Origen:** Propuesta
@@ -1408,6 +1414,8 @@ _Módulo del MVP: M10. Autorización previa (Ley 1581) y bitácora de todo._
 
 _Módulo del MVP: M11. Traer lo que ya existe sin bloquear el arranque._
 
+
+**Historial:** 26-nov-2026, R11 (V-17): la página sigue en `borrador-sin-validar` (AQ-10) con el aviso "Texto en revisión jurídica", y Mi taller se lo muestra al dueño. El agente no redacta texto legal (R-10).
 ### HU-91 · Llenar el sistema mientras trabajo
 
 **Épica:** E13 · **Roles:** Dueño del taller, Mecánico · **Superficies:** Motor, Piso · **Prioridad:** Must · **Origen:** Propuesta
@@ -1434,6 +1442,8 @@ _Módulo del MVP: M11. Traer lo que ya existe sin bloquear el arranque._
 - **Dado** clientes importados, **cuando** quedan en la base, **entonces** su autorización queda "pendiente" (HU-95).
 - **Dado** una fila con placa pero sin cilindraje o turbo, **cuando** la importo, **entonces** el vehículo entra con "motor pendiente" y no se rechaza la fila.
 
+
+**Historial:** 26-nov-2026, R11 (V-15): inhabilitada en la entrega del 27-nov. La importación de clientes y vehículos queda detrás de `FEATURE_CUSTOMER_TOOLS` (apagada por defecto); la de repuestos (HU-37) no depende de esa bandera.
 ### HU-93 · Pasar mi lista de precios con una foto
 
 **Épica:** E13 · **Roles:** Dueño del taller · **Superficies:** Panel, Motor · **Prioridad:** Must (antes Should) · **Origen:** Propuesta

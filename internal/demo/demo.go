@@ -258,7 +258,7 @@ func newLoader(d Deps, clk *clock.Fake) *loader {
 	mem := otp.NewMemory()
 	// La carga usa su propio servidor en el proceso con todo encendido (también el simulador de WhatsApp) para
 	// dejar el guion completo en la base; con FEATURE_WHATSAPP apagada esos datos quedan quietos (V-01).
-	all := config.Features{WhatsApp: true, Platform: true}
+	all := config.Features{WhatsApp: true, Platform: true, CustomerTools: true}
 	cfg := config.API{Env: config.EnvLocal, WhatsApp: config.WhatsApp{Provider: "local"}, AI: config.AI{Provider: "reglas"}, Features: all}
 	h := server.New(server.Deps{
 		Pool: d.API, Log: d.Log, Clock: clk,

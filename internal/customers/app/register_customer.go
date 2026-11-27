@@ -18,6 +18,17 @@ type RegisterCustomer struct {
 	Phone    string
 	Name     string
 	Email    *string
+	// Consent es la respuesta del cliente a la autorización de datos, que se guarda con él en la misma transacción
+	// (HU-86). RequireConsent: un cliente nuevo no se crea sin ella (mostrador y asistente del piso, R11). Si el
+	// cliente ya existía, no se toca su autorización.
+	Consent        *ConsentAnswer
+	RequireConsent bool
+}
+
+// ConsentAnswer es lo que respondió el cliente y la prueba de cómo se le preguntó.
+type ConsentAnswer struct {
+	Granted bool
+	Record  ConsentRecord
 }
 
 // RegisterResult dice si el cliente ya existía (HU-09, criterio 1).
@@ -63,6 +74,9 @@ func (s *Service) Register(ctx context.Context, cmd RegisterCustomer) (RegisterR
 		if err != nil {
 			return err
 		}
+		if cmd.RequireConsent && cmd.Consent == nil {
+			return domain.ErrConsentRequired
+		}
 		inserted, err := s.repo.Insert(ctx, c, cmd.Actor.ID)
 		if err != nil {
 			return err
@@ -85,6 +99,15 @@ func (s *Service) Register(ctx context.Context, cmd RegisterCustomer) (RegisterR
 			Type: "customers.cliente_creado", AggregateID: c.ID, OccurredAt: now,
 		}); err != nil {
 			return err
+		}
+		if cmd.Consent != nil {
+			rec := cmd.Consent.Record
+			if rec.At.IsZero() {
+				rec.At = now
+			}
+			if c.Consent, err = s.recordConsent(ctx, cmd.TallerID, c, cmd.Actor, cmd.Consent.Granted, rec); err != nil {
+				return err
+			}
 		}
 		res = RegisterResult{Customer: c}
 		return nil

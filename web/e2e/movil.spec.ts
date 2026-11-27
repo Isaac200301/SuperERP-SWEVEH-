@@ -44,6 +44,7 @@ test('el dueño maneja el taller desde el celular', async ({ page }) => {
   await expect(page.getByLabel('Placa')).toHaveValue(placa);
   await page.getByLabel('Celular del cliente').fill(`300${uniq}3`);
   await page.getByLabel('Nombre', { exact: true }).fill('Laura Cliente');
+  await page.getByRole('radio', { name: 'Autoriza', exact: true }).click(); // HU-86: autorización en el mostrador
   await page.getByLabel('Combustible', { exact: true }).selectOption('gasolina');
   await page.getByLabel('Caja', { exact: true }).selectOption('manual');
   await page.getByLabel('Cilindraje', { exact: true }).fill('1600');

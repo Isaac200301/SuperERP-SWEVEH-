@@ -11,7 +11,7 @@ import (
 func TestVehicleSheet_RegisterGateAndComplete(t *testing.T) {
 	e := newEnv(t)
 	c := e.register("3105550150", "Diana Mejía")
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550150", "nombre": "Jorge Pérez"}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550150", "nombre": "Jorge Pérez"}))
 	cliente := nested(r.body, "cliente", "id").(string)
 
 	// Carro diésel turbo automático 4x4: ficha completa, se puede recibir de una vez.

@@ -18,11 +18,22 @@ const (
 	ConsentRejected ConsentStatus = "rechazada"
 )
 
+// Texto y versión de la autorización del cliente final en el mostrador (HU-86). Borrador hasta la revisión jurídica
+// (AQ-10): no lo redacta el agente; cambiarlo es cambiar la versión.
+const (
+	CounterConsentVersion = "autorizacion-cliente-borrador-2026-11-01"
+	CounterConsentText    = "Autorizo al taller a tratar mis datos (nombre, celular y datos del vehículo) para atender mi vehículo y avisarme por WhatsApp."
+)
+
 var (
 	ErrCustomerNotFound = shared.NotFound("cliente_no_encontrado", "No encontramos ese cliente en tu taller.")
 	ErrNameRequired     = shared.Validation("nombre_requerido", "Escribe el nombre del cliente.").WithField("nombre")
 	ErrNameTooLong      = shared.Validation("nombre_largo", "El nombre puede tener hasta 120 letras.").WithField("nombre")
 	ErrEmailInvalid     = shared.Validation("correo_invalido", "Revisa el correo, por ejemplo nombre@correo.com.").WithField("correo")
+	// ErrConsentRequired (HU-86, R-10, R11): un cliente nuevo del mostrador no se guarda sin su respuesta a la
+	// autorización de datos. Puede decir que no (la orden sigue, HU-86 criterio 2); el silencio no cuenta.
+	ErrConsentRequired = shared.Validation("autorizacion_requerida",
+		"Antes de guardar al cliente, pregúntale si autoriza el tratamiento de sus datos y marca su respuesta.").WithField("autorizacion")
 )
 
 var reEmail = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)

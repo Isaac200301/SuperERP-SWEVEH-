@@ -85,7 +85,7 @@ func TestOnboarding_PreloadAndExampleOrder(t *testing.T) {
 		t.Errorf("la clave vieja \"electrico\" debía guardarse como sistema_electrico: %v", esp)
 	}
 
-	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3000000000", "nombre": "Cliente de ejemplo"}))
+	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3000000000", "nombre": "Cliente de ejemplo"}))
 	clienteID := nested(r.body, "cliente", "id").(string)
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": "EJM12A", "clienteId": clienteID}))
 	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": "EJM12A", "sintoma": "Revisión general (ejemplo)", "ejemplo": true}))
@@ -139,7 +139,7 @@ func TestCustomers_ListSearchConsentAndOwnerChange(t *testing.T) {
 	e := newEnv(t)
 	c := e.register("3105550160", "Nora Vélez")
 	laura, vehID, _ := seedOrder(t, c, "3005550161", "BNM456")
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550162", "nombre": "Pedro Arango"}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550162", "nombre": "Pedro Arango"}))
 	pedro := nested(r.body, "cliente", "id").(string)
 
 	r = c.must(http.StatusOK, c.do("GET", "/api/v1/customers", nil))
@@ -196,7 +196,7 @@ func TestReception_Permissions(t *testing.T) {
 		"costo": 9000, "precioVenta": 18000, "existencia": 3, "minimo": 1}))
 	rec := e.login("3005550171")
 
-	r := rec.must(http.StatusCreated, rec.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550172", "nombre": "Laura Gómez"}))
+	r := rec.must(http.StatusCreated, rec.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550172", "nombre": "Laura Gómez"}))
 	cid := nested(r.body, "cliente", "id").(string)
 	rec.must(http.StatusCreated, rec.do("POST", "/api/v1/vehicles", map[string]any{"placa": "REC172", "clienteId": cid}))
 	rec.must(http.StatusCreated, rec.do("POST", "/api/v1/orders", map[string]any{"placa": "REC172", "sintoma": "Cambio de aceite"}))

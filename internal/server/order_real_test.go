@@ -47,7 +47,7 @@ func orderInDiagnosis(t *testing.T, c *client, plate string, stock int) (orderID
 	partID = c.must(http.StatusCreated, c.do("POST", "/api/v1/parts", map[string]any{
 		"referencia": "PF-" + plate, "nombre": "Pastillas", "tipoVehiculo": "carro", "costo": 40000, "precioVenta": 65000, "existencia": stock, "minimo": 0,
 	})).str("id")
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550" + plate[3:], "nombre": "Cliente " + plate}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550" + plate[3:], "nombre": "Cliente " + plate}))
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": plate, "clienteId": nested(r.body, "cliente", "id"),
 		"cilindraje": "1600", "energia": "gasolina", "aspiracion": "atmosferico", "transmision": "manual"}))
 	orderID = c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": plate, "sintoma": "Frena mal", "estadoInicial": "recibido"})).str("id")

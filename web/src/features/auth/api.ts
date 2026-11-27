@@ -27,8 +27,8 @@ export function can(session: Sesion | null | undefined, permiso: string): boolea
   return session?.permisos?.includes(permiso) ?? false;
 }
 
-/** Funciones de la entrega del 27-nov (V-01, V-02): lo apagado en el servidor no se muestra ni se monta. */
-export type Funcion = 'whatsapp' | 'plataforma';
+/** Funciones de la entrega del 27-nov (V-01, V-02, V-15): lo apagado en el servidor no se muestra ni se monta. */
+export type Funcion = 'whatsapp' | 'plataforma' | 'herramientasClientes';
 
 /** ¿Está encendida la función en este servidor? Sin sesión o sin el dato, apagada. */
 export function feature(session: Sesion | null | undefined, f: Funcion): boolean {

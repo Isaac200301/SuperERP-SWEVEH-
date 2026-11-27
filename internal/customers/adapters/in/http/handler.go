@@ -26,10 +26,17 @@ type Handler struct {
 	svc   *app.Service
 	guard *authn.Guard
 	log   *slog.Logger
+	merge bool // V-15: unir repetidos (HU-15) solo con FEATURE_CUSTOMER_TOOLS
 }
 
 func NewHandler(svc *app.Service, guard *authn.Guard, log *slog.Logger) *Handler {
 	return &Handler{svc: svc, guard: guard, log: log}
+}
+
+// WithMerge monta "Posibles repetidos" y unir clientes (HU-15). Apagado, esas rutas no existen (V-15).
+func (h *Handler) WithMerge(on bool) *Handler {
+	h.merge = on
+	return h
 }
 
 // Routes monta las rutas bajo /api/v1 (el router ya pasó por Authenticate).
@@ -60,6 +67,10 @@ type registerReq struct {
 	Celular string  `json:"celular"`
 	Nombre  string  `json:"nombre"`
 	Correo  *string `json:"correo"`
+	// Autorizacion: lo que respondió el cliente en el mostrador (HU-86). Obligatoria si el cliente es nuevo (R11).
+	Autorizacion *struct {
+		Acepta *bool `json:"acepta"`
+	} `json:"autorizacion"`
 }
 
 type registerResp struct {
@@ -74,9 +85,15 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, h.log, err)
 		return
 	}
-	res, err := h.svc.Register(r.Context(), app.RegisterCustomer{
-		TallerID: p.TallerID, Actor: p.Actor(), Phone: req.Celular, Name: req.Nombre, Email: req.Correo,
-	})
+	cmd := app.RegisterCustomer{
+		TallerID: p.TallerID, Actor: p.Actor(), Phone: req.Celular, Name: req.Nombre, Email: req.Correo, RequireConsent: true,
+	}
+	if req.Autorizacion != nil && req.Autorizacion.Acepta != nil {
+		by := p.UserID
+		cmd.Consent = &app.ConsentAnswer{Granted: *req.Autorizacion.Acepta, Record: app.ConsentRecord{
+			Text: ConsentText, Version: ConsentVersion, Channel: "mostrador", By: &by}}
+	}
+	res, err := h.svc.Register(r.Context(), cmd)
 	if err != nil {
 		httpx.WriteError(w, r, h.log, err)
 		return

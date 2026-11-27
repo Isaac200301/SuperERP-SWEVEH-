@@ -83,7 +83,7 @@ func TestFeatures_OnKeepsEverything(t *testing.T) {
 func TestFeatures_WorkerSkipsWhatsAppEvents(t *testing.T) {
 	e := newEnvRaw(t, config.API{Env: config.EnvLocal})
 	c := e.register("3105550962", "Rosa Pérez")
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550962", "nombre": "Cliente OMI962"}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550962", "nombre": "Cliente OMI962"}))
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": "OMI962", "clienteId": nested(r.body, "cliente", "id"),
 		"cilindraje": "1600", "turbo": false, "energia": "gasolina", "transmision": "manual"}))
 	r = c.must(http.StatusCreated, c.do("POST", "/api/v1/orders", map[string]any{"placa": "OMI962", "sintoma": "Vibra", "estadoInicial": "recibido"}))

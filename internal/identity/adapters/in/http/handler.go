@@ -110,13 +110,15 @@ type sessionResp struct {
 }
 
 type featuresDTO struct {
-	WhatsApp   bool `json:"whatsapp"`
-	Plataforma bool `json:"plataforma"`
+	WhatsApp             bool `json:"whatsapp"`
+	Plataforma           bool `json:"plataforma"`
+	HerramientasClientes bool `json:"herramientasClientes"`
 }
 
-// SetFeatures dice qué está encendido (FEATURE_WHATSAPP, FEATURE_PLATFORM) para /me y las respuestas de sesión.
-func (h *Handler) SetFeatures(whatsapp, platform bool) {
-	h.features = featuresDTO{WhatsApp: whatsapp, Plataforma: platform}
+// SetFeatures dice qué está encendido (FEATURE_WHATSAPP, FEATURE_PLATFORM, FEATURE_CUSTOMER_TOOLS) para /me y las
+// respuestas de sesión.
+func (h *Handler) SetFeatures(whatsapp, platform, customerTools bool) {
+	h.features = featuresDTO{WhatsApp: whatsapp, Plataforma: platform, HerramientasClientes: customerTools}
 }
 
 // SetPlatformAdmins son los celulares (E.164) de los administradores del ERP, para /me (HU-74).

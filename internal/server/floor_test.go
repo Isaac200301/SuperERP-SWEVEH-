@@ -65,6 +65,20 @@ func chatOf(r resp) map[string]any { m, _ := r.body["chat"].(map[string]any); re
 
 func proposalOf(r resp) map[string]any { m, _ := chatOf(r)["propuesta"].(map[string]any); return m }
 
+// markConsent es la persona marcando en la ficha lo que respondió el cliente nuevo a la autorización de datos
+// (HU-86, R11): sin esa respuesta no se confirma un cliente nuevo.
+func markConsent(t *testing.T, c *client, r resp, acepta bool) resp {
+	t.Helper()
+	prop := proposalOf(r)
+	cl, _ := prop["cliente"].(map[string]any)
+	if cl == nil {
+		t.Fatalf("la propuesta no tiene cliente: %v", prop)
+	}
+	cl["autoriza"] = acepta
+	return c.must(http.StatusOK, c.do("PATCH", "/api/v1/assistant/floor/chats/"+chatOf(r)["id"].(string),
+		map[string]any{"version": chatOf(r)["version"], "propuesta": prop}))
+}
+
 func lastReply(r resp) string {
 	msgs, _ := chatOf(r)["mensajes"].([]any)
 	if len(msgs) == 0 {
@@ -143,6 +157,13 @@ func TestFloor_ReceiveNewVehicleAndConfirm(t *testing.T) {
 		t.Fatalf("foto del chat: %d", s)
 	}
 
+	// HU-86 (R11): el cliente nuevo no se guarda sin su respuesta a la autorización; la marca la persona en la ficha.
+	if r := owner.confirmFloor(chatID, chat["version"], "sin-autorizacion-01"); r.str("code") != "autorizacion_requerida" || countOrders(t, owner) != 0 {
+		t.Fatalf("sin autorización: %d %v", r.status, r.body)
+	}
+	r = markConsent(t, owner, r, true)
+	chat = chatOf(r)
+
 	if r := owner.do("POST", "/api/v1/assistant/floor/chats/"+chatID+"/confirm", map[string]any{"version": chat["version"]}); r.str("code") != "clave_requerida" {
 		t.Fatalf("sin Idempotency-Key: %d %v", r.status, r.body)
 	}
@@ -171,6 +192,9 @@ func TestFloor_ReceiveNewVehicleAndConfirm(t *testing.T) {
 	o := owner.must(http.StatusOK, owner.do("GET", "/api/v1/orders/"+orderID, nil))
 	if o.str("estado") != "por_recibir" || o.str("sintoma") != "le suenan los frenos" || nested(o.body, "cliente", "nombre") != "Carlos Gómez" {
 		t.Fatalf("orden: %v", o.body)
+	}
+	if cl := owner.must(http.StatusOK, owner.do("GET", "/api/v1/customers/by-phone/3001112233", nil)); cl.str("autorizacionEstado") != "autorizada" {
+		t.Fatalf("la respuesta del cliente se guarda con él: %v", cl.body)
 	}
 	cl := owner.must(http.StatusOK, owner.do("GET", "/api/v1/orders/"+orderID+"/checklist", nil))
 	if cl.body["kilometraje"] != float64(45000) || cl.body["combustible"] != "1/2" || len(cl.body["ladosConFoto"].([]any)) != 4 {
@@ -467,11 +491,21 @@ func TestFloor_ConfirmFromChatAndRealStatus(t *testing.T) {
 	if !strings.HasPrefix(lastReply(r), "Lo nuevo todavía no se ha guardado") {
 		t.Fatalf("el texto que da por guardada la propuesta se corrige: %q", lastReply(r))
 	}
+	// Sin la autorización del cliente nuevo, confirmar por chat dice qué falta y no guarda (HU-86).
+	if n := owner.must(http.StatusOK, owner.floorSend(map[string]string{"chatId": chatID, "texto": "confírmalo"}, 0)); !strings.Contains(lastReply(n),
+		"Falta la autorización de datos") || countOrders(t, owner) != 0 {
+		t.Fatalf("confirmar sin autorización: %q", lastReply(n))
+	} else {
+		markConsent(t, owner, n, false) // dijo que no: la orden se crea igual (HU-86, criterio 2)
+	}
 	calls := len(adv.reqs)
 	r = owner.must(http.StatusOK, owner.floorSend(map[string]string{"chatId": chatID, "texto": "Sí, confírmalo"}, 0))
 	if !strings.Contains(lastReply(r), "Listo, quedó guardado") || !strings.Contains(lastReply(r), "Para pasar a Recibido falta") ||
 		chatOf(r)["ordenId"] == nil || countOrders(t, owner) != 1 || len(adv.reqs) != calls {
 		t.Fatalf("confírmalo: %q %v (llamadas a la IA %d → %d)", lastReply(r), chatOf(r)["ordenId"], calls, len(adv.reqs))
+	}
+	if cl := owner.must(http.StatusOK, owner.do("GET", "/api/v1/customers/by-phone/3001112255", nil)); cl.str("autorizacionEstado") != "rechazada" {
+		t.Fatalf("no autorizó: %v", cl.body)
 	}
 	// Después de guardar, el modelo recibe el estado real leído de la base.
 	owner.must(http.StatusOK, owner.floorSend(map[string]string{"chatId": chatID, "texto": "¿ya quedó la orden?"}, 0))

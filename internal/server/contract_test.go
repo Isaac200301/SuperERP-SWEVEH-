@@ -70,7 +70,7 @@ func contractOperations(t *testing.T) map[string]string {
 }
 
 func TestRouterMatchesOpenAPIContract(t *testing.T) {
-	routerMatches(t, newEnv(t), map[string]bool{"whatsapp": true, "platform": true, "auth-otp": true})
+	routerMatches(t, newEnv(t), map[string]bool{"whatsapp": true, "platform": true, "customer-tools": true, "auth-otp": true})
 }
 
 // Entrega del 27-nov (V-01, V-02, V-03): con FEATURE_WHATSAPP y FEATURE_PLATFORM apagadas y AUTH_MODE=pin, el router

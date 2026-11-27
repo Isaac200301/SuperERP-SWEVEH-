@@ -79,7 +79,11 @@ func newEnv(t *testing.T) *env {
 
 // allOn: las pruebas de antes corren con WhatsApp y Plataforma encendidos (V-01, V-02); las de la entrega del 27-nov
 // los apagan a propósito (features_test.go).
-var allOn = config.Features{WhatsApp: true, Platform: true}
+// acepta es la respuesta del cliente a la autorización de datos en el mostrador: un cliente nuevo no se crea sin ella
+// (HU-86, R11).
+var acepta = map[string]any{"acepta": true}
+
+var allOn = config.Features{WhatsApp: true, Platform: true, CustomerTools: true}
 
 // newEnvWith es newEnv con la configuración del motor (WhatsApp, IA) y los webhooks públicos montados.
 // Sin banderas en cfg, todo encendido (allOn): así siguen pasando las pruebas de antes.
@@ -329,12 +333,12 @@ func TestSlice_CustomerVehicleOrder(t *testing.T) {
 	c := e.register("3105550103", "Hernán Ruiz")
 
 	// HU-09: crear y, con el mismo celular, recibir el existente.
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "300 555 0001", "nombre": "Laura Gómez"}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "300 555 0001", "nombre": "Laura Gómez"}))
 	clienteID := nested(r.body, "cliente", "id").(string)
-	if nested(r.body, "cliente", "autorizacionEstado") != "pendiente" {
-		t.Fatalf("autorización inicial: %v", r.body)
+	if nested(r.body, "cliente", "autorizacionEstado") != "autorizada" {
+		t.Fatalf("autorización dada en el mostrador al crearlo (HU-86): %v", r.body)
 	}
-	r = c.must(http.StatusOK, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550001", "nombre": "Otra"}))
+	r = c.must(http.StatusOK, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550001", "nombre": "Otra"}))
 	if nested(r.body, "cliente", "id") != clienteID || r.body["existente"] != true {
 		t.Fatalf("mismo celular debía devolver el existente: %v", r.body)
 	}
@@ -437,7 +441,7 @@ func TestIsolation_TwoWorkshops(t *testing.T) {
 	a := e.register("3105550104", "Dueño A")
 	b := e.register("3105550105", "Dueño B")
 
-	r := a.must(http.StatusCreated, a.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550002", "nombre": "Cliente de A"}))
+	r := a.must(http.StatusCreated, a.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550002", "nombre": "Cliente de A"}))
 	clienteA := nested(r.body, "cliente", "id").(string)
 	r = a.must(http.StatusCreated, a.do("POST", "/api/v1/vehicles", map[string]any{"placa": "GBW118", "clienteId": clienteA}))
 	vehiculoA := nested(r.body, "vehiculo", "id").(string)
@@ -469,7 +473,7 @@ func TestIsolation_TwoWorkshops(t *testing.T) {
 		t.Fatalf("B cambió el motor del vehículo de A: %d %v", r.status, r.body)
 	}
 	// La misma placa y el mismo celular son independientes en cada taller; la numeración también.
-	r = b.must(http.StatusCreated, b.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550002", "nombre": "Cliente de B"}))
+	r = b.must(http.StatusCreated, b.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550002", "nombre": "Cliente de B"}))
 	clienteB := nested(r.body, "cliente", "id").(string)
 	b.must(http.StatusCreated, b.do("POST", "/api/v1/vehicles", map[string]any{"placa": "GBW118", "clienteId": clienteB}))
 	r = b.must(http.StatusCreated, b.do("POST", "/api/v1/orders", map[string]any{"placa": "GBW118", "sintoma": "Revisión"}))
@@ -486,10 +490,10 @@ func TestSecurity_SessionAndCSRF(t *testing.T) {
 	}
 	c := e.register("3105550106", "Dueña C")
 	// CSRF: sin encabezado personalizado o con Origin ajeno se rechaza.
-	if r := c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550003", "nombre": "X"}, "X-Requested-With", ""); r.status != http.StatusForbidden || r.str("code") != "csrf" {
+	if r := c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550003", "nombre": "X"}, "X-Requested-With", ""); r.status != http.StatusForbidden || r.str("code") != "csrf" {
 		t.Fatalf("sin X-Requested-With: %d %v", r.status, r.body)
 	}
-	if r := c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550003", "nombre": "X"}, "Origin", "https://evil.example"); r.status != http.StatusForbidden {
+	if r := c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550003", "nombre": "X"}, "Origin", "https://evil.example"); r.status != http.StatusForbidden {
 		t.Fatalf("Origin ajeno: %d %v", r.status, r.body)
 	}
 	// Token alterado → 401.
@@ -513,7 +517,7 @@ func TestSecurity_SessionAndCSRF(t *testing.T) {
 		t.Fatalf("Permissions-Policy: %q", pp)
 	}
 	// Cuerpo con campos desconocidos → 400 (validación estricta en el borde).
-	if r := c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550003", "nombre": "X", "taller_id": "otro"}); r.status != http.StatusBadRequest {
+	if r := c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550003", "nombre": "X", "taller_id": "otro"}); r.status != http.StatusBadRequest {
 		t.Fatalf("campo desconocido (taller_id del cliente): %d %v", r.status, r.body)
 	}
 }
@@ -550,7 +554,7 @@ func TestRefresh_RotationAndReuseDetection(t *testing.T) {
 func TestConcurrency_OrderNumbersAreUniqueAndConsecutive(t *testing.T) {
 	e := newEnv(t)
 	c := e.register("3105550108", "Dueño E")
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550004", "nombre": "Cliente"}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550004", "nombre": "Cliente"}))
 	clienteID := nested(r.body, "cliente", "id").(string)
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": "FQD264", "clienteId": clienteID}))
 
@@ -596,7 +600,7 @@ func TestConcurrency_SamePhoneSameCustomer(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			r := c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550005", "nombre": "Marta"})
+			r := c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550005", "nombre": "Marta"})
 			ids <- nested(r.body, "cliente", "id").(string)
 		}()
 	}

@@ -27,6 +27,7 @@ test('recibir un carro con un video y la guía de lados', async ({ page }) => {
   await page.getByLabel('Mensaje para el asistente').fill(`Llegó el Mazda ${placa} de Carlos Gómez, celular 3001112233, le suenan los frenos`);
   await page.getByRole('button', { name: 'Enviar' }).click();
   const general = page.getByRole('region', { name: 'Ficha en vivo' });
+  await general.getByRole('radio', { name: 'Autoriza', exact: true }).click(); // HU-86: cliente nuevo
   await general.getByRole('button', { name: 'Confirmar' }).click();
   await page.getByRole('link', { name: /Seguimos en la orden OS-\d{4}/ }).click();
 

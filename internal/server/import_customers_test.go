@@ -12,8 +12,8 @@ import (
 func TestImport_CustomersAndVehicles(t *testing.T) {
 	e := newEnv(t)
 	c := e.register("3105550710", "Rosa Pérez")
-	c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550711", "nombre": "Laura Gómez"}))
-	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550719", "nombre": "Dueña Anterior"}))
+	c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550711", "nombre": "Laura Gómez"}))
+	r := c.must(http.StatusCreated, c.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550719", "nombre": "Dueña Anterior"}))
 	c.must(http.StatusCreated, c.do("POST", "/api/v1/vehicles", map[string]any{"placa": "OLD719", "clienteId": nested(r.body, "cliente", "id")}))
 
 	malo := "Nombre;Celular;Placa;Tipo de vehículo;Marca;Cilindraje;Turbo\n" +

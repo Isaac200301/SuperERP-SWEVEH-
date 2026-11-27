@@ -144,8 +144,8 @@ func TestWhatsApp_NoConsentOrClosedWindowSkips(t *testing.T) {
 	owner := e.register("3105550420", "Pablo Rodríguez")
 	w := e.whatsapp(t, owner, nil)
 
-	// Cliente registrado en el mostrador, sin autorización.
-	r := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"celular": "3001234420", "nombre": "Cliente Importado"}))
+	// Cliente registrado en el mostrador que no autorizó sus datos (HU-86).
+	r := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"autorizacion": map[string]any{"acepta": false}, "celular": "3001234420", "nombre": "Cliente Importado"}))
 	id, _ := w.orderFor(nested(r.body, "cliente", "id").(string), "SIN420")
 	w.move(id, "recibido", nil)
 	runs := w.runsOf("AU-01")

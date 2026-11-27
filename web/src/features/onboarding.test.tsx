@@ -104,5 +104,8 @@ describe('Primera orden (HU-05)', () => {
     expect(await screen.findByText('Así le llegaría el aviso a tu cliente')).toBeInTheDocument();
     expect(screen.getByText(/no cuenta en tus números/)).toBeInTheDocument();
     expect((calls.find((c) => c.method === 'POST' && c.path === '/orders')?.body as { ejemplo?: boolean }).ejemplo).toBe(true);
+    // El cliente de ejemplo es ficticio: no se registra una autorización de alguien que no existe (HU-86).
+    expect((calls.find((c) => c.method === 'POST' && c.path === '/customers')?.body as { autorizacion?: { acepta: boolean } }).autorizacion)
+      .toEqual({ acepta: false });
   });
 });

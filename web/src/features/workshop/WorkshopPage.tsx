@@ -78,6 +78,13 @@ export function WorkshopPage() {
       <Schedule t={q.data} />
       <SettingsForm />
       {whatsapp ? <WahaCard /> : null}
+      {/* HU-90 (R11): la política sigue en borrador hasta la revisión jurídica (AQ-10); el dueño lo ve aquí. */}
+      <Alert kind="warn" title="Política de datos: texto en revisión jurídica">
+        La política y el texto de la autorización que se le lee al cliente son un borrador mientras los revisa un abogado.{' '}
+        <Link to="/politica-de-datos" className="font-bold underline">
+          Ver la política
+        </Link>
+      </Alert>
     </>
   );
 }

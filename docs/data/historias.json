@@ -871,7 +871,7 @@
    "au": [],
    "esc": [],
    "ca": [],
-   "notas": "",
+   "notas": " Entrega del 27-nov (R11, V-15): inhabilitada detrás de FEATURE_CUSTOMER_TOOLS.",
    "refs": [],
    "canc": "",
    "ac": [
@@ -4169,7 +4169,7 @@
    "au": [],
    "esc": [],
    "ca": [],
-   "notas": "Nueva y necesaria: RF-22 solo cubre a quien escribe primero, pero AU-01 le escribe a clientes recibidos en mostrador. Además ese primer aviso queda fuera de la ventana de 24 h y necesita plantilla (Q-07).",
+   "notas": "Nueva y necesaria: RF-22 solo cubre a quien escribe primero, pero AU-01 le escribe a clientes recibidos en mostrador. Además ese primer aviso queda fuera de la ventana de 24 h y necesita plantilla (Q-07). Entrega del 27-nov (R11, V-17): se pide al crear un cliente nuevo en el mostrador o desde el asistente; sin respuesta no se guarda; \"No autoriza\" crea igual, marcado. La marca la persona, nunca la IA.",
    "refs": [
     7,
     2
@@ -4213,7 +4213,7 @@
    "au": [],
    "esc": [],
    "ca": [],
-   "notas": "",
+   "notas": " Entrega del 27-nov (R11, V-15): se queda, solo para el dueño.",
    "refs": [
     7
    ],
@@ -4329,7 +4329,7 @@
    "au": [],
    "esc": [],
    "ca": [],
-   "notas": "",
+   "notas": " Entrega del 27-nov (R11): aviso \"Texto en revisión jurídica\" en la página y en Mi taller.",
    "refs": [
     23
    ],
@@ -4405,7 +4405,7 @@
    "au": [],
    "esc": [],
    "ca": [],
-   "notas": "",
+   "notas": " Entrega del 27-nov (R11, V-15): inhabilitada detrás de FEATURE_CUSTOMER_TOOLS.",
    "refs": [
     20
    ],

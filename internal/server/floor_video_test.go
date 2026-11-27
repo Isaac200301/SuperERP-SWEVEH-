@@ -253,7 +253,7 @@ func TestFloorVideo_Moto(t *testing.T) {
 	}
 	e := floorEnv(t, adv)
 	owner := e.register("3105550927", "Sebastián Arango")
-	cl := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"celular": "3005550927", "nombre": "Cliente moto"}))
+	cl := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/customers", map[string]any{"autorizacion": acepta, "celular": "3005550927", "nombre": "Cliente moto"}))
 	owner.must(http.StatusCreated, owner.do("POST", "/api/v1/vehicles", map[string]any{"placa": "XVN43F", "tipo": "moto",
 		"clienteId": nested(cl.body, "cliente", "id"), "marca": "Honda", "linea": "CB 190R", "cilindraje": "190", "turbo": false}))
 	o := owner.must(http.StatusCreated, owner.do("POST", "/api/v1/orders", map[string]any{"placa": "XVN43F", "sintoma": "Revisión"}))
