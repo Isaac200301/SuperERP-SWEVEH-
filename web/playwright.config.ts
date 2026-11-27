@@ -23,7 +23,7 @@ export default defineConfig({
   // El recorrido de escritorio y el del celular (mockups móviles v1, CA-11) van en proyectos separados.
   projects: [
     { name: 'escritorio', use: { ...devices['Desktop Chrome'] }, testIgnore: /movil\.spec\.ts/ },
-    { name: 'movil', use: { ...devices['Pixel 7'] }, testMatch: /movil\.spec\.ts/ },
+    { name: 'movil', use: { ...devices['Pixel 7'] }, testMatch: /(movil|entrega)\.spec\.ts/ }, // R12: la entrega también en Pixel 7
   ],
   outputDir: process.env.SWEVEH_E2E_OUT ?? 'test-results',
 });

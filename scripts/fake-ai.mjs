@@ -36,6 +36,11 @@ function plan(messages) {
       lados: Array.from({ length: Math.min(images, 4) }, (_, i) => ({ foto: i + 1, lado: SIDES[i] })),
     });
   }
+  // R12: la ficha del vehículo cuando la persona la dice ("gasolina, caja manual, 1600 cc, atmosférico").
+  if (/gasolina/i.test(u) && !results.includes('ficha')) {
+    const cc = Number(u.match(/(\d{3,4})\s?cc/i)?.[1] ?? 0);
+    return call('proponer_ficha', { combustible: 'gasolina', caja: 'manual', ...(cc ? { cilindraje: cc } : {}), aspiracion: 'atmosferico' });
+  }
   return { content: 'Listo, te lo dejé en la ficha. Revísalo y toca Confirmar.' };
 }
 
